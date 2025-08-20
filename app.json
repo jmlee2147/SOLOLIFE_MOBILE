@@ -4,7 +4,7 @@
     "slug": "SOLOLIFE_MOBILE",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/icons/icon.png",
     "scheme": "sololifemobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
