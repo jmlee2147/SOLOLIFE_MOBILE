@@ -1,7 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import '../../global.css';
-import Icon from '../shared/ui/Icon';
+import Icon from '../components/shared/Icon';
 
 
 export default function App() {
