@@ -14,7 +14,8 @@ const TabsLayout = () => {
             backgroundColor: "#FFFFFF",
             height: 62,
             borderTopWidth: 0,
-            paddingHorizontal: 40,
+            paddingHorizontal: 22,
+            justifyContent: "center",
           },
           tabBarLabelStyle: {
             fontSize: 12,
@@ -22,7 +23,7 @@ const TabsLayout = () => {
             marginTop: 2,
           },
           tabBarItemStyle: {
-            flex: 0,
+            flex: 1,
             marginHorizontal: 10,
             alignItems: "center",
           }
