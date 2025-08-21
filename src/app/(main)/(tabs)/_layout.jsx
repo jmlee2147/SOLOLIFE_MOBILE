@@ -6,6 +6,7 @@ const TabsLayout = () => {
   return (
     <>      
       <Tabs
+        initialRouteName="home"
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: "#6A8042",
@@ -29,7 +30,7 @@ const TabsLayout = () => {
         }}
       >
         <Tabs.Screen
-          name="journey/index"
+          name="journey"
           options={{
             tabBarLabel: "여정기록",
             tabBarIcon: ({ focused }) => (
@@ -52,7 +53,7 @@ const TabsLayout = () => {
           }}
         />
         <Tabs.Screen
-          name="map/index"
+          name="map"
           options={{
             tabBarLabel: "지도",
             tabBarIcon: ({ focused }) => (
@@ -75,7 +76,7 @@ const TabsLayout = () => {
           }}
         />
         <Tabs.Screen
-          name="home/index"
+          name="home"
           options={{
             tabBarLabel: "홈",
             tabBarIcon: ({ focused }) => (
@@ -98,7 +99,7 @@ const TabsLayout = () => {
           }}
         />
         <Tabs.Screen
-          name="heart/index"
+          name="heart"
           options={{
             tabBarLabel: "공감",
             tabBarIcon: ({ focused }) => (
@@ -122,7 +123,7 @@ const TabsLayout = () => {
         />
 
         <Tabs.Screen
-          name="profile/index"
+          name="profile"
           options={{
             tabBarLabel: "프로필",
             tabBarIcon: ({ focused }) => (

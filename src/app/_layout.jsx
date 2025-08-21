@@ -1,11 +1,6 @@
 // src/app/_layout.jsx
-import SafeScreen from '../components/shared/SafeScreen';
-import TabLayout from './(main)/(tabs)/_layout';
+import { Slot } from 'expo-router'
 
 export default function RootLayout() {
-  return (
-    <SafeScreen>
-      <TabLayout />
-    </SafeScreen>
-  );
+  return <Slot />
 }
