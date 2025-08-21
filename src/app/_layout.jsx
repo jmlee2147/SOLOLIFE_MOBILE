@@ -1,20 +1,47 @@
-import React from 'react';
-import { View } from 'react-native';
+import * as Font from 'expo-font';
+import { Slot } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, SafeAreaView, Text, TextInput } from 'react-native';
 import '../../global.css';
-import Icon from '../components/shared/Icon';
+import SafeScreen from '../components/shared/SafeScreen';
 
+if (Text.defaultProps == null) Text.defaultProps = {};
+Text.defaultProps.allowFontScaling = false;
 
-export default function App() {
+if (TextInput.defaultProps == null) TextInput.defaultProps = {};
+TextInput.defaultProps.allowFontScaling = false;
+
+export default function RootLayout() {
+  const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  useEffect(() => {
+    async function loadFonts() {
+      await Font.loadAsync({
+        "pretendardExtraBold": require("../assets/fonts/Pretendard-ExtraBold.ttf"),
+        "pretendardSemiBold": require("../assets/fonts/Pretendard-SemiBold.ttf"),
+        "pretendardMedium": require("../assets/fonts/Pretendard-Medium.ttf"),
+        "pretendardRegular": require("../assets/fonts/Pretendard-Regular.ttf"),
+      });
+      setFontsLoaded(true);
+    }
+    loadFonts();
+  }, []);
+
+  if (!fontsLoaded) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <View className="items-center justify-center flex-1 bg-yellowTertiary">
-      <View style={{ flexDirection: 'row', justifyContent: 'space-around', padding: 20 }}>
-        <Icon name="home" width={30} height={30} />
-        <Icon name="map" width={30} height={30} />
-        <Icon name="journey" width={30} height={30} />
-        <Icon name="heart" width={30} height={30} />
-        <Icon name="profile" width={30} height={30} />
-        <Icon name="gallery" width={30} height={30} />
-      </View>
-    </View>
+    <>
+      <StatusBar style="dark" />
+      <SafeScreen>
+        <Slot />
+      </SafeScreen>
+    </>
   );
 }
