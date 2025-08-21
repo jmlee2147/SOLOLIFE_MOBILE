@@ -31,7 +31,7 @@ const TabsLayout = () => {
         <Tabs.Screen
           name="Journey/index"
           options={{
-            tabBarLabel: "여정",
+            tabBarLabel: "여정기록",
             tabBarIcon: ({ focused }) => (
                 <View
                     style={{
