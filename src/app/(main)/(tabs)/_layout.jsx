@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import { View } from "react-native";
-import Icon from "../../components/shared/Icon";
+import Icon from "../../../components/shared/Icon";
 
 const TabsLayout = () => {
   return (
@@ -29,7 +29,7 @@ const TabsLayout = () => {
         }}
       >
         <Tabs.Screen
-          name="Journey/index"
+          name="journey/index"
           options={{
             tabBarLabel: "여정기록",
             tabBarIcon: ({ focused }) => (
@@ -52,7 +52,7 @@ const TabsLayout = () => {
           }}
         />
         <Tabs.Screen
-          name="Map/index"
+          name="map/index"
           options={{
             tabBarLabel: "지도",
             tabBarIcon: ({ focused }) => (
@@ -75,7 +75,7 @@ const TabsLayout = () => {
           }}
         />
         <Tabs.Screen
-          name="Home/index"
+          name="home/index"
           options={{
             tabBarLabel: "홈",
             tabBarIcon: ({ focused }) => (
@@ -98,7 +98,7 @@ const TabsLayout = () => {
           }}
         />
         <Tabs.Screen
-          name="Heart/index"
+          name="heart/index"
           options={{
             tabBarLabel: "공감",
             tabBarIcon: ({ focused }) => (
@@ -122,7 +122,7 @@ const TabsLayout = () => {
         />
 
         <Tabs.Screen
-          name="Profile/index"
+          name="profile/index"
           options={{
             tabBarLabel: "프로필",
             tabBarIcon: ({ focused }) => (
