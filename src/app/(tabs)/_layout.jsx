@@ -1,32 +1,6 @@
 import { Tabs } from "expo-router";
-import { Image, StyleSheet } from "react-native";
-
-//  탭 아이콘 헬퍼 함수
-const getTabIcon = (name, focused) => {
-    switch (name) {
-        case "Journey":
-            return focused
-                ? require("../../assets/icons/journey.png")
-                : require("../../assets/icons/journey-inactive.png");
-        case "Map":
-            return focused
-                ? require("../../assets/icons/map.png")
-                : require("../../assets/icons/map-inactive.png");
-        case "Home":
-            return focused
-                ? require("../../assets/icons/home.png")
-                : require("../../assets/icons/home-inactive.png");
-        case "Heart":
-            return focused
-                ? require("../../assets/icons/heart.png")
-                : require("../../assets/icons/heart-inactive.png");
-        case "Profile":
-            return focused
-                ? require("../../assets/icons/profile.png")
-                : require("../../assets/icons/profile-inactive.png");
-
-    }
-}
+import { View } from "react-native";
+import Icon from "../../components/shared/Icon";
 
 const TabsLayout = () => {
   return (
@@ -34,19 +8,24 @@ const TabsLayout = () => {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: "#FFFFFF",
-          tabBarInactiveTintColor: "#888888",
+          tabBarActiveTintColor: "#6A8042",
+          tabBarInactiveTintColor: "#AFAFAF",
           tabBarStyle: {
-            backgroundColor: "#000000",
+            backgroundColor: "#FFFFFF",
             height: 62,
             borderTopWidth: 0,
+            paddingHorizontal: 40,
           },
           tabBarLabelStyle: {
             fontSize: 12,
-            fontFamily: "Bookk-Myungjo",
-            letterSpacing: -1,
-            marginTop: 6,
+            fontFamily: "Pretendard-Regular",
+            marginTop: 2,
           },
+          tabBarItemStyle: {
+            flex: 0,
+            marginHorizontal: 10,
+            alignItems: "center",
+          }
         }}
       >
         <Tabs.Screen
@@ -54,10 +33,21 @@ const TabsLayout = () => {
           options={{
             tabBarLabel: "여정",
             tabBarIcon: ({ focused }) => (
-                <Image
-                    source={getTabIcon("Journey", focused)}
-                    style={{ width: 24, height: 24 }}
-                />
+                <View
+                    style={{
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.11,
+                    shadowRadius: 6,
+                    elevation: 4, // Android 전용
+                    }}
+                >
+                    {focused ? (
+                    <Icon name="journey" width={24} height={24} />
+                    ) : (
+                    <Icon name="journey_inactive" width={24} height={24} />
+                    )}
+                </View>
             ),
           }}
         />
@@ -66,10 +56,21 @@ const TabsLayout = () => {
           options={{
             tabBarLabel: "지도",
             tabBarIcon: ({ focused }) => (
-                <Image
-                    source={getTabIcon("Map", focused)}
-                    style={{ width: 24, height: 24 }}
-                />
+                <View
+                    style={{
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.11,
+                    shadowRadius: 6,
+                    elevation: 4, // Android 전용
+                    }}
+                >
+                    {focused ? (
+                    <Icon name="map" width={24} height={24} />
+                    ) : (
+                    <Icon name="map_inactive" width={24} height={24} />
+                    )}
+                </View>
             ),
           }}
         />
@@ -78,12 +79,22 @@ const TabsLayout = () => {
           options={{
             tabBarLabel: "홈",
             tabBarIcon: ({ focused }) => (
-                <Image
-                    source={getTabIcon("Home", focused)}
-                    style={{ width: 24, height: 24 }}
-                />
+                <View
+                    style={{
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.11,
+                    shadowRadius: 6,
+                    elevation: 4, // Android 전용
+                    }}
+                >
+                    {focused ? (
+                    <Icon name="home" width={24} height={24} />
+                    ) : (
+                    <Icon name="home_inactive" width={24} height={24} />
+                    )}
+                </View>
             ),
-            
           }}
         />
         <Tabs.Screen
@@ -91,12 +102,22 @@ const TabsLayout = () => {
           options={{
             tabBarLabel: "공감",
             tabBarIcon: ({ focused }) => (
-                <Image
-                    source={getTabIcon("Heart", focused)}
-                    style={{ width: 24, height: 24 }}
-                />
+                <View
+                    style={{
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.11,
+                    shadowRadius: 6,
+                    elevation: 4, // Android 전용
+                    }}
+                >
+                    {focused ? (
+                    <Icon name="heart" width={24} height={24} />
+                    ) : (
+                    <Icon name="heart_inactive" width={24} height={24} />
+                    )}
+                </View>
             ),
-        
           }}
         />
 
@@ -105,28 +126,27 @@ const TabsLayout = () => {
           options={{
             tabBarLabel: "프로필",
             tabBarIcon: ({ focused }) => (
-                <Image
-                    source={getTabIcon("Profile", focused)}
-                    style={{ width: 24, height: 24 }}
-                />
+                <View
+                    style={{
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.11,
+                    shadowRadius: 6,
+                    elevation: 4, // Android 전용
+                    }}
+                >
+                    {focused ? (
+                    <Icon name="profile" width={24} height={24} />
+                    ) : (
+                    <Icon name="profile_inactive" width={24} height={24} />
+                    )}
+                </View>
             ),
-        
           }}
         />      
       </Tabs>
     </>
   );
 };
-
-const styles = StyleSheet.create({
-  gradient: {
-    position: "absolute",
-    bottom: 77, // 탭바 높이만큼 띄우기
-    left: 0,
-    right: 0,
-    height: 30, // 그라데이션 높이 조절
-    zIndex: 10,
-  },
-});
 
 export default TabsLayout;

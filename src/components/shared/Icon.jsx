@@ -259,6 +259,84 @@ const icons = {
   </Svg>
 
   ),
+
+  heart_inactive: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G clipPath="url(#a)">
+        <Path
+          fill="#AFAFAF"
+          d="m12 21-1.45-1.295C5.4 15.125 2 12.093 2 8.395 2 5.364 4.42 3 7.5 3c1.74 0 3.41.795 4.5 2.04A6.062 6.062 0 0 1 16.5 3C19.58 3 22 5.364 22 8.395c0 3.698-3.4 6.73-8.55 11.31L12 21Z"
+        />
+      </G>
+      <Defs>
+        <ClipPath id="clip-heart_inactive">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  home_inactive: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G clipPath="url(#a)">
+        <Path fill="#D4D4D4" d="m7 20 5-7 5 7H7Z" />
+        <Path
+          fill="#AFAFAF"
+          d="M2 21v-4.65l8.75-11.8L9 2.2 10.6 1 12 2.875 13.4 1 15 2.2l-1.75 2.35L22 16.35V21H2Zm6.225-2h7.55L12 13.725 8.225 19Z"
+        />
+      </G>
+      <Defs>
+        <ClipPath id="clip-home_inactive">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  journey_inactive: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G clipPath="url(#a)">
+      <Path fill="#D4D4D4" d="M4 20h10.91L20 14.91V4H4v16Z" />
+      <Path
+        fill="#AFAFAF"
+        d="M14.91 14.91V20L20 14.91h-5.09ZM11 13v-3l8.13-8L22 5l-8.13 8H11Z"
+      />
+      </G>
+      <Defs>
+        <ClipPath id="clip-journey_inactive">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  map_inactive: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G clipPath="url(#a)">
+      <Path
+        fill="#D4D4D4"
+        d="M8.667 20 2 17.507V3l6.667 2.267L15.333 3 22 4.587V20l-6.667-1.133L8.667 20Z"
+      />
+      <Path fill="#AFAFAF" d="M8.667 5.267 15.333 3v15.867L8.667 20V5.267Z" />
+      </G>
+      <Defs>
+        <ClipPath id="clip-map_inactive">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  profile_inactive: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G fill="#D4D4D4" clipPath="url(#a)">
+      <Path d="M12 20c2.233 0 4.125-.775 5.675-2.325C19.225 16.125 20 14.233 20 12c0-.4-.025-.787-.075-1.162a4.861 4.861 0 0 0-.275-1.088 9.096 9.096 0 0 1-2.15.25 9.786 9.786 0 0 1-4.3-.975A9.983 9.983 0 0 1 9.75 6.3a9.868 9.868 0 0 1-2.287 3.388A9.746 9.746 0 0 1 4 11.85V12c0 2.233.775 4.125 2.325 5.675C7.875 19.225 9.767 20 12 20Zm0 2a9.744 9.744 0 0 1-3.9-.787 10.083 10.083 0 0 1-3.175-2.138c-.9-.9-1.612-1.959-2.137-3.175A9.75 9.75 0 0 1 2 12c0-1.384.262-2.684.788-3.9a10.152 10.152 0 0 1 2.137-3.175A10.04 10.04 0 0 1 8.1 2.788 9.787 9.787 0 0 1 12 2a9.696 9.696 0 0 1 3.9.788 10.13 10.13 0 0 1 3.175 2.137A10.105 10.105 0 0 1 21.213 8.1 9.688 9.688 0 0 1 22 12a9.816 9.816 0 0 1-.788 3.9 10.002 10.002 0 0 1-2.137 3.175c-.901.898-1.96 1.61-3.175 2.138A9.645 9.645 0 0 1 12 22Z" />
+      <Circle cx={8} cy={13} r={1} />
+      <Circle cx={16} cy={13} r={1} />
+      </G>
+      <Defs>
+        <ClipPath id="clip-profile_inactive">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
 };
 
 const Icon = ({ name, width, height }) => {
