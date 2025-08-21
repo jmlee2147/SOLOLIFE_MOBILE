@@ -27,7 +27,7 @@
       [
         "expo-router",
         {
-          "appDir": "src/app"
+          "root": "src/app"
         }
       ],
       [
