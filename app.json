@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jmlee2147.SOLOLIFE-MOBILE"
     },
     "android": {
       "adaptiveIcon": {
@@ -25,7 +26,6 @@
     },
     "plugins": [
       "expo-router",
-  
       [
         "expo-splash-screen",
         {
