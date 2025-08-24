@@ -1,21 +1,19 @@
-import { useRouter } from 'expo-router';
-import { Button, Text, View } from 'react-native';
+import React from "react";
+import { View } from "react-native";
+import Header from "../../../../components/shared/Header";
 
-export default function HomePage() {
-  const router = useRouter();
-
+const HomeScreen = () => {
   return (
-    <View className="items-center justify-center flex-1 bg-white">
-      <Text className="mb-6 text-xl font-bold">Home</Text>
-      <Button
-        title="장소 추천 받기"
-        onPress={() => router.push('home/recommend')}
-      />
-      <View className="h-4" />
-      <Button
-        title="루트 만들기"
-        onPress={() => router.push('home/route')}
+    <View style={{ flex: 1 }}>
+      <Header
+        title="홈"
+        leftIcon="notification"         // Icon.jsx에 정의된 아이콘 이름
+        onLeftPress={() => console.log("뒤로가기")}
+        rightIcon="menu"    // Icon.jsx에 정의된 아이콘 이름
+        onRightPress={() => console.log("설정 클릭")}
       />
     </View>
   );
-}
+};
+
+export default HomeScreen;
