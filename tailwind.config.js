@@ -10,18 +10,20 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        yellowPrimary: '#EE7A13',
-        yellowSecondary: '#FFE787',
-        yellowTertiary: '#FFFADD',
+        yellow50: '#FFADD',
+        yellow500: '#FFE787',
+        yellow900: '#EE7A13',
 
-        greenPrimary: '#B3B56C',
-        greenSecondary: '#6A8042',
-        greenTertiary: '#1E3006',
+        green50: '#DBDCC1',
+        green200: '#B3B56C',
+        green500: '#6A8042',
+        green900: '#1E3006',
 
         white: '#FFFFFF',
-        grayLight: '#D4D4D4',
-        grayMedium: '#AFAFAF',
-        grayDark: '#6B6B6B',
+        gray50: '#EEEEEE',
+        gray100: '#D4D4D4',
+        gray200: '#AFAFAF',
+        gray300: '#6B6B6B',
         black: '#121212'
       },
       
