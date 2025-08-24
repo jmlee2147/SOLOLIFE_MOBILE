@@ -1,5 +1,5 @@
 import React from 'react';
-import Svg, { Circle, ClipPath, Defs, G, Mask, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
 
 const icons = {
   book: ({ width = 24, height = 24, ...props }) => (
@@ -486,26 +486,24 @@ const icons = {
   ),
   notification: ({ width = 24, height = 24, ...props}) => (
     <Svg width={24} height={24} fill="none" {...props}>
-      <G clipPath="url(#a)">
-        <Mask id="b" fill="#fff">
+      <Defs>
+        <ClipPath id="clip">
           <Path d="M12 3c4.142 0 7.5 3.134 7.5 7v8a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-8c0-3.866 3.358-7 7.5-7Z" />
-        </Mask>
+        </ClipPath>
+      </Defs>
+
+      <G clipPath="url(#clip)">
         <Path
           fill="#000"
           d="M12 3v2c3.17 0 5.5 2.366 5.5 5h4c0-5.098-4.386-9-9.5-9v2Zm7.5 7h-2v8h4v-8h-2Zm-1 9v-2h-13v4h13v-2Zm-14-1h2v-8h-4v8h2Zm0-8h2c0-2.634 2.33-5 5.5-5V1c-5.114 0-9.5 3.902-9.5 9h2Zm1 9v-2a1 1 0 0 1 1 1h-4a3 3 0 0 0 3 3v-2Zm14-1h-2a1 1 0 0 1 1-1v4a3 3 0 0 0 3-3h-2Z"
-          mask="url(#b)"
-        />
-        <Path
-          stroke="#000"
-          strokeWidth={2}
-          d="M14.5 19.5c0 1.105-1.12 2-2.5 2s-2.5-.895-2.5-2"
         />
       </G>
-      <Defs>
-        <ClipPath id="a">
-          <Path fill="#fff" d="M0 0h24v24H0z" />
-        </ClipPath>
-      </Defs>
+
+      <Path
+        stroke="#000"
+        strokeWidth={2}
+        d="M14.5 19.5c0 1.105-1.12 2-2.5 2s-2.5-.895-2.5-2"
+      />
     </Svg>
   ),
   options: ({ width = 24, height = 24, ...props}) => (
