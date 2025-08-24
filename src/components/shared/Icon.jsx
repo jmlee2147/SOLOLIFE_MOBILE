@@ -1,5 +1,5 @@
 import React from 'react';
-import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, G, Mask, Path, Rect } from 'react-native-svg';
 
 const icons = {
   book: ({ width = 24, height = 24, ...props }) => (
@@ -332,6 +332,229 @@ const icons = {
       </G>
       <Defs>
         <ClipPath id="clip-profile_inactive">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+
+  bookmark: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G clipPath="url(#a)">
+      <Path
+        stroke="#000"
+        strokeWidth={2}
+        d="M20 3v16.426l-7.575-3.554-.425-.2-.425.2L4 19.426V3h16Z"
+      />
+      </G>
+      <Defs>
+        <ClipPath id="clip-bookmark">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  circle_check: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
+      <Path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"
+      />
+      <Path d="M8 10.575 11.385 14 16 9" />
+      </G>
+      <Defs>
+        <ClipPath id="clip-circle-check">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  circle_check2: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
+        <Path d="M21 11.177v.828a9 9 0 1 1-5.337-8.226" />
+        <Path d="m21 5-8.5 8.5L8 9" />
+      </G>
+      <Defs>
+        <ClipPath id="cliip-circle-check2">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  circle_close: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
+        <Path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"
+        />
+        <Path d="m8 8 8 8M16 8l-8 8" />
+      </G>
+      <Defs>
+        <ClipPath id="clip-circle-close">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  circle: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G clipPath="url(#a)">
+        <Path
+          stroke="#000"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"
+        />
+      </G>
+      <Defs>
+        <ClipPath id="clip-circle">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  close: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
+        <Path d="m4 4 16 16M20 4 4 20" />
+      </G>
+      <Defs>
+        <ClipPath id="clip-close">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  double_left_arrow: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
+        <Path d="m13 21-8-9 8-9" />
+        <Path d="m19 21-8-9 8-9" />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  down_arrow: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <Path stroke="#000" strokeWidth={2} d="m21 8-9 8-9-8" />
+    </Svg>
+  ),
+  home_header: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
+        <Path strokeLinecap="round" d="m3 9 9-7 9 7v13.5H3V9Z" />
+        <Path d="M9 22V12h6v10" />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  left_arrow: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G clipPath="url(#a)">
+        <Path stroke="#000" strokeWidth={2} d="m16 21-8-9 8-9" />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  menu: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <Path
+      stroke="#000"
+      strokeLinecap="round"
+      strokeWidth={2.5}
+      d="M4 6h16M4 12h16M4 18h16"
+      />
+    </Svg>
+  ),
+  notification: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G clipPath="url(#a)">
+        <Mask id="b" fill="#fff">
+          <Path d="M12 3c4.142 0 7.5 3.134 7.5 7v8a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-8c0-3.866 3.358-7 7.5-7Z" />
+        </Mask>
+        <Path
+          fill="#000"
+          d="M12 3v2c3.17 0 5.5 2.366 5.5 5h4c0-5.098-4.386-9-9.5-9v2Zm7.5 7h-2v8h4v-8h-2Zm-1 9v-2h-13v4h13v-2Zm-14-1h2v-8h-4v8h2Zm0-8h2c0-2.634 2.33-5 5.5-5V1c-5.114 0-9.5 3.902-9.5 9h2Zm1 9v-2a1 1 0 0 1 1 1h-4a3 3 0 0 0 3 3v-2Zm14-1h-2a1 1 0 0 1 1-1v4a3 3 0 0 0 3-3h-2Z"
+          mask="url(#b)"
+        />
+        <Path
+          stroke="#000"
+          strokeWidth={2}
+          d="M14.5 19.5c0 1.105-1.12 2-2.5 2s-2.5-.895-2.5-2"
+        />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  options: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G fill="#000" clipPath="url(#a)">
+        <Circle cx={12.5} cy={4.5} r={1.5} />
+        <Circle cx={12.5} cy={11.5} r={1.5} />
+        <Circle cx={12.5} cy={19.5} r={1.5} />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  previous: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
+        <Path d="M21 12H5M12 21l-8-9 8-9" />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  refresh: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
+        <Path d="M3 6v5h5M21 18v-5h-5" />
+        <Path d="M18.946 9.333a8.072 8.072 0 0 0-2.05-3.312 7.174 7.174 0 0 0-3.266-1.824 6.797 6.797 0 0 0-3.672.118 7.266 7.266 0 0 0-3.162 2.03L3 10.222m18 3.556-3.796 3.877a7.265 7.265 0 0 1-3.163 2.03 6.797 6.797 0 0 1-3.67.118 7.174 7.174 0 0 1-3.267-1.824 8.072 8.072 0 0 1-2.05-3.312" />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  reset: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={24} height={24} fill="none" {...props}>
+      <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
+        <Path d="M4 4v6h6" />
+        <Path d="M5 14.658a8.038 8.038 0 0 0 3.204 4.002 8.416 8.416 0 0 0 5.035 1.327 8.368 8.368 0 0 0 4.846-1.88 7.965 7.965 0 0 0 2.71-4.332 7.79 7.79 0 0 0-.514-5.045A8.092 8.092 0 0 0 16.75 5a8.44 8.44 0 0 0-5.131-.921C9 4.436 7.857 5.714 6.714 6.858" />
+      </G>
+      <Defs>
+        <ClipPath id="a">
           <Path fill="#fff" d="M0 0h24v24H0z" />
         </ClipPath>
       </Defs>

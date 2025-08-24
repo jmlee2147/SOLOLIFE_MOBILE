@@ -1,35 +1,61 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Icon from './Icon';
+import React from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import Icon from "./Icon";
 
-const Header = ({ leftIcon, rightIcon, title }) => {
+const Header = ({ title, leftIcon, onLeftPress, rightIcon, onRightPress }) => {
   return (
     <View style={styles.container}>
-      <TouchableOpacity>
-        {leftIcon && <Icon name={leftIcon} width={24} height={24} />}
-      </TouchableOpacity>
+      {/* 좌측 아이콘 */}
+      {leftIcon ? (
+        <TouchableOpacity 
+          onPress={onLeftPress} 
+          style={styles.iconWrapper}
+          activeOpacity={1}
+        >
+          <Icon name={leftIcon} width={24} height={24} />
+        </TouchableOpacity>
+      ) : <View style={styles.iconPlaceholder} />}
 
-      {title && <Text style={styles.title}>{title}</Text>}
+      {/* 가운데 타이틀 */}
+      <Text style={styles.title}>{title}</Text>
 
-      <TouchableOpacity>
-        {rightIcon && <Icon name={rightIcon} width={24} height={24} />}
-      </TouchableOpacity>
+      {/* 우측 아이콘 */}
+      {rightIcon ? (
+        <TouchableOpacity 
+          onPress={onRightPress} 
+          style={styles.iconWrapper}
+          activeOpacity={1}
+        >
+          <Icon name={rightIcon} width={24} height={24} />
+        </TouchableOpacity>
+      ) : <View style={styles.iconPlaceholder} />}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
+    height: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 25,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E5E5",
+    backgroundColor: "#FFFFFF",
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: "400",
+    textAlign: "center",
+    flex: 1,
+  },
+  iconWrapper: {
+    width: 40,
+    alignItems: "center",
+  },
+  iconPlaceholder: {
+    width: 40,
   },
 });
 
