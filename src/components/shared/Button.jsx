@@ -1,51 +1,73 @@
-// components/shared/Button.jsx
-import { tw } from "nativewind";
-import React from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import React from 'react';
+import { Dimensions, Text, TouchableOpacity } from 'react-native';
+import scale from '../../utils/scale';
+
+const { hs, vs, rp, fs } = scale;
+
+const VARIANT_STYLES = {
+  primary: { backgroundColor: '#6A8042', textColor: '#FFFFFF' },
+  secondary: { backgroundColor: '#DBDCC1', textColor: '#6A8042' },
+  disabled: { backgroundColor: '#EEEEEE', textColor: '#6B6B6B' },
+};
+
+const SIZE_STYLES = {
+  large: { widthPx: 343, heightPx: 50 },
+  medium: { widthPx: 228, heightPx: 55 },
+  small: { widthPx: 104, heightPx: 55 },
+};
+
+// 아이폰16 기준 폰트
+const BASE_FONT_SIZE = 16;
+
+// 화면 크기 기반 스케일링
+const { width: DEVICE_WIDTH } = Dimensions.get('window');
+const FONT_ADJUST_FACTOR = DEVICE_WIDTH / 393; // iPhone 16 width 기준
 
 const Button = ({
   title,
+  variant = 'primary',
+  size = 'medium',
   onPress,
-  variant = "primary", // primary | secondary | disabled
-  size = "medium",     // small | medium | large
-  icon: Icon,
+  style,
+  textStyle,
+  activeOpacity = 0.8,
 }) => {
-  const getVariantStyle = () => {
-    switch (variant) {
-      case "primary":
-        return "bg-greenPrimary text-white";
-      case "secondary":
-        return "bg-greenSecondarytext-black";
-      case "disabled":
-        return "bg-gray100 text-gray-500";
-      default:
-        return "bg-green-600 text-white";
-    }
-  };
+  const { backgroundColor, textColor } = VARIANT_STYLES[variant] ?? VARIANT_STYLES.primary;
+  const { widthPx, heightPx } = SIZE_STYLES[size] ?? SIZE_STYLES.medium;
+  const isDisabled = variant === 'disabled';
 
-  const getSizeStyle = () => {
-    switch (size) {
-      case "small":
-        return "px-3 py-2 text-sm";
-      case "medium":
-        return "px-4 py-3 text-base";
-      case "large":
-        return "px-5 py-4 text-lg";
-      default:
-        return "px-4 py-3 text-base";
-    }
-  };
-
-  const [bgClass, textClass] = getVariantStyle().split(" ");
+  // large/medium/small 모두 공통 폰트
+  const adjustedFontSize = fs(BASE_FONT_SIZE, 0.5, false);
 
   return (
     <TouchableOpacity
-      onPress={variant === "disabled" ? null : onPress}
-      style={tw`${bgClass} ${getSizeStyle()} rounded-lg flex-row items-center justify-center`}
-      activeOpacity={0.7}
+      activeOpacity={isDisabled ? 1 : activeOpacity}
+      disabled={isDisabled}
+      onPress={onPress}
+      style={[
+        {
+          width: hs(widthPx),
+          height: vs(heightPx),
+          borderRadius: rp(10),
+          backgroundColor,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        style,
+      ]}
     >
-      {Icon && <View style={tw`mr-2`}><Icon /></View>}
-      <Text style={tw`font-semibold ${textClass}`}>{title}</Text>
+      <Text
+        style={[
+          {
+            color: textColor,
+            fontSize: adjustedFontSize,
+            fontFamily: 'Pretendard-SemiBold',
+          },
+          textStyle,
+        ]}
+      >
+        {title}
+      </Text>
     </TouchableOpacity>
   );
 };

@@ -2,7 +2,9 @@
 
 module.exports = {
   content: [
-    "./src/**/*.{js,ts,jsx,tsx}",  
+    "./src/**/*.{js,ts,jsx,tsx}",
+    "./app/**/*.{js,ts,jsx,tsx}",
+    "./components/**/*.{js,ts,jsx,tsx}",
   ],
   presets: [
     require('nativewind/preset'),
@@ -10,7 +12,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        yellow50: '#FFADD',
+        yellow50: '#FFFADD',
         yellow500: '#FFE787',
         yellow900: '#EE7A13',
 
