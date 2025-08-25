@@ -476,12 +476,7 @@ const icons = {
   ),
   menu: ({ width = 24, height = 24, ...props}) => (
     <Svg width={24} height={24} fill="none" {...props}>
-      <Path
-      stroke="#000"
-      strokeLinecap="round"
-      strokeWidth={2.5}
-      d="M4 6h16M4 12h16M4 18h16"
-      />
+      <Path stroke="#000" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
     </Svg>
   ),
   notification: ({ width = 24, height = 24, ...props}) => (
