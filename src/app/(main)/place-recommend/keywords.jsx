@@ -19,9 +19,14 @@ export default function KeywordsScreen() {
   };
 
   const goNext = () => {
-    // TODO: 다음 단계 라우팅
-    // router.push({ pathname: "/place-recommend/results", params: { category, option, keywords: JSON.stringify(selected) } });
-    console.log("선택 키워드:", selected);
+    router.push({
+      pathname: "/place-recommend/results",
+      params: {
+        category: String(category || ""),
+        option: String(option || ""),
+        keywords: JSON.stringify(selected), // 배열 → 문자열
+      },
+    });
   };
 
   return (
@@ -72,7 +77,7 @@ export default function KeywordsScreen() {
                   <Text
                     className={[
                       "text-[18px] font-pretendardMedium",
-                      isActive ? "text-white" : "text-gray300",
+                      isActive ? "text-white" : "text-gray700",
                     ].join(" ")}
                   >
                     {k}
@@ -97,7 +102,7 @@ export default function KeywordsScreen() {
           style={Platform.select({
             ios: {
               shadowColor: "#000",
-              shadowOpacity: 0.15,
+              shadowOpacity: 0,
               shadowRadius: 8,
               shadowOffset: { width: 0, height: 4 },
             },
