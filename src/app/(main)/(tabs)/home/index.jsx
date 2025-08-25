@@ -21,7 +21,7 @@ const HomeScreen = () => {
       />
 
       <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: 20}}>
-        <Text className="text-title-2 font-pretendardExtraBold">
+        <Text className="mb-2 text-title-1 font-pretendardExtraBold">
           포슬감자님 반가워요.
         </Text>
         <Text className="text-gray300 text-heading-3 font-pretendardSemiBold">

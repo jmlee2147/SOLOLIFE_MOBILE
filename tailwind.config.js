@@ -23,9 +23,9 @@ module.exports = {
 
         white: '#FFFFFF',
         gray50: '#EEEEEE',
-        gray100: '#D4D4D4',
-        gray200: '#AFAFAF',
-        gray300: '#6B6B6B',
+        gray200: '#D4D4D4',
+        gray500: '#AFAFAF',
+        gray700: '#6B6B6B',
         black: '#121212'
       },
       
@@ -37,22 +37,22 @@ module.exports = {
       },
 
       fontSize: {
-        'title-1': ['28px', { lineHeight: 1.2, fontWeight: '900' }],
-        'title-2': ['24px', { lineHeight: 1.2, fontWeight: '900' }],
-        'title-3': ['24px', { lineHeight: 1.2, fontWeight: '600' }],
+        'title-1': ['28px', { lineHeight: 1.2 }],
+        'title-2': ['24px', { lineHeight: 1.2 }],
+        'title-3': ['24px', { lineHeight: 1.2}],
 
-        'heading-1': ['20px', { lineHeight: 1.4, fontWeight: '600' }],
-        'heading-2': ['18px', { lineHeight: 1.4, fontWeight: '600' }],
-        'heading-3': ['16px', { lineHeight: 1.4, fontWeight: '500' }],
+        'heading-1': ['20px', { lineHeight: 1.4 }],
+        'heading-2': ['18px', { lineHeight: 1.4 }],
+        'heading-3': ['16px', { lineHeight: 1.4 }],
 
-        'body-1': ['16px', { lineHeight: 1.4, fontWeight: '400' }],
-        'body-2': ['14px', { lineHeight: 1.4, fontWeight: '400' }],
-        'body-3': ['12px', { lineHeight: 1.4, fontWeight: '400' }],
+        'body-1': ['16px', { lineHeight: 1.4 }],
+        'body-2': ['14px', { lineHeight: 1.4 }],
+        'body-3': ['12px', { lineHeight: 1.4 }],
 
-        'caption': ['10px', { lineHeight: 1.4, letterSpacing: '0.2px', fontWeight: '500' }],
+        'caption': ['10px', { lineHeight: 1.4, letterSpacing: '0.2px' }],
 
-        'button-1': ['18px', { lineHeight: 1.2, fontWeight: '500' }],
-        'button-2': ['16px', { lineHeight: 1.2, fontWeight: '500' }],
+        'button-1': ['18px', { lineHeight: 1.2 }],
+        'button-2': ['16px', { lineHeight: 1.2 }],
     },
   },
   plugins: [],
