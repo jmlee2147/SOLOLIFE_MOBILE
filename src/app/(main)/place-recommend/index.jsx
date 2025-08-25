@@ -30,8 +30,8 @@ export default function PlaceRecommendScreen() {
         onRightPress={() => router.push("/home")}
       />
       <View style={styles.container}>
-        <Text style={styles.title}>포슬감자님 반가워요.</Text>
-        <Text style={styles.subtitle}>오늘은 어디를 탐험해볼까요?</Text>
+        <Text className="mb-2 text-title-1 font-pretendardExtraBold">포슬감자님 반가워요.</Text>
+        <Text className="mb-[10%] text-heading-3 font-pretendardMedium text-gray300">오늘은 어디를 탐험해볼까요?</Text>
 
         <View style={styles.grid}>
           {categories.map((category) => (
@@ -58,8 +58,8 @@ export default function PlaceRecommendScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 24, paddingTop: 18 },
-  title: { fontSize: 24, fontWeight: "800", marginBottom: 4 },
-  subtitle: { fontSize: 16, fontWeight: "600", color: "#666", marginBottom: width * 0.1 },
+  // title: { fontSize: 24, fontWeight: "800", marginBottom: 4 },
+  // subtitle: { fontSize: 16, fontWeight: "600", color: "#666", marginBottom: width * 0.1 },
   grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginBottom: CARD_GAP },
   longCard: { backgroundColor: "#F3F8E8", borderWidth: 1, borderColor: "#B3B56C", borderRadius: 12, padding: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.11, shadowRadius: 6, elevation: 3 },
   longCardTitle: { fontSize: 18, fontWeight: "500", marginBottom: 8, textAlign: "center" },
