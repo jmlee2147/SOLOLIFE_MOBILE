@@ -27,7 +27,7 @@ const HomeScreen = () => {
         <Text className="mb-2 text-title-1 font-pretendardExtraBold">
           포슬감자님 반가워요.
         </Text>
-        <Text className="text-gray300 text-heading-3 font-pretendardSemiBold">
+        <Text className="text-gray700 text-heading-3 font-pretendardSemiBold">
           오늘은 어디를 탐험해볼까요?
         </Text>
 

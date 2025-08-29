@@ -31,7 +31,7 @@ export default function PlaceRecommendScreen() {
       />
       <View style={styles.container}>
         <Text className="mb-2 text-title-1 font-pretendardExtraBold">포슬감자님 반가워요.</Text>
-        <Text className="mb-[10%] text-heading-3 font-pretendardMedium text-gray300">오늘은 어디를 탐험해볼까요?</Text>
+        <Text className="mb-[10%] text-heading-3 font-pretendardMedium text-gray700">오늘은 어디를 탐험해볼까요?</Text>
 
         <View style={styles.grid}>
           {categories.map((category) => (
@@ -46,7 +46,7 @@ export default function PlaceRecommendScreen() {
           ))}
         </View>
 
-        <View style={[styles.longCard, { marginTop: CARD_GAP }]}>
+        <View style={[styles.longCard, { marginTop: -16 }]}>
           <Text style={styles.longCardTitle}>추천받기</Text>
           <Text style={styles.longCardDesc}>가고 싶은 곳이 없다면 랜덤 추천을 받아보세요!</Text>
           <Text style={styles.longCardDesc}>우연한 계기가 운명의 장소가 될 수 있어요.</Text>
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
   // title: { fontSize: 24, fontWeight: "800", marginBottom: 4 },
   // subtitle: { fontSize: 16, fontWeight: "600", color: "#666", marginBottom: width * 0.1 },
   grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginBottom: CARD_GAP },
-  longCard: { backgroundColor: "#F3F8E8", borderWidth: 1, borderColor: "#B3B56C", borderRadius: 12, padding: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.11, shadowRadius: 6, elevation: 3 },
+  longCard: { backgroundColor: "#F4F4F4", borderRadius: 12, padding: 20 },
   longCardTitle: { fontSize: 18, fontWeight: "500", marginBottom: 8, textAlign: "center" },
   longCardDesc: { fontSize: 14, fontWeight: "500", textAlign: "center" },
 });
