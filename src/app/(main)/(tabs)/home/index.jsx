@@ -1,11 +1,14 @@
 import { router } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import { Text, View } from "react-native";
+import AppDialog from "../../../../components/shared/AppDialog";
 import Button from "../../../../components/shared/Button";
 import Header from "../../../../components/shared/Header";
 
 const HomeScreen = () => {
   const handlePress = () => console.log("버튼 클릭됨");
+  const [showDialog, setShowDialog] = useState(false);
+  const [dontShow, setDontShow] = useState(false);
 
   return (
     // 전체 배경색 적용
@@ -35,7 +38,25 @@ const HomeScreen = () => {
             variant="primary"
             onPress={() => router.push("/place-recommend")}
           />
-          <Button title="루트 추천받기" size="medium" variant="secondary" onPress={handlePress} />
+          <Button title="루트 추천받기"
+                  size="medium" 
+                  variant="secondary" 
+                  onPress={() => setShowDialog(true)} 
+          />
+
+          <AppDialog
+            visible={showDialog}
+            title="장소를 추가하지 않고 넘어갈까요?"
+            description="장소 추가 시 적립 기회가 있어요."
+            showDontShow={true}
+            dontShowChecked={dontShow}
+            onToggleDontShow={() => setDontShow((p) => !p)}
+            onConfirm={() => {
+              console.log("확인 눌림");
+              setShowDialog(false);
+            }}
+            onCancel={() => setShowDialog(false)}
+          />
           <Button title="루트 만들기" size="medium" variant="disabled" onPress={handlePress} />
         </View>
       </View>

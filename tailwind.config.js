@@ -22,7 +22,7 @@ module.exports = {
         green900: '#1E3006',
 
         white: '#FFFFFF',
-        gray50: '#EEEEEE',
+        gray50: '#F4F4F4',
         gray200: '#D4D4D4',
         gray500: '#AFAFAF',
         gray700: '#6B6B6B',
