@@ -1,19 +1,19 @@
-// src/app/(main)/place-recommend/results.jsx
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-    Animated, // Animated.FlatList 사용
-    SafeAreaView,
-    Text,
-    useWindowDimensions,
-    View,
+  Animated, // Animated.FlatList 사용
+  SafeAreaView,
+  Text,
+  useWindowDimensions,
+  View,
 } from "react-native";
-import PlaceCard from "../../../components/home/PlaceCard"; // ← 경로 확인
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import PlaceCard from "../../../components/place/PlaceCard"; // ← 경로 확인
 import Button from "../../../components/shared/Button";
 import Header from "../../../components/shared/Header";
 import { hs, vs } from "../../../utils/scale";
 
-// 데모 데이터 (이미지 경로 실제 존재하는지 확인)
+// 데모 데이터
 const MOCK_PLACES = [
   {
     id: "1",
@@ -48,6 +48,7 @@ export default function ResultsScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { keywords } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   // 키워드 파싱
   const selectedKeywords = useMemo(() => {
@@ -139,7 +140,7 @@ export default function ResultsScreen() {
       />
 
       {/* 상단 선택 키워드 뱃지 */}
-      <View className="px-6 mt-2 mb-2">
+      <View className="px-[25px] mt-2 mb-2">
         <Text className="text-title-1 font-pretendardExtraBold">
           포슬감자님 여긴 어때요?
         </Text>
@@ -178,15 +179,21 @@ export default function ResultsScreen() {
       />
 
       {/* 하단 버튼 */}
-      <View className="flex-row justify-center pt-4 pb-8">
-        <Button
-            title="다시 추천받기"
-            size="small"
-            variant="secondary"
-            style={{ marginRight: hs(25) }} // 버튼 사이 간격 (반응형)
+      <View className="flex-row items-center justify-between px-[25px]"
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+            }}>
+        <Button title="다시 추천받기" size="small" variant="secondary"
         />
-        <Button title="여기 갈래요" size="medium" variant="primary" />
-    </View>
+        <Button title="여기 갈래요" size="medium" variant="primary" 
+                onPress={() => router.push({
+                  pathname: "/route-builder",
+                  params: { placeName: "55데시벨"},
+                })}/>
+      </View>
     </SafeAreaView>
   );
 }

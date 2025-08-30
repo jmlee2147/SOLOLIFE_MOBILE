@@ -16,13 +16,13 @@ function PlaceCard({
 }) {
   return (
     <View
-      className="bg-[#F3F8E8] rounded-[10px]"
+      className="bg-[#FDFFFA] rounded-[10px]"
       style={[
         { 
             width: hs(316),
             height: vs(470),
             borderWidth: 1,
-            borderColor: "#B3B56C",
+            borderColor: "#6A8042",
         },
         Platform.select({
           ios: {

@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router"; // router import 수정
 import React from "react";
 import { Dimensions, StyleSheet, Text, View } from "react-native";
-import CategoryCard from "../../../components/home/CategoryCard";
+import CategoryCard from "../../../components/place/CategoryCard";
 import Header from "../../../components/shared/Header";
 
 const { width } = Dimensions.get("window");
