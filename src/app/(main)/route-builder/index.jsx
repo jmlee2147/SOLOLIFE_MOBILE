@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import RouteStepCard from "../../../components/route/RouteStepCard";
+import EditStepCard from "../../../components/route/EditStepCard";
 import Header from '../../../components/shared/Header';
 
 const RouteBuilderScreen  = () => {
@@ -25,8 +25,17 @@ const RouteBuilderScreen  = () => {
                 </Text>
             </View>
 
-            <RouteStepCard
+            {/*<RouteStepCard
                 step={1}
+                title="55데시벨"
+                rating={4.5}
+                categories={["카페", "디저트"]}
+                address="경기도 수원시 영통구"
+                imageSource={require("../../../assets/images/sample.png")}
+                style={{ alignSelf: "center" }}
+            />*/}
+
+            <EditStepCard
                 title="55데시벨"
                 rating={4.5}
                 categories={["카페", "디저트"]}
