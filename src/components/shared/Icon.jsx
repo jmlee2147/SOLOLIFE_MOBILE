@@ -582,6 +582,35 @@ const icons = {
       <Path stroke="#fff" strokeWidth={2} d="m1 4.35 2.333 2.4L8.5 1.5" />
     </Svg>
   ),
+  comment_fill: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={22} height={22} fill="none" {...props}>
+      <Path
+        fill="#D4D4D4"
+        d="M20.167 10.49a8.535 8.535 0 0 1-.917 3.871 8.657 8.657 0 0 1-7.74 4.787 8.535 8.535 0 0 1-3.871-.916l-5.806 1.935 1.935-5.806a8.536 8.536 0 0 1-.916-3.87 8.657 8.657 0 0 1 4.787-7.74 8.535 8.535 0 0 1 3.87-.918h.51a8.637 8.637 0 0 1 8.148 8.149v.509Z"
+      />
+    </Svg>
+  ),
+  smile: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={22} height={22} fill="none" {...props}>
+      <Path
+        fill="#D4D4D4"
+        d="M11 20.167a9.167 9.167 0 1 0 0-18.334 9.167 9.167 0 0 0 0 18.334Z"
+      />
+      <Path
+        stroke="#F4F4F4"
+        strokeLinejoin="round"
+        strokeWidth={1.664}
+        d="M7.333 12.833S8.708 14.667 11 14.667s3.667-1.834 3.667-1.834"
+      />
+      <Path
+        stroke="#F4F4F4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.664}
+        d="M8.25 8.25h.01M13.75 8.25h.01"
+      />
+    </Svg>
+  ),
 };
 
 const Icon = ({ name, width, height }) => {
