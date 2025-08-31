@@ -1,5 +1,6 @@
 import React from "react";
 import { Modal, Pressable, Text, TouchableOpacity, View } from "react-native";
+import Icon from "./Icon";
 
 export default function AppDialog({
   visible,
@@ -59,10 +60,14 @@ export default function AppDialog({
             >
               <View
                 className={[
-                  "w-[13px] h-[13px] mr-1 border-[1.5px]",
-                  dontShowChecked ? "bg-green500 border-green500" : "bg-white border-gray500",
+                  "w-[13px] h-[13px] mr-1 border-[1.5px] items-center justify-center",
+                  dontShowChecked ? "bg-black border-black" : "bg-white border-gray500",
                 ].join(" ")}
-              />
+              >
+                {dontShowChecked && (
+                  <Icon name="checkbox" width={10} height={9} />
+                )}
+              </View>
               <Text className="text-heading-3 font-pretendardMedium text-gray500">다시 보지 않기</Text>
             </TouchableOpacity>
           ) : null}
