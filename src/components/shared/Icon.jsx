@@ -138,21 +138,21 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  location: ({ width = 24, height = 24, ...props}) => (
-    <Svg width={24} height={24} fill="none" {...props}>
-      <G clipPath="url(#a)">
-        <Circle cx={12} cy={10} r={3} fill="#fff" />
-        <Path
-          fill="#B3B56C"
-          d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 1 1 16 0Z"
-        />
-        <Path fill="#fff" d="M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-      </G>
-      <Defs>
-        <ClipPath id="clip-location">
-          <Path fill="#fff" d="M0 0h24v24H0z" />
-        </ClipPath>
-      </Defs>
+  location: ({ width = 24, height = 24, color = "#B3B56C", ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      preserveAspectRatio="xMidYMid meet"
+      {...props}
+    >
+      <Circle cx={12} cy={10} r={3} fill="#fff" />
+      <Path
+        d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 1 1 16 0Z"
+        fill={color}
+      />
+      <Path fill="#fff" d="M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
     </Svg>
   ),
   map: ({ width = 24, height = 24, ...props}) => (
@@ -338,20 +338,20 @@ const icons = {
     </Svg>
   ),
 
-  bookmark: ({ width = 24, height = 24, ...props}) => (
-    <Svg width={24} height={24} fill="none" {...props}>
-      <G clipPath="url(#a)">
+  bookmark: ({ width = 24, height = 24, strokeColor = "#000", fillColor = "none", ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
       <Path
-        stroke="#000"
-        strokeWidth={2}
         d="M20 3v16.426l-7.575-3.554-.425-.2-.425.2L4 19.426V3h16Z"
+        stroke={strokeColor}       
+        strokeWidth={2}
+        fill={fillColor}          
       />
-      </G>
-      <Defs>
-        <ClipPath id="clip-bookmark">
-          <Path fill="#fff" d="M0 0h24v24H0z" />
-        </ClipPath>
-      </Defs>
     </Svg>
   ),
   circle_check: ({ width = 24, height = 24, ...props}) => (
@@ -501,18 +501,13 @@ const icons = {
       />
     </Svg>
   ),
-  options: ({ width = 24, height = 24, ...props}) => (
-    <Svg width={24} height={24} fill="none" {...props}>
-      <G fill="#000" clipPath="url(#a)">
-        <Circle cx={12.5} cy={4.5} r={1.5} />
-        <Circle cx={12.5} cy={11.5} r={1.5} />
-        <Circle cx={12.5} cy={19.5} r={1.5} />
+  options: ({ width = 24, height = 24, stroke = "none", fill = "#000", ...props }) => (
+    <Svg width={width} height={height} viewBox="0 0 24 24" {...props}>
+      <G fill={fill}>
+        <Circle cx={12} cy={5} r={1.5} />
+        <Circle cx={12} cy={12} r={1.5} />
+        <Circle cx={12} cy={19} r={1.5} />
       </G>
-      <Defs>
-        <ClipPath id="a">
-          <Path fill="#fff" d="M0 0h24v24H0z" />
-        </ClipPath>
-      </Defs>
     </Svg>
   ),
   previous: ({ width = 24, height = 24, ...props}) => (
@@ -613,13 +608,13 @@ const icons = {
   ),
 };
 
-const Icon = ({ name, width, height }) => {
+const Icon = ({ name, width, height, ...rest }) => {
   if (!icons[name]) {
     console.warn(`Icon "${name}" does not exist`);
     return null;
   }
   const SvgIcon = icons[name];
-  return <SvgIcon width={width} height={height} />;
+  return <SvgIcon width={width} height={height} {...rest} />;
 };
 
 export default Icon;
