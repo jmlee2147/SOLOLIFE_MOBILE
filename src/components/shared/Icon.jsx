@@ -577,6 +577,11 @@ const icons = {
       </Defs>
     </Svg>
   ),
+  checkbox: ({ width = 24, height = 24, ...props}) => (
+    <Svg width={10} height={9} fill="none" {...props}>
+      <Path stroke="#fff" strokeWidth={2} d="m1 4.35 2.333 2.4L8.5 1.5" />
+    </Svg>
+  ),
 };
 
 const Icon = ({ name, width, height }) => {

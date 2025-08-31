@@ -1,5 +1,6 @@
 import React from "react";
 import { Modal, Pressable, Text, TouchableOpacity, View } from "react-native";
+import Icon from "./Icon";
 
 export default function AppDialog({
   visible,
@@ -59,11 +60,15 @@ export default function AppDialog({
             >
               <View
                 className={[
-                  "w-5 h-5 mr-2 border",
-                  dontShowChecked ? "bg-green500 border-green500" : "bg-white border-gray700",
+                  "w-[13px] h-[13px] mr-1 border-[1.5px] items-center justify-center",
+                  dontShowChecked ? "bg-black border-black" : "bg-white border-gray500",
                 ].join(" ")}
-              />
-              <Text className="text-heading-3 text-gray700">다시 보지 않기</Text>
+              >
+                {dontShowChecked && (
+                  <Icon name="checkbox" width={10} height={9} />
+                )}
+              </View>
+              <Text className="text-heading-3 font-pretendardMedium text-gray500">다시 보지 않기</Text>
             </TouchableOpacity>
           ) : null}
 
@@ -71,7 +76,7 @@ export default function AppDialog({
           <View className="flex-row gap-3">
             <Pressable
               onPress={onConfirm}
-              className="items-center justify-center flex-1 h-[50px] rounded-[5px] bg-green500"
+              className="items-center justify-center flex-1 h-[50px] rounded-[10px] bg-green500"
             >
               <Text className="text-white text-heading-3 font-pretendardSemiBold">
                 {confirmLabel}
@@ -80,7 +85,7 @@ export default function AppDialog({
 
             <Pressable
               onPress={onCancel}
-              className="items-center justify-center flex-1 h-[50px] rounded-[5px] bg-green500"
+              className="items-center justify-center flex-1 h-[50px] rounded-[10px] bg-green500"
             >
               <Text className="text-white text-heading-3 font-pretendardSemiBold">
                 {cancelLabel}
