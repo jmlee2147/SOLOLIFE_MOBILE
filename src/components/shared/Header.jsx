@@ -2,9 +2,9 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Icon from "./Icon";
 
-const Header = ({ title, leftIcon, onLeftPress, rightIcon, onRightPress }) => {
+const Header = ({ title, leftIcon, onLeftPress, rightIcon, onRightPress, backgroundColor = "#FFFFFF" }) => {
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor }]}>
       {/* 좌측 아이콘 */}
       {leftIcon ? (
         <TouchableOpacity 
