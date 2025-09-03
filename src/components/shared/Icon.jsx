@@ -444,8 +444,13 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  down_arrow: ({ width = 24, height = 24, ...props}) => (
-    <Svg width={24} height={24} fill="none" {...props}>
+  down_arrow: ({ width = 24, height = 24, style, ...props}) => (
+    <Svg width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      style={style}
+      {...props}
+      fill="none">
       <Path stroke="#000" strokeWidth={2} d="m21 8-9 8-9-8" />
     </Svg>
   ),
@@ -608,13 +613,13 @@ const icons = {
   ),
 };
 
-const Icon = ({ name, width, height, ...rest }) => {
+const Icon = ({ name, width, height, style, ...props }) => {
   if (!icons[name]) {
     console.warn(`Icon "${name}" does not exist`);
     return null;
   }
   const SvgIcon = icons[name];
-  return <SvgIcon width={width} height={height} {...rest} />;
+  return <SvgIcon width={width} height={height} style={style} {...props} />;
 };
 
 export default Icon;
