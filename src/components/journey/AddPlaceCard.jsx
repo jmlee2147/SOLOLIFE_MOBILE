@@ -1,0 +1,127 @@
+import React from "react";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import Icon from "../shared/Icon";
+
+const SAMPLE_IMAGE = require("../../assets/images/sample.png");
+
+export default function AddPlaceCard({
+  image,
+  name,
+  category,
+  address,
+  rating,
+  onDelete,
+  onPress,
+  style,
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.card, style]}
+      android_ripple={{ color: "rgba(0,0,0,0.06)" }}
+    >
+      {/* 좌측 이미지 */}
+      <Image
+        source={image || SAMPLE_IMAGE}
+        style={styles.image}
+        resizeMode="cover"
+      />
+
+      {/* 우측 정보 */}
+      <View style={styles.right}>
+        {/* 제목 */}
+        <Text
+          className="text-heading-2 font-pretendardSemiBold"
+          numberOfLines={1}
+          style={styles.title}
+        >
+          {name}
+        </Text>
+
+        {/* 카테고리 + 주소 (맨 아래) */}
+        <View style={styles.bottomInfo}>
+          <Text
+            className="text-gray700 text-body-2 font-pretendardMedium"
+            numberOfLines={1}
+          >
+            {category}
+          </Text>
+          <Text
+            className="text-gray700 text-body-2 font-pretendardMedium"
+            numberOfLines={1}
+          >
+            {address}
+          </Text>
+        </View>
+
+        {/* 삭제 버튼 (맨 오른쪽 위) */}
+        <Pressable onPress={onDelete} style={styles.deleteBtn}>
+          <Text className="text-gray500 text-body-2 font-pretendardMedium">
+            장소 삭제하기
+          </Text>
+          <Icon name="close" width={20} height={20} color="#AFAFAF" style={{ marginLeft: 2 }} />
+        </Pressable>
+
+        {/* 평점 뱃지 (맨 오른쪽 아래) */}
+        {typeof rating === "number" && (
+          <View style={styles.ratingBadge}>
+            <Icon name="star" width={16} height={16} color="#6A8042" />
+            <Text className="mx-[2px] mr-[13px] text-body-2 font-pretendardMedium text-green500">
+              {rating}
+            </Text>
+            <Icon name="left_arrow" width={11} height={11} color="#6A8042"flip strokeWidth={4} />
+          </View>
+        )}
+      </View>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    flexDirection: "row",
+    width: 343,
+    height: 88,
+    backgroundColor: "#fff",
+    overflow: "hidden",
+  },
+  image: {
+    width: 91,
+    height: 88,
+    backgroundColor: "#EEE",
+  },
+  right: {
+    flex: 1,
+    position: "relative", // 삭제 버튼 / 평점 절대 배치용 기준
+    paddingLeft: 10,       // 이미지와 제목 사이 여백
+    paddingRight: 12,
+  },
+  title: {
+    marginRight: 0, // 삭제 버튼 영역 비워주기
+    // backgroundColor: "#aadd11",
+  },
+  deleteBtn: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  bottomInfo: {
+    position: "absolute",
+    left: 10,
+    bottom: 0,
+  },
+  ratingBadge: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingLeft: 5,
+    paddingRight: 2.6,
+    paddingVertical: 2.5,
+    borderRadius: 3,
+    backgroundColor: "#dbdcc1",
+  },
+});

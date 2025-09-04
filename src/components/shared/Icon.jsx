@@ -419,9 +419,16 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  close: ({ width = 24, height = 24, ...props}) => (
-    <Svg width={24} height={24} fill="none" {...props}>
-      <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
+  close: ({ width = 24, height = 24, style, color = "#000", ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      style={style}
+      {...props}
+      fill="none"
+    >
+      <G stroke={color} strokeWidth={2} clipPath="url(#clip-close)">
         <Path d="m4 4 16 16M20 4 4 20" />
       </G>
       <Defs>
@@ -467,16 +474,30 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  left_arrow: ({ width = 24, height = 24, ...props}) => (
-    <Svg width={24} height={24} fill="none" {...props}>
-      <G clipPath="url(#a)">
-        <Path stroke="#000" strokeWidth={2} d="m16 21-8-9 8-9" />
-      </G>
-      <Defs>
-        <ClipPath id="a">
-          <Path fill="#fff" d="M0 0h24v24H0z" />
-        </ClipPath>
-      </Defs>
+  left_arrow: ({
+    width = 24,
+    height = 24,
+    color = "#000",
+    flip = false,
+    strokeWidth = 2,
+    style,
+    ...props
+  }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      style={[flip && { transform: [{ scaleX: -1 }] }, style]}
+      {...props}
+    >
+      <Path
+        d="M16 21L8 12L16 3"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </Svg>
   ),
   menu: ({ width = 24, height = 24, ...props}) => (
@@ -553,10 +574,23 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  star: ({ width = 16, height = 16, ...props}) => (
-    <Svg width={16} height={16} fill="none" {...props}>
+  star: ({
+    width = 16,
+    height = 16,
+    color = "#EE7A13",   // 기본값은 기존 주황색
+    style,
+    ...props
+  }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 16 16"   // 원본 좌표계 지정
+      fill="none"
+      style={style}
+      {...props}
+    >
       <Path
-        fill="#EE7A13"
+        fill={color}
         d="M7.103 1.817a1 1 0 0 1 1.794 0l1.221 2.475a1 1 0 0 0 .753.548l2.732.397a1 1 0 0 1 .555 1.705L12.18 8.87a1 1 0 0 0-.288.885l.467 2.721a1 1 0 0 1-1.451 1.054l-2.444-1.284a1 1 0 0 0-.93 0L5.09 13.529a1 1 0 0 1-1.45-1.054l.466-2.72a1 1 0 0 0-.288-.886L1.843 6.942a1 1 0 0 1 .554-1.705l2.732-.397a1 1 0 0 0 .753-.548l1.221-2.475Z"
       />
     </Svg>

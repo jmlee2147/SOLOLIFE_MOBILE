@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ScrollView, View } from "react-native";
+import AddPlaceCard from "../../../../components/journey/AddPlaceCard";
 import LogBoardCard from "../../../../components/journey/LogBoardCard";
 import LogListCard from "../../../../components/journey/LogListCard";
 import SortDropdown from "../../../../components/journey/SortDropdown";
@@ -32,6 +33,16 @@ const JourneyScreen = () => {
           ]}
         />
       </View>
+
+      <AddPlaceCard
+        name="55데시벨"
+        category="카페, 디저트"
+        address="경기도 수원시 영통구"
+        rating={5}
+        onDelete={() => console.log("delete")}
+        onPress={() => console.log("press")}
+        style={{ marginBottom: 16 }}
+      />
 
       {/* 보드형 카드 */}
       <LogBoardCard
