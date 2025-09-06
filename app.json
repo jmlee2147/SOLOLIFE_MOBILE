@@ -10,14 +10,19 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.jmlee2147.SOLOLIFE-MOBILE"
+      "bundleIdentifier": "com.jmlee2147.SOLOLIFE-MOBILE",
+      "infoPlist":{
+        "NSLocationWhenInUseUsageDescription": "주변 추천을 위해 현재 위치가 필요합니다.",
+        "LSApplicationQueriesSchemes": ["nmap"]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.jmlee2147.sololifemobile"
     },
     "web": {
       "bundler": "metro",

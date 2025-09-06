@@ -1,33 +1,86 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
-import { Platform, Pressable, SafeAreaView, ScrollView, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { Platform, Pressable, SafeAreaView, Text, View } from "react-native";
 import Header from "../../../components/shared/Header";
-
-const KEYWORDS_DEFAULT = [
-  "북적북적한", "조용한", "넓은", "아늑한", "밝은",
-  "사진찍기 좋은", "감성적인", "어두운",
-];
+import Icon from "../../../components/shared/Icon";
+import { CATEGORY, MOODS, resolveCategoryKeyByLabel } from "../../../config/category.config";
 
 export default function KeywordsScreen() {
   const router = useRouter();
-  const { category, option } = useLocalSearchParams();
-  const title = useMemo(() => `${option ?? category} 장소를 찾으시는군요!`, [option, category]);
+  const params = useLocalSearchParams(); // { category: 'cafe' | '카페', subcategory?: 'exhibition' | ... }
+  const rawCategory = params.category;
+  const subKeyParam = params.subcategory;
+
+  // 1) category key 정규화
+  const catKey = useMemo(() => {
+    if (!rawCategory) return "";
+    if (CATEGORY?.[rawCategory]) return String(rawCategory); // 이미 key
+    return resolveCategoryKeyByLabel(String(rawCategory)) || "";
+  }, [rawCategory]);
+
+  const cfg = CATEGORY?.[catKey];
+  const subKey = typeof subKeyParam === "string" ? subKeyParam : "";
+
+  // 2) 라벨
+  const categoryLabel = cfg?.label ?? String(rawCategory ?? "");
+  const subLabel = useMemo(() => {
+    if (!cfg?.subcategories || !subKey) return "";
+    return cfg.subcategories?.[subKey]?.label ?? "";
+  }, [cfg, subKey]);
+
+  // 3) 공통 무드 + 전용 키워드 병합
+  const options = useMemo(() => {
+    if (!cfg) return Array.isArray(MOODS) ? [...MOODS] : [];
+    const common = Array.isArray(MOODS) ? MOODS : [];
+
+    // 루트 카테고리(예: 카페)
+    if (Array.isArray(cfg.keywords) && cfg.keywords.length) {
+      return Array.from(new Set([...common, ...cfg.keywords]));
+    }
+
+    // 서브카테고리(예: 활동/전시)
+    const subKw =
+      cfg.subcategories && cfg.subcategories[subKey] && Array.isArray(cfg.subcategories[subKey].keywords)
+        ? cfg.subcategories[subKey].keywords
+        : [];
+
+    return Array.from(new Set([...common, ...subKw]));
+  }, [cfg, subKey]);
+
+  // 4) 선택 상태
   const [selected, setSelected] = useState([]);
-
-  const toggle = (k) => {
+  const toggle = (k) =>
     setSelected((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]));
-  };
 
+  // 5) 타이틀
+  const title = useMemo(() => {
+    return `${subLabel || categoryLabel} 장소를 찾으시는군요!`;
+  }, [categoryLabel, subLabel]);
+
+  // 6) 키워드가 하나도 없으면(드물겠지만) 바로 결과로
+  useEffect(() => {
+    if (!cfg) return; // 아직 로딩/정규화 실패 시
+    if (!options.length) {
+      router.replace({
+        pathname: "/place-recommend/results",
+        params: { category: catKey, subcategory: subKey },
+      });
+    }
+  }, [cfg, options.length, catKey, subKey, router]);
+
+  // 7) 다음(한글 그대로 전송/전달)
   const goNext = () => {
     router.push({
       pathname: "/place-recommend/results",
       params: {
-        category: String(category || ""),
-        option: String(option || ""),
-        keywords: JSON.stringify(selected), // 배열 → 문자열
+        category: catKey,
+        subcategory: subKey,
+        keywordsKo: JSON.stringify(selected), // 한글 배열 그대로
       },
     });
   };
+
+  if (!cfg || !options.length) return null;
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -39,28 +92,24 @@ export default function KeywordsScreen() {
         onRightPress={() => router.push("/home")}
       />
 
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 120 }}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={{ flex: 1, paddingHorizontal: 25, paddingTop: 5 }}>
         {/* 타이틀 */}
-        <Text className="mt-3 leading-tight text-title-1 font-pretendardExtraBold">{title}</Text>
-        <Text className="mt-2 mb-12 leading-6 text-heading-3 text-gray300 font-pretendardMedium">
+        <Text className="text-title-1 mb-[6px] font-pretendardExtraBold">{title}</Text>
+        <Text className="mb-12 leading-6 text-heading-3 text-gray700 font-pretendardMedium">
           선호하는 키워드를 선택해주세요.
         </Text>
 
         {/* 칩 그리드 */}
         <View className="flex-row flex-wrap mt-5">
-          {KEYWORDS_DEFAULT.map((k) => {
-            const isActive = selected.includes(k);
+          {options.map((k) => {
+            const active = selected.includes(k);
             return (
               <Pressable
                 key={k}
                 onPress={() => toggle(k)}
                 className={[
                   "px-7 py-4 rounded-full mr-3 mb-5",
-                  isActive ? "bg-green500" : "bg-gray50",
+                  active ? "bg-green500" : "bg-gray50",
                 ].join(" ")}
                 android_ripple={{ color: "rgba(0,0,0,0.06)", borderless: true }}
                 style={Platform.select({
@@ -72,30 +121,30 @@ export default function KeywordsScreen() {
                   },
                   android: { elevation: 1 },
                 })}
+                accessibilityRole="button"
+                accessibilityLabel={k}
               >
-            
-                  <Text
-                    className={[
-                      "text-[18px] font-pretendardMedium",
-                      isActive ? "text-white" : "text-gray700",
-                    ].join(" ")}
-                  >
-                    {k}
-                  </Text>
+                <Text
+                  className={[
+                    "text-[18px] font-pretendardMedium",
+                    active ? "text-white" : "text-gray700",
+                  ].join(" ")}
+                >
+                  {k}
+                </Text>
 
-                  {/* 주황 점: 칩 외부 오른쪽 위 */}
-                {isActive && (
-                <View className="absolute w-3 h-3 rounded-full bg-yellow900 -top-1 -right-1" />
+                {/* 선택 표시 점 */}
+                {active && (
+                  <View className="absolute w-3 h-3 rounded-full bg-yellow900 -top-1 -right-1" />
                 )}
-             
               </Pressable>
             );
           })}
         </View>
-      </ScrollView>
+      </View>
 
-      {/* 하단 고정 '다음' 버튼 */}
-      <View className="absolute bottom-0 left-0 right-0 items-center pb-6">
+      {/* 하단 '다음' */}
+      <View className="absolute bottom-0 left-0 right-0 items-center">
         <Pressable
           onPress={goNext}
           className="w-[64px] h-[64px] rounded-full bg-white items-center justify-center"
@@ -112,9 +161,9 @@ export default function KeywordsScreen() {
           accessibilityRole="button"
           accessibilityLabel="다음"
         >
-          <Text className="text-[28px] font-pretendardExtraBold">→</Text>
+          <Icon name="next_circle" width={53} height={53}/>
         </Pressable>
-        <Text className="mt-1 text-gray300 font-pretendardMedium">다음</Text>
+        <Text className="mt-[6px] text-heading-3 text-green500 font-pretendardSemiBold">다음</Text>
       </View>
     </SafeAreaView>
   );

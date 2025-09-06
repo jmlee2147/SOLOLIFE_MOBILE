@@ -1,5 +1,4 @@
-import { router } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 const { width } = Dimensions.get("window");
@@ -8,16 +7,24 @@ const cardWidth = (width - 24 * 2 - 12) / 2;
 const DEFAULT_BG = "#F4F4F4";
 const PRESSED_BG = "#FDFFFA";
 
-const CategoryCard = ({ image, title, description, style }) => {
+const CategoryCard = ({ image, title, description, style, onPress }) => {
   const [pressed, setPressed] = useState(false);
   const timerRef = useRef(null);
 
   const handlePress = () => {
     // 눌림색이 눈에 보이도록 아주 살짝 딜레이 후 이동
     timerRef.current = setTimeout(() => {
-      router.push(`/place-recommend/${title.toLowerCase()}`);
+      onPress?.();
     }, 90);
   };
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <View style={[styles.outerCard, style, { width: cardWidth }]}>

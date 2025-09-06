@@ -1,14 +1,14 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  Animated, // Animated.FlatList 사용
+  Animated,
   SafeAreaView,
   Text,
   useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import PlaceCard from "../../../components/place/PlaceCard"; // ← 경로 확인
+import PlaceCard from "../../../components/place/PlaceCard";
 import Button from "../../../components/shared/Button";
 import Header from "../../../components/shared/Header";
 import { hs, vs } from "../../../utils/scale";
@@ -17,7 +17,8 @@ import { hs, vs } from "../../../utils/scale";
 const MOCK_PLACES = [
   {
     id: "1",
-    image: require("../../../assets/images/sample.png"),
+    location_id: 1,                          
+    imageSource: require("../../../assets/images/sample.png"), 
     title: "55데시벨",
     rating: 4.5,
     categories: ["카페", "디저트"],
@@ -26,7 +27,8 @@ const MOCK_PLACES = [
   },
   {
     id: "2",
-    image: require("../../../assets/images/shopping.png"),
+    location_id: 2,
+    imageSource: require("../../../assets/images/sample.png"),
     title: "카페 게이트",
     rating: 4.3,
     categories: ["카페"],
@@ -35,38 +37,47 @@ const MOCK_PLACES = [
   },
   {
     id: "3",
-    image: require("../../../assets/images/shopping.png"),
+    location_id: 3,
+    imageSource: require("../../../assets/images/sample.png"),
     title: "카페 칸나",
-    rating: 4.3,
+    rating: 4.7,
     categories: ["카페"],
     address: "경기도 수원시 영통구",
-    tags: ["아늑한", "감성적인"],
+    tags: ["사진찍기 좋은", "조용한"],
   },
 ];
 
 export default function ResultsScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { keywords } = useLocalSearchParams();
+  const { keywords, keywordsKo } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
 
-  // 키워드 파싱
-  const selectedKeywords = useMemo(() => {
-    if (!keywords) return [];
-    if (Array.isArray(keywords)) return keywords.filter(Boolean);
-    const str = String(keywords).trim();
-    try {
-      const parsed = JSON.parse(str);
-      if (Array.isArray(parsed)) return parsed.filter(Boolean);
-    } catch {}
-    const decoded = decodeURIComponent(str);
-    return decoded
-      .replace(/^\s*\[|\]\s*$/g, "")
-      .replace(/['"]/g, "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }, [keywords]);
+  // === 키워드 파싱 유틸 ===
+  const tryParseJsonArray = (val) => {
+      if (!val) return null;
+      try {
+        const parsed = JSON.parse(String(val));
+        return Array.isArray(parsed) ? parsed : null;
+      } catch {
+        return null;
+      }
+    };
+    const splitComma = (val) =>
+      String(val)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+  
+    // 우선순위: 1) keywordsKo(JSON 한글 배열) 2) keywords(enum 콤마)
+    const selectedKeywords = useMemo(() => {
+      // 1) 한글 배열(JSON)이 오면 그대로
+      const koArr = tryParseJsonArray(keywordsKo);
+      if (koArr) return koArr;
+      // 2) 한글 콤마 문자열 처리
+      if (keywords) return splitComma(decodeURIComponent(String(keywords)));
+      return [];
+    }, [keywords, keywordsKo]);
 
   // 갤러리 구성
   const CARD_W = hs(316);                       // PlaceCard 폭과 동일
@@ -112,7 +123,7 @@ export default function ResultsScreen() {
           }}
         >
           <PlaceCard
-            imageSource={item.image}
+            imageSource={item.imageSource}
             title={item.title}
             rating={item.rating}
             categories={item.categories}
@@ -122,6 +133,7 @@ export default function ResultsScreen() {
             onToggleLike={() =>
               setLiked((p) => ({ ...p, [item.id]: !p[item.id] }))
             }
+            onPressTitle={() => router.push(`/place-recommend/detail/${String(item.id)}`)}
           />
         </Animated.View>
       );
@@ -139,8 +151,8 @@ export default function ResultsScreen() {
         onRightPress={() => router.push("/home")}
       />
 
-      {/* 상단 선택 키워드 뱃지 */}
-      <View className="px-[25px] mt-2 mb-2">
+      {/* 타이틀 + 상단 선택 키워드 뱃지 */}
+      <View style={{ paddingHorizontal: 25, paddingTop: 5, backgroundColor: "#FFFFFF" }}>
         <Text className="text-title-1 font-pretendardExtraBold">
           포슬감자님 여긴 어때요?
         </Text>
@@ -148,10 +160,9 @@ export default function ResultsScreen() {
           {selectedKeywords.slice(0, 3).map((k) => (
             <View
               key={k}
-              className="px-[11px] py-[3px] mr-2 rounded-full bg-green200"
-              style={{ marginBottom: vs(11) }}
+              className="px-[11px] py-[3px] mr-2 mb-[45px] rounded-full border-gray200 border"
             >
-              <Text className="text-white text-heading-3 font-pretendardSemiBold">
+              <Text className="text-gray700 text-heading-3 font-pretendardSemiBold">
                 {k}
               </Text>
             </View>
