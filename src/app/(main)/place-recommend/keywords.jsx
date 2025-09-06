@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Platform, Pressable, SafeAreaView, ScrollView, Text, View } from "react-native";
+import { Platform, Pressable, SafeAreaView, Text, View } from "react-native";
 import Header from "../../../components/shared/Header";
+import Icon from "../../../components/shared/Icon";
 import { CATEGORY, MOODS, resolveCategoryKeyByLabel } from "../../../config/category.config";
 
 export default function KeywordsScreen() {
@@ -91,14 +92,10 @@ export default function KeywordsScreen() {
         onRightPress={() => router.push("/home")}
       />
 
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 120 }}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={{ flex: 1, paddingHorizontal: 25, paddingTop: 5 }}>
         {/* 타이틀 */}
-        <Text className="mt-3 leading-tight text-title-1 font-pretendardExtraBold">{title}</Text>
-        <Text className="mt-2 mb-12 leading-6 text-heading-3 text-gray300 font-pretendardMedium">
+        <Text className="text-title-1 mb-[6px] font-pretendardExtraBold">{title}</Text>
+        <Text className="mb-12 leading-6 text-heading-3 text-gray700 font-pretendardMedium">
           선호하는 키워드를 선택해주세요.
         </Text>
 
@@ -144,10 +141,10 @@ export default function KeywordsScreen() {
             );
           })}
         </View>
-      </ScrollView>
+      </View>
 
       {/* 하단 '다음' */}
-      <View className="absolute bottom-0 left-0 right-0 items-center pb-6">
+      <View className="absolute bottom-0 left-0 right-0 items-center">
         <Pressable
           onPress={goNext}
           className="w-[64px] h-[64px] rounded-full bg-white items-center justify-center"
@@ -164,9 +161,9 @@ export default function KeywordsScreen() {
           accessibilityRole="button"
           accessibilityLabel="다음"
         >
-          <Text className="text-[28px] font-pretendardExtraBold">→</Text>
+          <Icon name="next_circle" width={53} height={53}/>
         </Pressable>
-        <Text className="mt-1 text-gray300 font-pretendardMedium">다음</Text>
+        <Text className="mt-[6px] text-heading-3 text-green500 font-pretendardSemiBold">다음</Text>
       </View>
     </SafeAreaView>
   );

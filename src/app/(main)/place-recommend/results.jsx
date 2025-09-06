@@ -151,8 +151,8 @@ export default function ResultsScreen() {
         onRightPress={() => router.push("/home")}
       />
 
-      {/* 상단 선택 키워드 뱃지 */}
-      <View className="px-[25px] mt-2 mb-2">
+      {/* 타이틀 + 상단 선택 키워드 뱃지 */}
+      <View style={{ paddingHorizontal: 25, paddingTop: 5, backgroundColor: "#FFFFFF" }}>
         <Text className="text-title-1 font-pretendardExtraBold">
           포슬감자님 여긴 어때요?
         </Text>
@@ -160,10 +160,9 @@ export default function ResultsScreen() {
           {selectedKeywords.slice(0, 3).map((k) => (
             <View
               key={k}
-              className="px-[11px] py-[3px] mr-2 rounded-full bg-green200"
-              style={{ marginBottom: vs(11) }}
+              className="px-[11px] py-[3px] mr-2 mb-[45px] rounded-full border-gray200 border"
             >
-              <Text className="text-white text-heading-3 font-pretendardSemiBold">
+              <Text className="text-gray700 text-heading-3 font-pretendardSemiBold">
                 {k}
               </Text>
             </View>

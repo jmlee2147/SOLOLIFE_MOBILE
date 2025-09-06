@@ -67,7 +67,7 @@ export default function PlaceDetailScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       <Header
-        title="장소 상세"
+        title="장소 추천받기"
         leftIcon="previous"
         onLeftPress={() => router.back()}
         rightIcon="home_header"

@@ -1,7 +1,7 @@
 // src/app/(main)/place-recommend/[category].jsx
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo } from "react";
-import { Image, Platform, Pressable, SafeAreaView, ScrollView, Text, View } from "react-native";
+import { Image, Platform, Pressable, SafeAreaView, Text, View } from "react-native";
 import Header from "../../../components/shared/Header";
 import { CATEGORY, resolveCategoryKeyByLabel } from "../../../config/category.config";
 
@@ -77,10 +77,7 @@ export default function CategoryScreen() {
         onRightPress={() => router.push("/home")}
       />
 
-      <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={{ paddingHorizontal: 25, marginTop: 5 }}>
         {/* Hero */}
         <View className="items-center mt-6 mb-3">
           <Image source={CAT_IMAGE[catKey]} className="w-[220px] h-[220px]" resizeMode="contain" />
@@ -118,7 +115,7 @@ export default function CategoryScreen() {
             </Pressable>
           ))}
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }

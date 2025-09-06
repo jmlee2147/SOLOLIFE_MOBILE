@@ -1,7 +1,7 @@
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { SafeAreaView, StyleSheet, Text, View } from "react-native";
 import CategoryCard from "../../../components/place/CategoryCard";
 import Header from "../../../components/shared/Header";
 import Icon from "../../../components/shared/Icon";
@@ -120,7 +120,7 @@ export default function PlaceRecommendScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+    <SafeAreaView className="flex-1 bg-white">
       <Header
         title="장소 추천받기"
         leftIcon="previous"
@@ -129,7 +129,7 @@ export default function PlaceRecommendScreen() {
         onRightPress={() => router.push("/home")}
       />
       <View style={styles.container}>
-        <Text className="mb-2 text-title-1 font-pretendardExtraBold">포슬감자님 반가워요.</Text>
+        <Text className="mb-[6px] text-title-1 font-pretendardExtraBold">포슬감자님 반가워요.</Text>
         <Text className="mb-8 text-heading-3 font-pretendardMedium text-gray700">오늘은 어디를 탐험해볼까요?</Text>
         
         {/* 위치 표시 필터 */}
@@ -162,12 +162,12 @@ export default function PlaceRecommendScreen() {
           <Text style={styles.longCardDesc}>우연한 계기가 운명의 장소가 될 수 있어요.</Text>
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 24, paddingTop: 18 },
+  container: { flex: 1, paddingHorizontal: 25, paddingTop: 5 },
   locPill: {
     flexDirection: "row",
     alignItems: "center",

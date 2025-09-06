@@ -709,6 +709,43 @@ const icons = {
       />
     </Svg>
   ),
+  next_circle: ({ width = 53, height = 53, ...props}) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 53 53"
+      fill="none"
+      {...props}
+    >
+      <Path
+        stroke="#6A8042"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={3}
+        d="M26.5 1.5c13.807 0 25 11.193 25 25s-11.193 25-25 25-25-11.193-25-25 11.193-25 25-25Z"
+      />
+      <Path
+        stroke="#6A8042"
+        strokeWidth={3}
+        d="M15 27h21.333M27 15l10.667 12L27 39"
+      />
+    </Svg>
+  ),
+  share: ({ width = 17, height = 17, ...props}) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 17 17"
+      fill="none"
+      {...props}
+    >
+      <Path
+        stroke="#000"
+        d="M12.75 9.208v5.667H2.125V4.25h5.667M10.625 2.125h4.25v4.25"
+      />
+      <Path stroke="#000" strokeLinejoin="round" d="m7.083 9.917 7.792-7.792" />
+    </Svg>
+  ),
 };
 
 const Icon = ({ name, width, height, style, ...props }) => {
