@@ -1,4 +1,3 @@
-// components/map/MapView.jsx
 import React, { useMemo } from 'react';
 import { WebView } from 'react-native-webview';
 

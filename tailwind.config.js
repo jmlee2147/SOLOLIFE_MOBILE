@@ -34,6 +34,7 @@ module.exports = {
         pretendardSemiBold: ['Pretendard-SemiBold'],
         pretendardMedium: ['Pretendard-Medium'],
         pretendardRegular: ['Pretendard-Regular'],
+        pretendardLight: ['Pretendard-Light'],
       },
 
       fontSize: {
@@ -45,6 +46,7 @@ module.exports = {
         'heading-2': ['18px', { lineHeight: 1.4 }],
         'heading-3': ['16px', { lineHeight: 1.4 }],
 
+        'body-0': ['18px', { lineHeight: 1.4 }],
         'body-1': ['16px', { lineHeight: 1.4 }],
         'body-2': ['14px', { lineHeight: 1.4 }],
         'body-3': ['12px', { lineHeight: 1.4 }],

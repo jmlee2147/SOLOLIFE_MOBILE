@@ -1,7 +1,7 @@
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { DeviceEventEmitter, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import CategoryCard from "../../../components/place/CategoryCard";
 import Header from "../../../components/shared/Header";
 import Icon from "../../../components/shared/Icon";
@@ -54,6 +54,15 @@ export default function PlaceRecommendScreen() {
   
   useEffect(() => {
     let mounted = true;
+
+    const sub = DeviceEventEmitter.addListener("location:selected", (payload) => {
+      if (!payload) return;
+      setLabel(payload.label || "선택된 위치");
+      lastCoordsRef.current = {
+        latitude: Number(payload.latitude),
+        longitude: Number(payload.longitude),
+      };
+    });
   
     const run = async () => {
       try {
@@ -104,6 +113,7 @@ export default function PlaceRecommendScreen() {
       mounted = false;
       watcherRef.current?.remove?.();
       watcherRef.current = null;
+      sub?.remove?.();
     };
   }, []);
 
@@ -133,7 +143,7 @@ export default function PlaceRecommendScreen() {
         <Text className="mb-8 text-heading-3 font-pretendardMedium text-gray700">오늘은 어디를 탐험해볼까요?</Text>
         
         {/* 위치 표시 필터 */}
-        <View style={styles.locPill}>
+        <Pressable style={styles.locPill} onPress={() => router.push("place-recommend/location-search")}>
           <Icon name="location" width={24} height={24} color="#EE7A13" />
           <View style={{ marginLeft: 6, flex: 1 }}>
             <Text numberOfLines={1}
@@ -141,7 +151,7 @@ export default function PlaceRecommendScreen() {
               {label}
             </Text>
           </View>
-        </View>
+        </Pressable>
 
         <View style={styles.grid}>
           {categories.map(( { key, image }) => (
