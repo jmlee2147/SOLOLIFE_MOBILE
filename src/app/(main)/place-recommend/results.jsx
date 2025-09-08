@@ -1,95 +1,115 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   SafeAreaView,
   Text,
-  useWindowDimensions,
   View,
+  useWindowDimensions,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PlaceCard from "../../../components/place/PlaceCard";
 import Button from "../../../components/shared/Button";
 import Header from "../../../components/shared/Header";
+import { postLocationRecommendations } from "../../../services/api";
 import { hs, vs } from "../../../utils/scale";
-
-// 데모 데이터
-const MOCK_PLACES = [
-  {
-    id: "1",
-    location_id: 1,                          
-    imageSource: require("../../../assets/images/sample.png"), 
-    title: "55데시벨",
-    rating: 4.5,
-    categories: ["카페", "디저트"],
-    address: "경기도 수원시 영통구",
-    tags: ["어두운", "감성적인", "조용한"],
-  },
-  {
-    id: "2",
-    location_id: 2,
-    imageSource: require("../../../assets/images/sample.png"),
-    title: "카페 게이트",
-    rating: 4.3,
-    categories: ["카페"],
-    address: "경기도 수원시 영통구",
-    tags: ["아늑한", "감성적인"],
-  },
-  {
-    id: "3",
-    location_id: 3,
-    imageSource: require("../../../assets/images/sample.png"),
-    title: "카페 칸나",
-    rating: 4.7,
-    categories: ["카페"],
-    address: "경기도 수원시 영통구",
-    tags: ["사진찍기 좋은", "조용한"],
-  },
-];
 
 export default function ResultsScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { keywords, keywordsKo } = useLocalSearchParams();
-  const insets = useSafeAreaInsets();
 
-  // === 키워드 파싱 유틸 ===
-  const tryParseJsonArray = (val) => {
-      if (!val) return null;
-      try {
-        const parsed = JSON.parse(String(val));
-        return Array.isArray(parsed) ? parsed : null;
-      } catch {
-        return null;
-      }
-    };
-    const splitComma = (val) =>
-      String(val)
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-  
-    // 우선순위: 1) keywordsKo(JSON 한글 배열) 2) keywords(enum 콤마)
-    const selectedKeywords = useMemo(() => {
-      // 1) 한글 배열(JSON)이 오면 그대로
-      const koArr = tryParseJsonArray(keywordsKo);
-      if (koArr) return koArr;
-      // 2) 한글 콤마 문자열 처리
-      if (keywords) return splitComma(decodeURIComponent(String(keywords)));
+  const { category, subcategory, keywordsKo, moodsKo } = useLocalSearchParams();
+
+  const parseJsonArr = (v) => {
+    try {
+      const a = JSON.parse(String(v));
+      return Array.isArray(a) ? a : [];
+    } catch {
       return [];
-    }, [keywords, keywordsKo]);
-
-  // 갤러리 구성
-  const CARD_W = hs(316);                       // PlaceCard 폭과 동일
-  const ITEM_GAP = hs(1);                      // ← 더 크게: 다음 카드 더 보이게
-  const SPACER = Math.max(0, (width - CARD_W) / 2);
-  const contentPadding = {
-    paddingHorizontal: SPACER,
-    paddingVertical: vs(8),
+    }
   };
 
+  const selectedKeywords = useMemo(() => parseJsonArr(keywordsKo), [keywordsKo]);
+  const selectedMoods = useMemo(() => parseJsonArr(moodsKo), [moodsKo]);
+  const categoryLabel = useMemo(
+    () => (subcategory ? String(subcategory) : String(category || "")),
+    [category, subcategory]
+  );
+
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const fetchRecs = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await postLocationRecommendations({
+        category: categoryLabel,
+        keywords: selectedKeywords,
+        moods: selectedMoods,
+      });
+      setItems(Array.isArray(res?.items) ? res.items : []);
+    } catch (e) {
+      setError(e?.message || "추천을 불러오지 못했어요.");
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [categoryLabel, selectedKeywords, selectedMoods]);
+
+  useEffect(() => {
+    fetchRecs();
+  }, [fetchRecs]);
+
+  // 갤러리 + 중앙 카드 추적
+  const CARD_W = hs(316);
+  const ITEM_GAP = hs(8);
+  const SPACER = Math.max(0, (width - CARD_W) / 2);
+  const contentPadding = useMemo(
+    () => ({ paddingHorizontal: SPACER, paddingVertical: vs(8) }),
+    [SPACER]
+  );
+
+  const listRef = useRef(null);
   const [liked, setLiked] = useState({});
   const scrollX = useRef(new Animated.Value(0)).current;
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const snapSize = CARD_W + ITEM_GAP;
+
+  const onSnapEnd = useCallback(
+    (e) => {
+      const x = e?.nativeEvent?.contentOffset?.x ?? 0;
+      const idx = Math.round(x / snapSize);
+      const clamped = Math.max(0, Math.min(items.length - 1, idx));
+      setCurrentIndex(clamped);
+    },
+    [items.length, snapSize]
+  );
+
+  const goDetailForIndex = useCallback(
+    (index) => {
+      const it = items[index];
+      if (!it) return;
+      router.push({
+        pathname: "/place-recommend/detail/[id]",
+        params: { id: String(it.location_id) },
+      });
+    },
+    [items, router]
+  );
+
+  const scrollToIndex = useCallback(
+    (index) => {
+      if (!listRef.current) return;
+      listRef.current.scrollToOffset({
+        offset: index * snapSize,
+        animated: true,
+      });
+    },
+    [snapSize]
+  );
 
   const renderItem = useCallback(
     ({ item, index }) => {
@@ -98,20 +118,29 @@ export default function ResultsScreen() {
         index * (CARD_W + ITEM_GAP),
         (index + 1) * (CARD_W + ITEM_GAP),
       ];
-
-      // 중앙 1.0, 양옆 0.86로 축소
       const scale = scrollX.interpolate({
         inputRange,
         outputRange: [0.86, 1.0, 0.86],
         extrapolate: "clamp",
       });
-
-      // 중앙 1.0, 양옆 0.7로 투명도
       const opacity = scrollX.interpolate({
         inputRange,
         outputRange: [0.7, 1.0, 0.7],
         extrapolate: "clamp",
       });
+
+      // 서버 응답 -> PlaceCard props 매핑
+      const imageSource = item?.photos?.[0]
+        ? { uri: item.photos[0] }
+        : null;
+      const title = item?.location_name ?? "";
+      const rating = item?.rating_avg ?? null;
+      const categories = item?.category ? [item.category] : [];
+      const address = item?.address ?? "";
+      const tags = [
+        ...(Array.isArray(item?.keywords) ? item.keywords : []),
+        ...(Array.isArray(item?.features_flat) ? item.features_flat : []),
+      ];
 
       return (
         <Animated.View
@@ -123,23 +152,41 @@ export default function ResultsScreen() {
           }}
         >
           <PlaceCard
-            imageSource={item.imageSource}
-            title={item.title}
-            rating={item.rating}
-            categories={item.categories}
-            address={item.address}
-            tags={item.tags}
-            liked={!!liked[item.id]}
+            imageSource={imageSource}
+            title={title}
+            rating={rating}
+            categories={categories}
+            address={address}
+            tags={tags}
+            liked={!!liked[item.location_id]}
             onToggleLike={() =>
-              setLiked((p) => ({ ...p, [item.id]: !p[item.id] }))
+              setLiked((p) => ({ ...p, [item.location_id]: !p[item.location_id] }))
             }
-            onPressTitle={() => router.push(`/place-recommend/detail/${String(item.id)}`)}
+            // 제목 눌렀을 
+            // - 중앙 카드가 아니면 먼저 그 카드로 스냅
+            // - 중앙 카드면 상세로 이동
+            onPressTitle={() => {
+              const payload = JSON.stringify(item); // item = 백엔드 응답 1개
+              if (index !== currentIndex) {
+                scrollToIndex(index);
+              } else {
+                router.push({
+                  pathname: "/place-recommend/detail/[id]",
+                  params: { 
+                    id: String(item.location_id),
+                    initial: encodeURIComponent(payload), // 초기 데이터 전달
+                  },
+                });
+              }
+            }}
           />
         </Animated.View>
       );
     },
-    [CARD_W, ITEM_GAP, liked, scrollX]
+    [CARD_W, ITEM_GAP, liked, scrollX, currentIndex, scrollToIndex, goDetailForIndex]
   );
+
+  const currentItem = items[currentIndex];
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -151,59 +198,85 @@ export default function ResultsScreen() {
         onRightPress={() => router.push("/home")}
       />
 
-      {/* 타이틀 + 상단 선택 키워드 뱃지 */}
+      {/* 타이틀 + 상단 선택 뱃지 */}
       <View style={{ paddingHorizontal: 25, paddingTop: 5, backgroundColor: "#FFFFFF" }}>
-        <Text className="text-title-1 font-pretendardExtraBold">
-          포슬감자님 여긴 어때요?
-        </Text>
+        <Text className="text-title-1 font-pretendardExtraBold">포슬감자님 여긴 어때요?</Text>
+
         <View className="flex-row flex-wrap mt-2">
-          {selectedKeywords.slice(0, 3).map((k) => (
+          {[...selectedMoods, ...selectedKeywords].slice(0, 3).map((k) => (
             <View
               key={k}
-              className="px-[11px] py-[3px] mr-2 mb-[45px] rounded-full border-gray200 border"
+              className="px-[11px] py-[3px] mr-2 mb-[45px] rounded-full border border-gray200"
             >
-              <Text className="text-gray700 text-heading-3 font-pretendardSemiBold">
-                {k}
-              </Text>
+              <Text className="text-gray700 text-heading-3 font-pretendardSemiBold">{k}</Text>
             </View>
           ))}
         </View>
       </View>
 
-      {/* 가로 스와이프 갤러리 (중앙정렬 + 스케일/투명도) */}
-      <Animated.FlatList
-        horizontal
-        data={MOCK_PLACES}
-        keyExtractor={(it) => it.id}
-        renderItem={renderItem}
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={CARD_W + ITEM_GAP}      // 한 장씩 스냅
-        decelerationRate="fast"
-        snapToAlignment="start"
-        contentContainerStyle={contentPadding}  // 좌/우 패딩 비대칭 → 오른쪽 더 보임
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: true }
-        )}
-        scrollEventThrottle={16}
-        extraData={liked}
-      />
+      {/* 본문 */}
+      {loading ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator />
+          <Text style={{ marginTop: 8, color: "#6B7280" }}>추천을 불러오는 중이에요…</Text>
+        </View>
+      ) : error ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
+          <Text style={{ color: "#EF4444", marginBottom: 12 }}>{error}</Text>
+          <Button title="다시 시도" size="small" variant="secondary" onPress={fetchRecs} />
+        </View>
+      ) : items.length === 0 ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
+          <Text style={{ color: "#6B7280", marginBottom: 12 }}>
+            조건에 맞는 장소를 찾지 못했어요.
+          </Text>
+          <Button title="조건 바꾸기" size="small" variant="secondary" onPress={() => router.back()} />
+        </View>
+      ) : (
+        <Animated.FlatList
+          ref={listRef}
+          horizontal
+          data={items}
+          keyExtractor={(it) => String(it.location_id)}
+          renderItem={renderItem}
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={CARD_W + ITEM_GAP}
+          decelerationRate="fast"
+          snapToAlignment="start"
+          contentContainerStyle={contentPadding}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+            { useNativeDriver: true }
+          )}
+          scrollEventThrottle={16}
+          onMomentumScrollEnd={onSnapEnd}
+          onScrollEndDrag={onSnapEnd}
+          extraData={[liked, currentIndex]}
+        />
+      )}
 
       {/* 하단 버튼 */}
-      <View className="flex-row items-center justify-between px-[25px]"
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-            }}>
-        <Button title="다시 추천받기" size="small" variant="secondary"
+      <View
+        className="flex-row items-center justify-between px-[25px]"
+        style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
+      >
+        <Button title="다시 추천받기" size="small" variant="secondary" onPress={fetchRecs} />
+        <Button
+          title="여기 갈래요"
+          size="medium"
+          variant="primary"
+          onPress={() => {
+            if (!currentItem) return;
+            router.push({
+              pathname: "/route-builder",
+              params: {
+                placeName: String(currentItem.location_name || "선택한 장소"),
+                lat: String(currentItem.latitude ?? ""),
+                lng: String(currentItem.longitude ?? ""),
+              },
+            });
+          }}
         />
-        <Button title="여기 갈래요" size="medium" variant="primary" 
-                onPress={() => router.push({
-                  pathname: "/route-builder",
-                  params: { placeName: "55데시벨"},
-                })}/>
       </View>
     </SafeAreaView>
   );

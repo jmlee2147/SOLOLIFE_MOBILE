@@ -1,17 +1,8 @@
-// src/app/(main)/place-recommend/[id].jsx
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import {
-  Animated,
-  Dimensions,
-  Image,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View
+  Animated, Dimensions, Image, Platform, Pressable, SafeAreaView,
+  ScrollView, StyleSheet, Text, View
 } from "react-native";
 import Button from "../../../../components/shared/Button";
 import Header from "../../../../components/shared/Header";
@@ -19,7 +10,7 @@ import Icon from "../../../../components/shared/Icon";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
-// MOCK DATA
+// fallback 목업 데이터
 const MOCK = {
   "1": {
     id: "1",
@@ -38,31 +29,70 @@ const MOCK = {
     phone: "031-1234-5678",
     price: "100만원",
     reviews: [
-      {
-        id: "r1",
-        user: "집가고 싶은 나",
-        rating: 4,
-        content:
-          "I was a ghost, I was alone, hah 어두워진, hah, 앞길속에 ... Given the throne...",
-      },
+      { id: "r1", user: "집가고 싶은 나", rating: 4, content: "..." },
       { id: "r2", user: "감자튀김", rating: 5, content: "조용해서 작업하기 좋았어요." },
     ],
     coords: { lat: 37.251, lng: 127.071 },
   },
 };
-// -----------
+// -------------------------------------
 
 export default function PlaceDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
-  const place = useMemo(() => MOCK[String(id)] ?? MOCK["1"], [id]);
-
-  const [liked, setLiked] = useState(false);
-  const [tab, setTab] = useState("review"); // 'review' | 'route'
+  const { id, initial } = useLocalSearchParams();
   const scrollX = useRef(new Animated.Value(0)).current;
+  const [liked, setLiked] = useState(false);
+  const [tab, setTab] = useState("review");
+
+  // 초기 데이터(옵션): results에서 넘겨준 백엔드 아이템
+  const initialItem = useMemo(() => {
+    try {
+      if (!initial) return null;
+      return JSON.parse(decodeURIComponent(String(initial)));
+    } catch {
+      return null;
+    }
+  }, [initial]);
+
+  // 백엔드 아이템 -> 화면용 필드 맵핑
+  const placeFromApi = useMemo(() => {
+    if (!initialItem) return null;
+    return {
+      id: String(initialItem.location_id),
+      name: initialItem.location_name,
+      rating: initialItem.rating_avg ?? null,
+      categories: initialItem.category ? [initialItem.category] : [],
+      images: (initialItem.photos || []).map((u) => ({ uri: u })),
+      tags: [
+        ...(Array.isArray(initialItem.keywords) ? initialItem.keywords : []),
+        ...(Array.isArray(initialItem.features_flat) ? initialItem.features_flat : []),
+      ],
+      address: initialItem.address ?? "",
+      hours: "", // 상세 스펙 나오면 매핑
+      phone: "", // 상세 스펙 나오면 매핑
+      price: initialItem.price_level ? `₩ Lv.${initialItem.price_level}` : "",
+      reviews: [], // 상세 API 나오면 교체
+      coords: { lat: initialItem.latitude, lng: initialItem.longitude },
+    };
+  }, [initialItem]);
+
+  // 최종 place: 초기데이터 -> MOCK 순
+  const place = useMemo(() => {
+    if (placeFromApi) return placeFromApi;
+    return MOCK[String(id)] ?? MOCK["1"];
+  }, [placeFromApi, id]);
+
+  const images = place.images?.length ? place.images : [require("../../../../assets/images/sample.png")];
 
   const IMG_W = SCREEN_W;
-  const IMG_H = Math.round((SCREEN_W * 9) / 16) + 80; // 시안 대비 여유
+  const IMG_H = Math.round((SCREEN_W * 9) / 16) + 80;
+
+  // 현재 페이지 인덱스 텍스트 (Animated.Value 기반)
+  const pageIndexText = useMemo(() => {
+    const listenerId = scrollX.addListener(() => {});
+    scrollX.removeListener(listenerId);
+    return `1 / ${images.length}`;
+  }, [images.length, scrollX]);
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -74,24 +104,17 @@ export default function PlaceDetailScreen() {
         onRightPress={() => router.push("/home")}
       />
 
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: 110 }}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
         {/* 이미지 캐러셀 */}
         <View style={{ width: IMG_W, height: IMG_H }}>
           <Animated.FlatList
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            data={place.images}
+            data={images}
             keyExtractor={(_, i) => `img-${i}`}
             renderItem={({ item }) => (
-              <Image
-                source={item}
-                resizeMode="cover"
-                style={{ width: IMG_W, height: IMG_H }}
-              />
+              <Image source={item} resizeMode="cover" style={{ width: IMG_W, height: IMG_H }} />
             )}
             onScroll={Animated.event(
               [{ nativeEvent: { contentOffset: { x: scrollX } } }],
@@ -99,7 +122,6 @@ export default function PlaceDetailScreen() {
             )}
             scrollEventThrottle={16}
           />
-          {/* 페이지 표시 1/4 */}
           <View
             style={{
               position: "absolute",
@@ -112,17 +134,7 @@ export default function PlaceDetailScreen() {
             }}
           >
             <Text className="text-white text-body-3 font-pretendardRegular">
-              {/* current index 계산 */}
-              {Math.min(
-                place.images.length,
-                Math.max(
-                  1,
-                  Math.round(
-                    (scrollX?._value ?? 0) / IMG_W + 1 // 초기값 보정
-                  )
-                )
-              )}{" "}
-              / {place.images.length}
+              {pageIndexText}
             </Text>
           </View>
         </View>
@@ -137,33 +149,36 @@ export default function PlaceDetailScreen() {
           </View>
 
           <View className="flex-row items-center">
-            <Text className="text-gray700 text-body-1 font-pretendardMedium">
-              {place.categories.join(", ")}
-            </Text>
-            <View className="flex-row items-center ml-2">
-              <Icon name="star" width={14} height={14} />
-              <Text className="ml-[2px] text-[14px] font-pretendardSemiBold text-[#EE7A13]">
-                {place.rating}
+            {!!place.categories?.length && (
+              <Text className="text-gray700 text-body-1 font-pretendardMedium">
+                {place.categories.join(", ")}
               </Text>
-            </View>
+            )}
+            {!!place.rating && (
+              <View className="flex-row items-center ml-2">
+                <Icon name="star" width={14} height={14} />
+                <Text className="ml-[2px] text-[14px] font-pretendardSemiBold text-[#EE7A13]">
+                  {place.rating}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* 키워드 칩 */}
-          <View className="flex-row flex-wrap mt-2">
-            {place.tags.map((t, i) => (
-              <View
-                key={`${t}-${i}`}
-                className="px-3 py-[6px] mr-2 mb-2 rounded-full bg-gray100"
-              >
-                <Text className="text-gray700">{t}</Text>
-              </View>
-            ))}
-          </View>
+          {!!place.tags?.length && (
+            <View className="flex-row flex-wrap mt-2">
+              {place.tags.map((t, i) => (
+                <View key={`${t}-${i}`} className="px-3 py-[6px] mr-2 mb-2 rounded-full bg-gray100">
+                  <Text className="text-gray700">{t}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* 정보 목록 */}
         <View style={{ marginTop: 12 }}>
-          {place.address && (
+          {!!place.address && (
             <View style={styles.infoRow}>
               <View style={styles.iconBox}>
                 <Icon name="location_outline" width={24} height={24} />
@@ -171,8 +186,7 @@ export default function PlaceDetailScreen() {
               <Text className="text-gray700 font-pretendardMedium text-body-1">{place.address}</Text>
             </View>
           )}
-
-          {place.hours && (
+          {!!place.hours && (
             <View style={styles.infoRow}>
               <View style={styles.iconBox}>
                 <Icon name="time" width={24} height={24} />
@@ -180,8 +194,7 @@ export default function PlaceDetailScreen() {
               <Text className="text-gray700 font-pretendardMedium text-body-1">{place.hours}</Text>
             </View>
           )}
-
-          {place.phone && (
+          {!!place.phone && (
             <View style={styles.infoRow}>
               <View style={styles.iconBox}>
                 <Icon name="phone" width={24} height={24} />
@@ -189,8 +202,7 @@ export default function PlaceDetailScreen() {
               <Text className="text-gray700 font-pretendardMedium text-body-1">{place.phone}</Text>
             </View>
           )}
-
-          {place.price && (
+          {!!place.price && (
             <View style={styles.infoRow}>
               <View style={styles.iconBox}>
                 <Icon name="price" width={24} height={24} />
@@ -204,28 +216,16 @@ export default function PlaceDetailScreen() {
         <View className="px-4 mt-5">
           <View className="flex-row">
             <Pressable onPress={() => setTab("review")}>
-              <Text
-                className={[
-                  "mr-5 pb-1 text-[16px] font-pretendardSemiBold",
-                  tab === "review" ? "text-black" : "text-gray400",
-                ].join(" ")}
-              >
+              <Text className={["mr-5 pb-1 text-[16px] font-pretendardSemiBold", tab === "review" ? "text-black" : "text-gray400"].join(" ")}>
                 리뷰
               </Text>
             </Pressable>
             <Pressable onPress={() => setTab("route")}>
-              <Text
-                className={[
-                  "pb-1 text-[16px] font-pretendardSemiBold",
-                  tab === "route" ? "text-black" : "text-gray400",
-                ].join(" ")}
-              >
+              <Text className={["pb-1 text-[16px] font-pretendardSemiBold", tab === "route" ? "text-black" : "text-gray400"].join(" ")}>
                 관련 여정
               </Text>
             </Pressable>
           </View>
-
-          {/* 탭 바 */}
           <View className="h-[1px] bg-gray200 mt-2" />
 
           {tab === "review" ? (
@@ -236,14 +236,9 @@ export default function PlaceDetailScreen() {
                   <Text className="text-[#3B5B2E]">리뷰작성하기</Text>
                 </Pressable>
               </View>
-
-              {/* 리뷰 리스트 */}
               <View className="mt-3">
-                {place.reviews.map((r) => (
-                  <View
-                    key={r.id}
-                    className="py-4 border-b border-gray200"
-                  >
+                {(place.reviews || []).map((r) => (
+                  <View key={r.id} className="py-4 border-b border-gray200">
                     <View className="flex-row items-center justify-between">
                       <View className="flex-row items-center">
                         <View className="w-8 h-8 mr-2 rounded-full bg-gray200" />
@@ -251,9 +246,7 @@ export default function PlaceDetailScreen() {
                       </View>
                       <Text>{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</Text>
                     </View>
-                    {!!r.content && (
-                      <Text className="mt-2 text-gray700">{r.content}</Text>
-                    )}
+                    {!!r.content && <Text className="mt-2 text-gray700">{r.content}</Text>}
                   </View>
                 ))}
               </View>
@@ -270,28 +263,19 @@ export default function PlaceDetailScreen() {
       <View
         style={{
           position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          paddingHorizontal: 20,
-          paddingBottom: 10,
-          paddingTop: 10,
+          left: 0, right: 0, bottom: 0,
+          paddingHorizontal: 20, paddingBottom: 10, paddingTop: 10,
           backgroundColor: "#fff",
           ...Platform.select({
-            ios: {
-              shadowColor: "#000",
-              shadowOpacity: 0.08,
-              shadowRadius: 8,
-              shadowOffset: { width: 0, height: -2 },
-            },
+            ios: { shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: -2 } },
             android: { elevation: 12 },
           }),
         }}
       >
         <Button
           title="여기 갈래요"
-          size="large"        
-          variant="primary"       
+          size="large"
+          variant="primary"
           onPress={() =>
             router.push({
               pathname: "/route-builder",
@@ -315,14 +299,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 25,
     paddingVertical: 8,
-    // backgroundColor: "#aaa123",
   },
   iconBox: {
-    width: 24,
-    height: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 3,
-    // backgroundColor: "#E5E7EB",
+    width: 24, height: 24, justifyContent: "center", alignItems: "center", marginRight: 3,
   },
 });

@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import React, { memo, useState } from "react";
 import { Image, Platform, Pressable, Text, View } from "react-native";
 import { fs, hs, vs } from "../../utils/scale";
 import Icon from "../shared/Icon";
@@ -14,15 +14,17 @@ function PlaceCard({
   onToggleLike = () => {},
   onPressTitle = () => {},
 }) {
+  const [imageError, setImageError] = useState(false);
+
   return (
     <View
       className="bg-[#FDFFFA] rounded-[10px]"
       style={[
-        { 
-            width: hs(316),
-            height: vs(470),
-            borderWidth: 1,
-            borderColor: "#6A8042",
+        {
+          width: hs(316),
+          height: vs(470),
+          borderWidth: 1,
+          borderColor: "#6A8042",
         },
         Platform.select({
           ios: {
@@ -35,7 +37,7 @@ function PlaceCard({
         }),
       ]}
     >
-      {/* 이미지 */}
+      {/* 이미지 영역 */}
       <View
         className="overflow-hidden rounded-[6px]"
         style={{
@@ -43,38 +45,49 @@ function PlaceCard({
           marginBottom: vs(16),
           marginHorizontal: hs(15),
           height: vs(286),
+          backgroundColor: "#E5E7EB", // 로딩/에러 시 회색 배경
         }}
       >
-        <Image source={imageSource} resizeMode="cover" className="w-full h-full" />
+        {imageError || !imageSource ? (
+          // 이미지 실패/없음 -> 회색 박스만
+          <View className="w-full h-full" />
+        ) : (
+          <Image
+            source={imageSource}
+            resizeMode="cover"
+            className="w-full h-full"
+            onError={() => setImageError(true)}
+          />
+        )}
       </View>
 
       {/* 본문 */}
       <View className="flex-1" style={{ paddingHorizontal: hs(16), paddingTop: vs(12) }}>
         {/* 제목 + 평점 + 좋아요 */}
         <View className="flex-row items-center justify-between">
-            <Pressable onPress={onPressTitle} hitSlop={8} className="flex-1">
-                <View className="flex-row items-center">
-                <Text style={{ fontSize: fs(20), fontWeight: "600", color: "#244DD3" }}>
-                    {title}
-                </Text>
+          <Pressable onPress={onPressTitle} hitSlop={8} className="flex-1">
+            <View className="flex-row items-center">
+              <Text style={{ fontSize: fs(20), fontWeight: "600", color: "#244DD3" }}>
+                {title}
+              </Text>
 
-                {rating != null && (
-                    <View className="flex-row items-center" style={{ marginLeft: hs(6) }}>
-                    <Icon name="star" width={fs(16)} height={fs(16)} />
-                    <Text
-                        className="text-yellow900"
-                        style={{ fontSize: fs(14), fontWeight: "600", marginLeft: hs(1) }}
-                    >
-                        {String(rating)}
-                    </Text>
-                    </View>
-                )}
+              {rating != null && (
+                <View className="flex-row items-center" style={{ marginLeft: hs(6) }}>
+                  <Icon name="star" width={fs(16)} height={fs(16)} />
+                  <Text
+                    className="text-yellow900"
+                    style={{ fontSize: fs(14), fontWeight: "600", marginLeft: hs(1) }}
+                  >
+                    {String(rating)}
+                  </Text>
                 </View>
-            </Pressable>
+              )}
+            </View>
+          </Pressable>
 
-            <Pressable onPress={onToggleLike} hitSlop={8} className="ml-2">
-                <Icon name={liked ? "heart" : "heart_outline"} size={fs(24)} />
-            </Pressable>
+          <Pressable onPress={onToggleLike} hitSlop={8} className="ml-2">
+            <Icon name={liked ? "heart" : "heart_outline"} width={fs(24)} height={fs(24)} />
+          </Pressable>
         </View>
 
         {/* 카테고리 */}

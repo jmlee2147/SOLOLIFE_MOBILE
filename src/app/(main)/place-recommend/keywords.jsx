@@ -14,7 +14,7 @@ export default function KeywordsScreen() {
   // 1) category key 정규화
   const catKey = useMemo(() => {
     if (!rawCategory) return "";
-    if (CATEGORY?.[rawCategory]) return String(rawCategory); // 이미 key
+    if (CATEGORY?.[rawCategory]) return String(rawCategory);
     return resolveCategoryKeyByLabel(String(rawCategory)) || "";
   }, [rawCategory]);
 
@@ -28,7 +28,7 @@ export default function KeywordsScreen() {
     return cfg.subcategories?.[subKey]?.label ?? "";
   }, [cfg, subKey]);
 
-  // 3) 공통 무드 + 전용 키워드 병합
+  // 3) 공통 무드 + 전용 키워드 병합(표시는 합쳐서 하되, 전송은 분리)
   const options = useMemo(() => {
     if (!cfg) return Array.isArray(MOODS) ? [...MOODS] : [];
     const common = Array.isArray(MOODS) ? MOODS : [];
@@ -57,25 +57,38 @@ export default function KeywordsScreen() {
     return `${subLabel || categoryLabel} 장소를 찾으시는군요!`;
   }, [categoryLabel, subLabel]);
 
-  // 6) 키워드가 하나도 없으면(드물겠지만) 바로 결과로
+  // 6) 키워드가 하나도 없으면 바로 결과로(빈 배열 전달)
   useEffect(() => {
-    if (!cfg) return; // 아직 로딩/정규화 실패 시
+    if (!cfg) return;
     if (!options.length) {
+      // 라벨 기준 category 계산
+      const categoryForAPI = subLabel || categoryLabel;
       router.replace({
         pathname: "/place-recommend/results",
-        params: { category: catKey, subcategory: subKey },
+        params: {
+          category: categoryForAPI,     // 라벨로 전달
+          subcategory: subKey,          // 필요하면 유지
+          keywordsKo: JSON.stringify([]),
+          moodsKo: JSON.stringify([]),
+        },
       });
     }
-  }, [cfg, options.length, catKey, subKey, router]);
+  }, [cfg, options.length, subKey, router, categoryLabel, subLabel]);
 
-  // 7) 다음(한글 그대로 전송/전달)
+  // 7) 다음(선택값을 무드/키워드로 분리해서 한글 그대로 전달)
   const goNext = () => {
+    const selectedMoods = selected.filter((k) => MOODS.includes(k));
+    const selectedKeywords = selected.filter((k) => !MOODS.includes(k));
+    // 라벨 기준 category 계산
+    const categoryForAPI = subLabel || categoryLabel;
+
     router.push({
       pathname: "/place-recommend/results",
       params: {
-        category: catKey,
-        subcategory: subKey,
-        keywordsKo: JSON.stringify(selected), // 한글 배열 그대로
+        category: categoryForAPI,                
+        subcategory: subKey,                      
+        keywordsKo: JSON.stringify(selectedKeywords), // 개별 키워드(한글 배열)
+        moodsKo: JSON.stringify(selectedMoods),       // 공통 무드(한글 배열)
       },
     });
   };
@@ -99,7 +112,7 @@ export default function KeywordsScreen() {
           선호하는 키워드를 선택해주세요.
         </Text>
 
-        {/* 칩 그리드 */}
+        {/* 칩 그리드(무드+키워드 합쳐서 표시) */}
         <View className="flex-row flex-wrap mt-5">
           {options.map((k) => {
             const active = selected.includes(k);
