@@ -268,7 +268,7 @@ export default function ResultsScreen() {
           onPress={() => {
             if (!currentItem) return;
             router.push({
-              pathname: "/route-builder",
+              pathname: "/place-recommend/confirm",
               params: {
                 placeName: String(currentItem.location_name || "선택한 장소"),
                 lat: String(currentItem.latitude ?? ""),
