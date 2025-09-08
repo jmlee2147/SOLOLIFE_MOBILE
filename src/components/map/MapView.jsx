@@ -1,6 +1,27 @@
 import React, { useMemo } from 'react';
 import { WebView } from 'react-native-webview';
 
+const NAVER_CLIENT_ID = process.env.EXPO_PUBLIC_NAVER_CLIENT_ID;
+
+const HTML = useMemo(() => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script type="text/javascript"
+    src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_CLIENT_ID}">
+  </script>
+  <style>
+    html,body{margin:0;padding:0;height:100%}
+    #map{position:absolute;inset:0}
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+</body>
+</html>
+`, [NAVER_CLIENT_ID]);
+
 export default function MapView({ lat = 37.248492, lng = 127.076754, name = "" }) {
   const HTML = useMemo(() => `
 <!DOCTYPE html>
@@ -13,7 +34,7 @@ export default function MapView({ lat = 37.248492, lng = 127.076754, name = "" }
                  minimum-scale=1.0, user-scalable=no">
   <!-- 네이버 지도 JS -->
   <script type="text/javascript"
-    src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${"9avrw4jz0c"}"></script>
+    src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_CLIENT_ID}"></script>
   <style>
     html,body{margin:0;padding:0;height:100%}
     #map{position:absolute;inset:0}
