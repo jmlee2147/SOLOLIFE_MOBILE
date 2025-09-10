@@ -1,6 +1,6 @@
 import React, { memo, useMemo, useState } from "react";
 import { Image, Platform, Pressable, Text, View } from "react-native";
-import { hs, vs } from "../../utils/scale";
+import { hs } from "../../utils/scale";
 import Icon from "../shared/Icon";
 
 const MAP_PLACEHOLDER = require("../../assets/images/map_placeholder.png");
@@ -26,11 +26,11 @@ function PlaceCard({
 
   return (
     <View
-      className="bg-[#FDFFFA] rounded-[10px]"
+      className="bg-[#FFFFFF] rounded-[10px]"
       style={[
         {
-          width: hs(317),
-          height: vs(479),
+          width: 317,
+          height: 479,
           borderWidth: 1,
           borderColor: "#62974F",
         },
@@ -143,8 +143,6 @@ function PlaceCard({
               flexWrap: "wrap",
             }}
           >
-            {console.log("tags:", tags)}
-            {console.log("highlightedTags:", highlightedTags)}
             
             {tags.map((t, i) => {
               const label = String(t);
