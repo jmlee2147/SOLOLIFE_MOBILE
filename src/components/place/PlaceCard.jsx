@@ -24,7 +24,7 @@ function PlaceCard({
           width: hs(316),
           height: vs(470),
           borderWidth: 1,
-          borderColor: "#6A8042",
+          borderColor: "#62974F",
         },
         Platform.select({
           ios: {

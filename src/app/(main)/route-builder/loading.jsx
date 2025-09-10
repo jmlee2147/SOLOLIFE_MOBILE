@@ -1,0 +1,141 @@
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Image, SafeAreaView, Text, View } from "react-native";
+import Header from "../../../components/shared/Header";
+import { postRouteNext } from "../../../services/api";
+
+const CHARACTER = require("../../../assets/images/explorer.png");
+
+const parseJsonArray = (v) => {
+  try { const a = JSON.parse(String(v ?? "[]")); return Array.isArray(a) ? a : []; }
+  catch { return []; }
+};
+
+export default function LoadingRouteScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams();
+
+  // confirm/index에서 넘어온 값 복구
+  const moods = useMemo(() => parseJsonArray(params.moodsKo || params.moods), [params]);
+  const region = useMemo(() => String(params.region ?? ""), [params]);
+
+  // 필수: first (URI-encoded JSON)
+  const first = useMemo(() => {
+    try {
+      const raw = decodeURIComponent(String(params.first || ""));
+      const o = JSON.parse(raw);
+      const lat = Number(o.latitude ?? o.lat);
+      const lng = Number(o.longitude ?? o.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      return {
+        location_id: Number(o.location_id),
+        location_name: String(o.location_name ?? ""),
+        category: o.category ? String(o.category) : undefined,
+        address: String(o.address ?? ""),
+        lat, lng,
+      };
+    } catch { return null; }
+  }, [params.first]);
+
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    let canceled = false;
+
+    async function run() {
+      // first가 없으면 여기서 멈춤 (자동 이동 X)
+      if (!first) {
+        setErr("처음 선택한 장소 정보가 유효하지 않아요. 뒤로 가서 다시 시도해 주세요.");
+        return;
+      }
+
+      // 최소 체류 시간(시각적 안정)
+      const minDelay = new Promise((r) => setTimeout(r, 600));
+
+      // 단계적 조건 완화
+      const base = {
+        moods,
+        exclude_location_ids: first.location_id ? [first.location_id] : [],
+        exclude_categories: first.category ? [first.category] : [],
+        center: { lat: first.lat, lng: first.lng },
+      };
+      const tries = [
+        { ...base, region, radius_km: 3 },
+        { ...base, region, radius_km: 5 },
+        { ...base, region, radius_km: 8, exclude_categories: [] },
+        { ...base, radius_km: 8, exclude_categories: [] }, // no region
+      ];
+
+      let merged = [];
+      for (const t of tries) {
+        if (canceled) return;
+        try {
+          const res = await postRouteNext(t);
+          const arr = Array.isArray(res?.items) ? res.items : [];
+          merged = merged.concat(arr);
+          if (merged.length >= 2) break;
+        } catch {}
+      }
+
+      // 유니크 상위 2개만
+      const seen = new Set();
+      const uniq = [];
+      for (const it of merged) {
+        const id = it?.location_id ?? `${it?.location_name}-${it?.category}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        uniq.push(it);
+        if (uniq.length >= 2) break;
+      }
+
+      await minDelay;
+      if (canceled) return;
+
+      // summary로 이동 (summary가 fallback 처리함)
+      router.replace({
+        pathname: "/route-builder/summary",
+        params: {
+          first: String(params.first || ""),
+          region,
+          moodsKo: JSON.stringify(moods),
+          prefetched: JSON.stringify(uniq), // 옵션
+        },
+      });
+    }
+
+    run();
+    return () => { canceled = true; };
+  }, [first, moods, region, router, params.first]);
+  
+
+  return (
+    <SafeAreaView className="flex-1 bg-white">
+      <Header
+        title="루트 추천받기"
+        leftIcon="previous"
+        onLeftPress={() => router.back()}
+        rightIcon="home_header"
+        onRightPress={() => router.push("/home")}
+      />
+      <View style={{ flex: 1, alignItems: "center", paddingTop: 36 }}>
+        <Text className="text-title-1 font-pretendardExtraBold">루트 생성 중이에요.</Text>
+        <Text className="mt-2 text-heading-3 text-gray700 font-pretendardMedium">
+          딱 맞는 루트를 추천해드릴게요!
+        </Text>
+        <Text className="text-heading-3 text-gray700 font-pretendardMedium">
+          잠시만 기다려 주세요.
+        </Text>
+
+        {/* 3D 캐릭터 이미지 */}
+        <Image source={CHARACTER} style={{ width: 240, height: 240, resizeMode: "contain", marginTop: 24 }} />
+        <ActivityIndicator size="large" style={{ marginTop: 28 }} />
+
+        {!!err && (
+          <Text style={{ marginTop: 16, color: "#EF4444", paddingHorizontal: 24, textAlign: "center" }}>
+            {err}
+          </Text>
+        )}
+      </View>
+    </SafeAreaView>
+  );
+}

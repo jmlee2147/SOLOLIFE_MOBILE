@@ -5,9 +5,9 @@ import scale from '../../utils/scale';
 const { hs, vs, rp, fs } = scale;
 
 const VARIANT_STYLES = {
-  primary: { backgroundColor: '#6A8042', textColor: '#FFFFFF' },
-  secondary: { backgroundColor: '#DBDCC1', textColor: '#6A8042' },
-  disabled: { backgroundColor: '#EEEEEE', textColor: '#6B6B6B' },
+  primary: { backgroundColor: '#62974F', textColor: '#FFFFFF' },
+  secondary: { backgroundColor: '#DBDCC1', textColor: '#62974F' },
+  disabled: { backgroundColor: '#F4F4F4', textColor: '#6B6B6B' },
 };
 
 const SIZE_STYLES = {

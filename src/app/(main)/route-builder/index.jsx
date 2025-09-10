@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Platform, Pressable, SafeAreaView, Text, View } from "react-native";
 import Header from "../../../components/shared/Header";
@@ -7,13 +7,20 @@ import { MOODS } from "../../../config/category.config";
 
 export default function MoodSelectScreen() {
   const router = useRouter();
+  const paramsFromPrev = useLocalSearchParams(); // confirm.jsx에서 온 first/region 등 유지용
   const [selected, setSelected] = useState([]);
 
   const toggle = (k) =>
     setSelected((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]));
 
   const goNext = () => {
-    router.push("/route-builder/summary");
+    router.push({
+      pathname: "/route-builder/loading",
+      params: {
+        ...paramsFromPrev,                     // 기존 파라미터 그대로 전달
+        moodsKo: JSON.stringify(selected),     // 이번 화면에서 고른 무드 전달
+      },
+    });
   };
 
   return (
@@ -39,7 +46,10 @@ export default function MoodSelectScreen() {
               <Pressable
                 key={k}
                 onPress={() => toggle(k)}
-                className={["px-7 py-4 rounded-full mr-3 mb-5", active ? "bg-green500" : "bg-gray50"].join(" ")}
+                className={[
+                  "px-7 py-4 rounded-full mr-3 mb-5",
+                  active ? "bg-green500" : "bg-gray50",
+                ].join(" ")}
                 android_ripple={{ color: "rgba(0,0,0,0.06)", borderless: true }}
                 style={Platform.select({
                   ios: { shadowColor: "#000", shadowOpacity: 0, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
@@ -48,7 +58,12 @@ export default function MoodSelectScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={k}
               >
-                <Text className={["text-[18px] font-pretendardMedium", active ? "text-white" : "text-gray700"].join(" ")}>
+                <Text
+                  className={[
+                    "text-[18px] font-pretendardMedium",
+                    active ? "text-white" : "text-gray700",
+                  ].join(" ")}
+                >
                   {k}
                 </Text>
                 {active && <View className="absolute w-3 h-3 rounded-full bg-yellow900 -top-1 -right-1" />}

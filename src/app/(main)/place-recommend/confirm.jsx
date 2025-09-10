@@ -1,4 +1,4 @@
-import * as Linking from 'expo-linking';
+import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -11,7 +11,7 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView from "../../../components/map/MapView";
@@ -21,15 +21,55 @@ import Icon from "../../../components/shared/Icon";
 export default function RouteBuilderScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
-  // 길찾기 실행 함수
+  // 결과 페이지에서 건네준 값들로 일관되게 세팅
+  const placeId = useMemo(() => Number(params.placeId) || Date.now(), [params.placeId]);
+  const placeName = useMemo(() => String(params.placeName ?? "선택한 장소"), [params.placeName]);
+  const category = useMemo(() => String(params.category ?? ""), [params.category]);
+  const addressStr = useMemo(
+    () => String(params.region ?? params.address ?? ""), // region 우선, 없으면 address
+    [params.region, params.address]
+  );
+  const center = useMemo(
+    () => ({
+      lat: Number(params.lat ?? 37.248492),
+      lng: Number(params.lng ?? 127.076754),
+    }),
+    [params.lat, params.lng]
+  );
+
+  // (선택) 사진 배열이 넘어온다면 사용 (JSON 문자열 가정)
+  const photos = useMemo(() => {
+    try {
+      const raw = params.photos ? JSON.parse(String(params.photos)) : [];
+      return Array.isArray(raw) ? raw : [];
+    } catch {
+      return [];
+    }
+  }, [params.photos]);
+
+  // 사용자가 이전 단계에서 고른 무드
+  const moodsKo = useMemo(() => {
+    try {
+      const m = params?.moodsKo;
+      const arr = m ? JSON.parse(String(m)) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch {
+      return [];
+    }
+  }, [params?.moodsKo]);
+
+  // 길찾기 실행
   const openNaverDirections = async ({ lat, lng, name, mode = "walk" }) => {
     const encodedName = encodeURIComponent(name || "");
     let appUrl = `nmap://route/car?dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=com.example.myapp`;
-    if (mode === "walk") appUrl = `nmap://route/walk?dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=com.example.myapp`;
-    if (mode === "transit") appUrl = `nmap://route/publicTransit?dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=com.example.myapp`;
-  
+    if (mode === "walk")
+      appUrl = `nmap://route/walk?dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=com.example.myapp`;
+    if (mode === "transit")
+      appUrl = `nmap://route/publicTransit?dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=com.example.myapp`;
+
     const webUrl = `https://map.naver.com/v5/directions/-/-/${lng},${lat},${encodedName}`;
     try {
       const supported = await Linking.canOpenURL(appUrl);
@@ -39,60 +79,47 @@ export default function RouteBuilderScreen() {
     }
   };
 
-  // 실제로는 params에서 받아오는 값 사용
-  const placeName = String(params.placeName ?? "55 데시벨");
-  const center = useMemo(
-    () => ({
-      lat: Number(params.lat ?? 37.248492),
-      lng: Number(params.lng ?? 127.076754),
-    }),
-    [params.lat, params.lng]
-  );
-
-  const insets = useSafeAreaInsets();
-
-  // 바텀시트 위치: 0(완전 펼침) ~ peekY(CTA가 가려지는 지점)
+  // 바텀시트
   const sheetY = useRef(new Animated.Value(0)).current;
   const dragStartY = useRef(0);
-  
-  // 시트 전체 높이, CTA 좌표/높이 측정
   const [sheetH, setSheetH] = useState(0);
   const [ctaBox, setCtaBox] = useState({ y: 0, h: 0 });
-
-  // CTA가 완전히 가려질 때까지 내릴 수 있는 거리
   const peekY = Math.max(0, sheetH - ctaBox.y + insets.bottom + 2);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       Animated.timing(sheetY, {
         toValue: 0,
-        duration: 300,     // 조금 더 부드럽게
+        duration: 300,
         useNativeDriver: true,
       }).start();
-    }, 0);              // ← 0.4초 뒤에 시작
-  
+    }, 0);
     return () => clearTimeout(timer);
   }, [sheetY]);
 
-  // 드래그 제스처
-  const panResponder = React.useMemo(
-    () => PanResponder.create({
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 4,
-      onPanResponderGrant: () => { sheetY.stopAnimation(v => (dragStartY.current = v)); },
-      onPanResponderMove: (_e, g) => {
-        const next = Math.min(Math.max(dragStartY.current + g.dy, 0), peekY);
-        sheetY.setValue(next);
-      },
-      onPanResponderRelease: (_e, g) => {
-        const end = dragStartY.current + g.dy + g.vy * 80;
-        const snapToPeek = end > peekY * 0.5 || g.vy > 0.6;
-        Animated.spring(sheetY, {
-          toValue: snapToPeek ? peekY : 0,
-          useNativeDriver: true,
-          stiffness: 220, damping: 28, mass: 0.9,
-        }).start();
-      },
-    }),
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 4,
+        onPanResponderGrant: () => {
+          sheetY.stopAnimation((v) => (dragStartY.current = v));
+        },
+        onPanResponderMove: (_e, g) => {
+          const next = Math.min(Math.max(dragStartY.current + g.dy, 0), peekY);
+          sheetY.setValue(next);
+        },
+        onPanResponderRelease: (_e, g) => {
+          const end = dragStartY.current + g.dy + g.vy * 80;
+          const snapToPeek = end > peekY * 0.5 || g.vy > 0.6;
+          Animated.spring(sheetY, {
+            toValue: snapToPeek ? peekY : 0,
+            useNativeDriver: true,
+            stiffness: 220,
+            damping: 28,
+            mass: 0.9,
+          }).start();
+        },
+      }),
     [peekY]
   );
 
@@ -116,46 +143,40 @@ export default function RouteBuilderScreen() {
         </Text>
       </View>
 
-      {/* 지도 영역: 타이틀 아래 4px 간격 + 남은 공간 전부 */}
+      {/* 지도 */}
       <View style={styles.mapArea}>
         <View style={styles.mapCard}>
           <View style={styles.mapInner}>
-            {/* MapView는 수정 금지. 부모가 공간을 제공하도록 flex로 감쌈 */}
             <View style={{ flex: 1 }}>
-              <MapView lat={center.lat} lng={center.lng} name={placeName}/>
+              <MapView lat={center.lat} lng={center.lng} name={placeName} />
             </View>
 
-            {/* 지도 위 FAB(예시) */}
-            <Pressable style={styles.fabSmall} onPress={() => { /* 현재위치 이동 등 */ }}>
-              <Text style={{ fontWeight: "600" }}>🧭</Text>
-            </Pressable>
-
-            {/* 지도 위 바텀시트 (맨 아래에서 슥 올라옴) */}
+            {/* 지도 위 바텀시트 */}
             <Animated.View
               pointerEvents="box-none"
               style={[styles.sheetWrap, { transform: [{ translateY: sheetY }] }]}
-              {...panResponder.panHandlers}           // ⬅️ 여기!
+              {...panResponder.panHandlers}
             >
-              <View
-                  style={styles.sheetCard}
-                  onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}>
-                {/* 그립바 */}
-                <View style={styles.handle} />
+              <View style={styles.sheetCard} onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}>
+                <View className="items-center" style={styles.handle} />
 
-                {/* 장소 요약 + 액션(같은 줄) */}
+                {/* 상단: 제목 + 액션 */}
                 <View style={styles.placeHeaderRow}>
-                  {/* 왼쪽: 제목 + 평점 */}
                   <View style={styles.titleRatingWrap}>
                     <Text className="text-heading-2 text-[#244DD3] font-pretendardSemiBold">
                       {placeName}
                     </Text>
-                    <View className="flex-row items-center ml-[9px]">
-                      <Icon name="star" width={16} height={16} />
-                      <Text className="ml-[2px] text-yellow900 text-body-2 font-pretendardMedium">4.5</Text>
-                    </View>
+                    {/* 평점이 넘어오면 표시 (없으면 숨김) */}
+                    {params?.rating_avg != null && (
+                      <View className="flex-row items-center ml-[9px]">
+                        <Icon name="star" width={16} height={16} />
+                        <Text className="ml-[2px] text-yellow900 text-body-2 font-pretendardMedium">
+                          {String(params.rating_avg)}
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
-                  {/* 오른쪽: 길찾기 / 공유 */}
                   <View style={styles.headerActions}>
                     <Pressable
                       onPress={() =>
@@ -177,7 +198,7 @@ export default function RouteBuilderScreen() {
                         try {
                           const msg =
                             `${placeName}\n` +
-                            `경기도 수원시 영통구\n\n` +
+                            `${addressStr || ""}\n\n` + // ✅ CHANGED: 하드코딩 제거
                             `지도 보기: https://map.naver.com/v5/?c=${center.lng},${center.lat},15,0,0,0`;
                           await Share.share({ message: msg });
                         } catch {}
@@ -191,23 +212,30 @@ export default function RouteBuilderScreen() {
                   </View>
                 </View>
 
-                {/* 아래 줄: 카테고리/주소 */}
-                <Text className="mt-1 text-body-2 font-pretendardMedium text-gray700">카페, 디저트</Text>
-                <Text className="mt-1 text-body-2 font-pretendardMedium text-gray700">경기도 수원시 영통구</Text>
+                {/* 카테고리/주소 (있을 때만) */}
+                {!!category && (
+                  <Text className="mt-1 text-body-2 font-pretendardMedium text-gray700">{category}</Text>
+                )}
+                {!!addressStr && (
+                  <Text className="mt-1 text-body-2 font-pretendardMedium text-gray700">{addressStr}</Text>
+                )}
 
-                {/* 썸네일 3개 (샘플) */}
+                {/* 썸네일 3개: 넘어온 사진 우선, 없으면 샘플 */}
                 <View style={styles.thumbRow}>
-                  <Image source={require("../../../assets/images/sample.png")} style={styles.thumb} />
-                  <Image source={require("../../../assets/images/cafe.png")} style={styles.thumb} />
-                  <Image source={require("../../../assets/images/shopping.png")} style={styles.thumb} />
+                  {[0, 1, 2].map((i) => {
+                    const uri = photos[i];
+                    const src = uri ? { uri } : require("../../../assets/images/sample.png");
+                    return <Image key={i} source={src} style={styles.thumb} resizeMode="cover" />;
+                  })}
                 </View>
 
-                <View 
-                    style={styles.ctaRow}
-                    onLayout={(e) => {
-                      const { y, height } = e.nativeEvent.layout;
-                      setCtaBox({ y, h: height });
-                    }}
+                {/* CTA */}
+                <View
+                  style={styles.ctaRow}
+                  onLayout={(e) => {
+                    const { y, height } = e.nativeEvent.layout;
+                    setCtaBox({ y, h: height });
+                  }}
                 >
                   <View style={{ flex: 1, paddingRight: 16 }}>
                     <Text className="text-heading-2 font-pretendardSemiBold">이 장소를 포함한</Text>
@@ -215,7 +243,28 @@ export default function RouteBuilderScreen() {
                   </View>
 
                   <Pressable
-                    onPress={() => router.push("/route-builder")}
+                    onPress={() => {
+                      // first payload를 실제 params 기반으로
+                      const firstPayload = {
+                        location_id: placeId,
+                        location_name: placeName,
+                        category,
+                        address: addressStr,
+                        latitude: center.lat,
+                        longitude: center.lng,
+                        rating_avg: params?.rating_avg ?? undefined,
+                        photos: photos, // 넘어왔다면 같이 전달
+                      };
+
+                      router.push({
+                        pathname: "/route-builder", // index.jsx
+                        params: {
+                          first: encodeURIComponent(JSON.stringify(firstPayload)),
+                          region: addressStr, // region 역할로 활용
+                          moodsKo: JSON.stringify(moodsKo),
+                        },
+                      });
+                    }}
                     style={styles.ctaCircle}
                     android_ripple={{ color: "rgba(0,0,0,0.06)", borderless: true }}
                     accessibilityRole="button"
@@ -234,50 +283,21 @@ export default function RouteBuilderScreen() {
 }
 
 const styles = StyleSheet.create({
-  // 타이틀 블록
-  titleBlock: { paddingHorizontal: 25, paddingTop: 5, marginBottom: 4 }, // ← 아래 여백 4px
+  titleBlock: { paddingHorizontal: 25, paddingTop: 5, marginBottom: 4 },
   title: { marginBottom: 6, letterSpacing: -0.3 },
-
-  // 지도 영역(남은 공간 전부 차지)
-  mapArea: { flex: 1 }, // ← 핵심: 타이틀 아래부터 화면 끝까지
+  mapArea: { flex: 1 },
   mapCard: { flex: 1 },
   mapInner: {
-    flex: 1,                 // ← 핵심: 내부도 전부 확장
+    flex: 1,
     overflow: "hidden",
     backgroundColor: "#E5E7EB",
     position: "relative",
-    minHeight: 414,          // WebView가 flex 스타일을 무시할 경우 대비 최소 높이
+    minHeight: 414,
   },
-
-  // 지도 위 FAB
-  fabSmall: {
-    position: "absolute",
-    left: 12,
-    bottom: 12,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-
-  // 바텀시트
-  sheetWrap: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
+  sheetWrap: { position: "absolute", left: 0, right: 0, bottom: 0 },
   sheetCard: {
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
     backgroundColor: "#FFFFFF",
     paddingHorizontal: 25,
     paddingTop: 20,
@@ -296,24 +316,17 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
   placeHeaderRow: { flexDirection: "row", alignItems: "center" },
-  titleRatingWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,           
-    paddingRight: 12,
-    minWidth: 0,       
-  },
+  titleRatingWrap: { flexDirection: "row", alignItems: "center", flex: 1, paddingRight: 12, minWidth: 0 },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 5, flexShrink: 0 },
   openMapBtn: {
     marginLeft: "auto",
     paddingHorizontal: 13.5,
     paddingVertical: 3,
     borderRadius: 40,
-    backgroundColor: "#6A8042",
+    backgroundColor: "#62974F",
     alignItems: "center",
     justifyContent: "center",
   },
-
   shareBtn: {
     flexDirection: "row",
     marginLeft: "auto",
@@ -327,11 +340,6 @@ const styles = StyleSheet.create({
   },
   thumbRow: { flexDirection: "row", gap: 10, marginTop: 18 },
   thumb: { flex: 1, height: 120, width: 120, backgroundColor: "#F3F4F6" },
-
-  ctaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 67,
-    marginBottom: 36,
-  }
+  ctaRow: { flexDirection: "row", alignItems: "center", marginTop: 67, marginBottom: 36 },
+  ctaCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
 });

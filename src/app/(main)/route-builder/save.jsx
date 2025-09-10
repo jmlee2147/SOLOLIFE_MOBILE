@@ -2,13 +2,13 @@
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-    Keyboard,
-    Pressable,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View
+  Keyboard,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
 } from "react-native";
 import Button from "../../../components/shared/Button";
 import Header from "../../../components/shared/Header";
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
   },
   pillActive: {
-    backgroundColor: "#6A8042",
+    backgroundColor: "#62974F",
   },
   pillText: {
     fontSize: 14,
