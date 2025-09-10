@@ -655,7 +655,7 @@ const icons = {
     <Svg
       width={width}
       height={height}
-      viewBox="0 0 24 24"
+      viewBox="6 0 18 24"
       fill="none"
       {...props}
     >

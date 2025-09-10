@@ -15,7 +15,7 @@ import { CATEGORY } from "../../../config/category.config";
 import { postLocationRecommendations } from "../../../services/api";
 import { hs, vs } from "../../../utils/scale";
 
-// 🔹 실패/오프라인 시 보여줄 목업(백엔드 응답 형태와 최대한 비슷하게)
+// 실패/오프라인 시 보여줄 목업(백엔드 응답 형태와 최대한 비슷하게)
 const MOCK_ITEMS = [
   {
     location_id: 1,
@@ -123,7 +123,7 @@ export default function ResultsScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ 추천 불러오기 (center / radius_km 포함)
+  // 추천 불러오기 (center / radius_km 포함)
   const fetchRecs = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -134,8 +134,8 @@ export default function ResultsScreen() {
         category: categoryLabel,        // 한글 라벨
         keywords: selectedKeywords,
         moods: selectedMoods,
-        center: centerForAPI,           // ✅ 필수
-        radius_km: 3,                   // ✅ 요구사항
+        center: centerForAPI,           // 필수
+        radius_km: 3,                   // 요구사항
       });
       const arr = Array.isArray(res?.items) ? res.items : [];
       setItems(arr.length ? arr : MOCK_ITEMS);
@@ -236,6 +236,7 @@ export default function ResultsScreen() {
             categories={categories}
             address={address}
             tags={tags}
+            highlightedTags={[...selectedMoods, ...selectedKeywords]}
             liked={!!liked[item.location_id]}
             onToggleLike={() =>
               setLiked((p) => ({ ...p, [item.location_id]: !p[item.location_id] }))
@@ -281,7 +282,7 @@ export default function ResultsScreen() {
           {[...selectedMoods, ...selectedKeywords].slice(0, 3).map((k) => (
             <View
               key={k}
-              className="px-[11px] py-[3px] mr-2 mb-[45px] rounded-full border border-gray200"
+              className="px-[11px] py-[3px] mr-2 mb-[38px] rounded-full border border-gray200"
             >
               <Text className="text-gray700 text-heading-3 font-pretendardSemiBold">{k}</Text>
             </View>
