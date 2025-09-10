@@ -270,6 +270,7 @@ export default function ResultsScreen() {
                 moodsKo: JSON.stringify(selectedMoods),
                 keywordsKo: JSON.stringify(selectedKeywords),
                 center: JSON.stringify(centerForAPI),
+                photos: encodeURIComponent(JSON.stringify(currentItem.photos || []))
               },
             });
           }}

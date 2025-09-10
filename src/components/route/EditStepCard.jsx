@@ -8,6 +8,7 @@ const DEFAULT_BG = "#FFFFFF";
 const PRESSED_BG = "#FDFFFA";
 const DEFAULT_BORDER = "#D4D4D4";
 const PRESSED_BORDER = "#62974F";
+const MAP_PLACEHOLDER = require("../../assets/images/map_placeholder.png");
 
 export default function EditStepCard({
   title = "",
@@ -18,13 +19,16 @@ export default function EditStepCard({
   onPress,
   disabled = false,
   style,
-  horizontalPadding = 24,
+  horizontalPadding = 25,
 }) {
   const { width: screenW } = useWindowDimensions();
   const cardW = Math.min(BASE_W, screenW - horizontalPadding * 2);
   const cardH = (BASE_H / BASE_W) * cardW;
 
   const [selected, setSelected] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  const showFallback = !imageSource || imgError;
 
   return (
     <TouchableOpacity
@@ -42,7 +46,7 @@ export default function EditStepCard({
             width: cardW,
             height: cardH,
             backgroundColor: selected ? PRESSED_BG : DEFAULT_BG,
-            borderColor: selected ? PRESSED_BORDER : DEFAULT_BORDER, 
+            borderColor: selected ? PRESSED_BORDER : DEFAULT_BORDER,
           },
           style,
         ]}
@@ -61,9 +65,7 @@ export default function EditStepCard({
             {rating != null && (
               <View style={{ flexDirection: "row", alignItems: "center", marginLeft: 6 }}>
                 <Icon name="star" width={16} height={16} />
-                <Text
-                  className="text-yellow900 font-pretendardSemiBold text-body-2 ml-[2px]"
-                >
+                <Text className="text-yellow900 font-pretendardSemiBold text-body-2 ml-[2px]">
                   {String(rating)}
                 </Text>
               </View>
@@ -72,32 +74,35 @@ export default function EditStepCard({
 
           {/* 카테고리 */}
           {categories?.length > 0 && (
-            <Text
-              className="text-gray700 text-body-2 font-pretendardMedium"
-              numberOfLines={1}
-            >
+            <Text className="text-gray700 text-body-2 font-pretendardMedium" numberOfLines={1}>
               {categories.join(", ")}
             </Text>
           )}
 
           {/* 주소 */}
           {!!address && (
-            <Text
-              className="text-gray700 text-body-2 font-pretendardMedium"
-              numberOfLines={1}
-            >
+            <Text className="text-gray700 text-body-2 font-pretendardMedium" numberOfLines={1}>
               {address}
             </Text>
           )}
         </View>
 
-        {/* 오른쪽 이미지 */}
+        {/* 오른쪽 이미지 (회색 배경 + placeholder 폴백) */}
         <View style={styles.imageWrapper}>
-          <Image
-            source={imageSource}
-            resizeMode="cover"
-            style={styles.image}
-          />
+          {showFallback ? (
+            <Image
+              source={MAP_PLACEHOLDER}
+              resizeMode="contain"
+              style={{ width: "70%", height: "70%", opacity: 0.9 }}
+            />
+          ) : (
+            <Image
+              source={imageSource}
+              resizeMode="cover"
+              style={styles.image}
+              onError={() => setImgError(true)}
+            />
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -117,20 +122,21 @@ const styles = StyleSheet.create({
     height: "100%",
     justifyContent: "flex-start",
     paddingLeft: 12,
-    // paddingTop: 12,
   },
   firstRow: {
     flexDirection: "row",
     alignItems: "center",
-    // backgroundColor: "#bbbbbb",
     paddingTop: 16,
     marginBottom: 11,
   },
   imageWrapper: {
-    width: 92,   // 고정 크기 (피그마 기준)
+    width: 92,
     height: 92,
     marginRight: 12,
     overflow: "hidden",
+    backgroundColor: "#E2E2E2", 
+    alignItems: "center",
+    justifyContent: "center",
   },
   image: {
     width: "100%",

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Icon from "../shared/Icon";
 
@@ -8,6 +8,7 @@ const IMG_W_RATIO = 92 / 343; // 오른쪽 이미지 비율
 const BADGE = 24; // 뱃지 지름
 
 const BADGE_COLORS = ["#62974F", "#B3B56C", "#DBDCC1"];
+const MAP_PLACEHOLDER = require("../../assets/images/map_placeholder.png");
 
 export default function RouteStepCard({
   step = 1,
@@ -27,11 +28,13 @@ export default function RouteStepCard({
   // 카드 폭(최대 343) = 화면 - 좌우 패딩*2
   const cardW = Math.min(BASE_W, screenW - horizontalPadding * 2);
   const cardH = (BASE_H / BASE_W) * cardW;
-  const imgW  = cardW * (92 / 343);                  // 가로 폭 = 카드 폭 비례
-  const imgH  = cardW * IMG_W_RATIO;
+  const imgW  = cardW * (92 / 343); // 오른쪽 이미지 폭
+  const imgH  = cardW * IMG_W_RATIO; // 오른쪽 이미지 높이
 
   const stepNum = Number(step) || 1;
   const badgeColor = BADGE_COLORS[(Math.max(1, stepNum) - 1) % BADGE_COLORS.length];
+
+  const [imgError, setImageError] = useState(false);
 
   return (
     <View style={[styles.card, { width: cardW, height: cardH }, style]}>
@@ -43,7 +46,10 @@ export default function RouteStepCard({
             <Text className="text-white font-pretendardMedium text-body-2">{step}</Text>
           </View>
 
-          <Text className="font-pretendardSemiBold text-[#244DD3] text-heading-2 ml-[15px]" numberOfLines={1}>
+          <Text
+            className="font-pretendardSemiBold text-[#244DD3] text-heading-2 ml-[15px]"
+            numberOfLines={1}
+          >
             {title}
           </Text>
 
@@ -71,7 +77,7 @@ export default function RouteStepCard({
           </Text>
         )}
 
-        {/* 하단 액션 버튼(길찾기 / 공유) — 레이아웃만 추가 */}
+        {/* 하단 액션 버튼(길찾기 / 공유) */}
         <View style={styles.actionsRow}>
           <Pressable onPress={onPressDirections} style={[styles.actionBtn, styles.primaryBtn]}>
             <Text className="text-white font-pretendardMedium text-body-2">길찾기</Text>
@@ -84,9 +90,32 @@ export default function RouteStepCard({
         </View>
       </View>
 
-      {/* 오른쪽 이미지: 카드 맨 위에서 시작 + 높이 비율 고정 */}
-      <View style={{ width: imgW, height: imgH, alignSelf: "flex-start" }}>
-        <Image source={imageSource} style={{ width: imgW, height: imgH }} resizeMode="cover" />
+      {/* 오른쪽 이미지: 카드 맨 위에서 시작 + 높이 비율 고정 + 플레이스홀더 처리 */}
+      <View
+        style={{
+          width: imgW,
+          height: imgH,
+          alignSelf: "flex-start",
+          backgroundColor: "#E2E2E2",
+          overflow: "hidden",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {(!imageSource || imgError) ? (
+          <Image
+            source={MAP_PLACEHOLDER}
+            resizeMode="contain"
+            style={{ width: "70%", height: "70%", opacity: 0.9 }}
+          />
+        ) : (
+          <Image
+            source={imageSource}
+            resizeMode="cover"
+            style={{ width: imgW, height: imgH }}
+            onError={() => setImageError(true)}
+          />
+        )}
       </View>
     </View>
   );
@@ -120,15 +149,12 @@ const styles = StyleSheet.create({
     width: BADGE,
     height: BADGE,
     borderRadius: BADGE / 2,
-    backgroundColor: "#62974F",
     alignItems: "center",
     justifyContent: "center",
   },
- 
   indent: {
     marginLeft: BADGE + 15,
   },
-
   actionsRow: {
     position: "absolute",
     bottom: 0,

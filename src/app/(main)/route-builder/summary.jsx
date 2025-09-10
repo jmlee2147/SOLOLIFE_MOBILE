@@ -15,7 +15,7 @@ const FALLBACK_FIRST = {
   rating: 4.5,
   categories: ["카페", "디저트"],
   address: "경기도 수원시 영통구",
-  imageSource: require("../../../assets/images/sample.png"),
+  imageSource: null,
   lat: 37.248492,
   lng: 127.076754,
 };
@@ -27,7 +27,7 @@ const FALLBACK_OTHERS = [
     rating: 4.2,
     categories: ["카페"],
     address: "경기도 수원시 영통구",
-    imageSource: require("../../../assets/images/cafe.png"),
+    imageSource: null,
     lat: 37.2512,
     lng: 127.0719,
   },
@@ -38,7 +38,7 @@ const FALLBACK_OTHERS = [
     rating: 4.7,
     categories: ["공원"],
     address: "서울 강북구",
-    imageSource: require("../../../assets/images/activity.png"),
+    imageSource: null,
     lat: 37.6512,
     lng: 127.0386,
   },
@@ -63,7 +63,7 @@ function mapApiItemToCard(item, stepIndexBase = 2) {
   const imageSource =
     photo && typeof photo === "string" && /^https?:\/\//i.test(photo)
       ? { uri: photo }
-      : require("../../../assets/images/sample.png");
+      : null;
   const lat = Number(item?.latitude ?? item?.lat);
   const lng = Number(item?.longitude ?? item?.lng);
 
@@ -126,6 +126,7 @@ export default function RouteSummaryScreen() {
        const obj = JSON.parse(raw);
        const lat = Number(obj.latitude ?? obj.lat);
        const lng = Number(obj.longitude ?? obj.lng);
+       const p0 = Array.isArray(obj?.photos) && obj.photos[0];
        if (Number.isFinite(lat) && Number.isFinite(lng)) {
          return {
            id: Number(obj.location_id) || Date.now(),
@@ -134,7 +135,7 @@ export default function RouteSummaryScreen() {
            rating: obj.rating_avg ?? undefined,
            categories: obj.category ? [String(obj.category)] : [],
            address: String(obj.address ?? ""),
-           imageSource: require("../../../assets/images/sample.png"), // 필요시 obj.photos[0] 매핑
+           imageSource: p0 ? { uri: p0 } : null,
            lat, lng,
          };
        }
@@ -403,15 +404,20 @@ useEffect(() => {
               pathname: "/route-builder/edit",
               params: {
                 routeItems: JSON.stringify(
-                  items.map((c) => c.raw || {
-                    location_id: c.location_id,
-                    location_name: c.title,
-                    category: c.categories?.[0] || "",
-                    address: c.address || "",
-                    latitude: c.lat,
-                    longitude: c.lng,
-                    photos: [],
-                    rating_avg: c.rating ?? null,
+                  items.map((c) => {
+                    if (c.raw) return c.raw;
+
+                    const photoUri = c?.imageSource?.uri ? [c.imageSource.uri] : [];
+                    return {
+                      location_id: c.location_id,
+                      location_name: c.title,
+                      category: c.categories?.[0] || "",
+                      address: c.address || "",
+                      latitude: c.lat,
+                      longitude: c.lng,
+                      photos: photoUri,
+                      rating_avg: c.rating ?? null,
+                    };
                   })
                 ),
                 center: JSON.stringify({ lat: items[0]?.lat, lng: items[0]?.lng }),

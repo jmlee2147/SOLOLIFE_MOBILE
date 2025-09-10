@@ -23,6 +23,7 @@ export default function RouteBuilderScreen() {
   const params = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const MAP_PLACEHOLDER = require("../../../assets/images/map_placeholder.png");
 
   // 결과 페이지에서 건네준 값들로 일관되게 세팅
   const placeId = useMemo(() => Number(params.placeId) || Date.now(), [params.placeId]);
@@ -40,15 +41,22 @@ export default function RouteBuilderScreen() {
     [params.lat, params.lng]
   );
 
-  // (선택) 사진 배열이 넘어온다면 사용 (JSON 문자열 가정)
+  // 사진
   const photos = useMemo(() => {
-    try {
-      const raw = params.photos ? JSON.parse(String(params.photos)) : [];
-      return Array.isArray(raw) ? raw : [];
-    } catch {
-      return [];
-    }
-  }, [params.photos]);
+      try {
+        if (!params?.photos) return [];
+        // 1) URI 디코딩 시도
+        const rawStr = decodeURIComponent(String(params.photos));
+        const parsed = JSON.parse(rawStr);
+        const arr = Array.isArray(parsed) ? parsed : [];
+        // 2) 백엔드가 문자열/객체 혼용으로 줄 수 있으니 URL만 추출
+        return arr
+          .map((p) => (typeof p === "string" ? p : p?.url || p?.src || null))
+          .filter(Boolean);
+      } catch {
+        return [];
+      }
+    }, [params?.photos]);
 
   // 사용자가 이전 단계에서 고른 무드
   const moodsKo = useMemo(() => {
@@ -224,8 +232,32 @@ export default function RouteBuilderScreen() {
                 <View style={styles.thumbRow}>
                   {[0, 1, 2].map((i) => {
                     const uri = photos[i];
-                    const src = uri ? { uri } : require("../../../assets/images/sample.png");
-                    return <Image key={i} source={src} style={styles.thumb} resizeMode="cover" />;
+                    if (uri) {
+                      return (
+                        <Image
+                          key={i}
+                          source={{ uri }}
+                          style={styles.thumb}
+                          resizeMode="cover"
+                        />
+                      );
+                    } else {
+                      return (
+                        <View
+                          key={i}
+                          style={[
+                            styles.thumb,
+                            { alignItems: "center", justifyContent: "center" },
+                          ]}
+                        >
+                          <Image
+                            source={MAP_PLACEHOLDER}
+                            style={{ width: "60%", height: "60%", opacity: 0.9 }}
+                            resizeMode="contain"
+                          />
+                        </View>
+                      );
+                    }
                   })}
                 </View>
 
@@ -338,8 +370,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  thumbRow: { flexDirection: "row", gap: 10, marginTop: 18 },
-  thumb: { flex: 1, height: 120, width: 120, backgroundColor: "#F3F4F6" },
+  thumbRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 18
+  },
+  thumb: { 
+    flex: 1,
+    width: 100,
+    aspectRatio: 1,
+    backgroundColor: "#E2E2E2",
+    overflow: "hidden",
+  },
   ctaRow: { flexDirection: "row", alignItems: "center", marginTop: 67, marginBottom: 36 },
   ctaCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
 });
