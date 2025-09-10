@@ -7,7 +7,7 @@ const BASE_H = 109;
 const DEFAULT_BG = "#FFFFFF";
 const PRESSED_BG = "#FDFFFA";
 const DEFAULT_BORDER = "#D4D4D4";
-const PRESSED_BORDER = "#6A8042";
+const PRESSED_BORDER = "#62974F";
 
 export default function EditStepCard({
   title = "",

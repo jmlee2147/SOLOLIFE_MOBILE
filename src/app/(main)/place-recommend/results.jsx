@@ -11,15 +11,69 @@ import {
 import PlaceCard from "../../../components/place/PlaceCard";
 import Button from "../../../components/shared/Button";
 import Header from "../../../components/shared/Header";
+import { CATEGORY } from "../../../config/category.config";
 import { postLocationRecommendations } from "../../../services/api";
 import { hs, vs } from "../../../utils/scale";
 
+// 🔹 실패/오프라인 시 보여줄 목업(백엔드 응답 형태와 최대한 비슷하게)
+const MOCK_ITEMS = [
+  {
+    location_id: 1,
+    location_name: "55데시벨",
+    category: "카페",
+    address: "경기도 수원시 영통구",
+    latitude: 37.248492,
+    longitude: 127.076754,
+    rating_avg: 4.5,
+    photos: [],
+    keywords: ["조용한", "디저트"],
+    features_flat: ["아늑함"],
+  },
+  {
+    location_id: 2,
+    location_name: "앤드카페",
+    category: "카페",
+    address: "경기도 수원시 영통구",
+    latitude: 37.2512,
+    longitude: 127.0719,
+    rating_avg: 4.2,
+    photos: [],
+    keywords: ["감성적인"],
+    features_flat: [],
+  },
+  {
+    location_id: 3,
+    location_name: "북서울꿈의숲",
+    category: "공원",
+    address: "서울 강북구",
+    latitude: 37.6512,
+    longitude: 127.0386,
+    rating_avg: 4.7,
+    photos: [],
+    keywords: [],
+    features_flat: [],
+  },
+];
+
+function keyToLabel(catKey = "", subKey = "") {
+  const cat = CATEGORY?.[catKey];
+  if (!cat) return catKey; // 이미 라벨일 수도 있음
+
+  // 서브카테고리가 있으면 우선 라벨 반환
+  if (subKey && cat.subcategories?.[subKey]?.label) {
+    return cat.subcategories[subKey].label; // ex: "restaurant" -> "음식점"
+  }
+
+  return cat.label; // ex: "cafe" -> "카페"
+}
 export default function ResultsScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
 
-  const { category, subcategory, keywordsKo, moodsKo } = useLocalSearchParams();
+  // ✅ params: category(라벨) / subcategory(라벨) / keywordsKo / moodsKo / center(옵션)
+  const { category, subcategory, keywordsKo, moodsKo, center, lat, lng } = useLocalSearchParams();
 
+  // JSON 배열 파싱
   const parseJsonArr = (v) => {
     try {
       const a = JSON.parse(String(v));
@@ -29,34 +83,72 @@ export default function ResultsScreen() {
     }
   };
 
+  // JSON 객체 파싱
+  const parseJsonObj = (v) => {
+    try {
+      const o = JSON.parse(String(v));
+      return o && typeof o === "object" ? o : null;
+    } catch {
+      return null;
+    }
+  };
+
   const selectedKeywords = useMemo(() => parseJsonArr(keywordsKo), [keywordsKo]);
   const selectedMoods = useMemo(() => parseJsonArr(moodsKo), [moodsKo]);
-  const categoryLabel = useMemo(
-    () => (subcategory ? String(subcategory) : String(category || "")),
-    [category, subcategory]
-  );
 
+  // 백엔드에 보낼 카테고리 라벨(서브 라벨 우선)
+  const categoryLabel = useMemo(() => {
+    return keyToLabel(String(category || ""), String(subcategory || ""));
+  }, [category, subcategory]);
+
+  // center 보장: 우선순위 - params.center(JSON) > params.lat/lng > 디폴트(영통 근처)
+  const centerFromJson = useMemo(() => parseJsonObj(center), [center]);
+  const centerFromLatLng = useMemo(() => {
+    const nlat = Number(lat);
+    const nlng = Number(lng);
+    return Number.isFinite(nlat) && Number.isFinite(nlng) ? { lat: nlat, lng: nlng } : null;
+  }, [lat, lng]);
+
+  const centerForAPI = useMemo(() => {
+    return (
+      (centerFromJson?.lat && centerFromJson?.lng && centerFromJson) ||
+      centerFromLatLng || 
+      { lat: 37.2421, lng: 127.0719 } // 🔸최소한의 기본값(영통 근처)
+    );
+  }, [centerFromJson, centerFromLatLng]);
+
+  // 상태
   const [items, setItems] = useState([]);
+  const [usedMock, setUsedMock] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // ✅ 추천 불러오기 (center / radius_km 포함)
   const fetchRecs = useCallback(async () => {
     setLoading(true);
     setError("");
+    setUsedMock(false);
+
     try {
       const res = await postLocationRecommendations({
-        category: categoryLabel,
+        category: categoryLabel,        // 한글 라벨
         keywords: selectedKeywords,
         moods: selectedMoods,
+        center: centerForAPI,           // ✅ 필수
+        radius_km: 3,                   // ✅ 요구사항
       });
-      setItems(Array.isArray(res?.items) ? res.items : []);
+      const arr = Array.isArray(res?.items) ? res.items : [];
+      setItems(arr.length ? arr : MOCK_ITEMS);
+      setUsedMock(!arr.length);
     } catch (e) {
+      // 🔸 실패 시 목업으로 대체
       setError(e?.message || "추천을 불러오지 못했어요.");
-      setItems([]);
+      setItems(MOCK_ITEMS);
+      setUsedMock(true);
     } finally {
       setLoading(false);
     }
-  }, [categoryLabel, selectedKeywords, selectedMoods]);
+  }, [categoryLabel, selectedKeywords, selectedMoods, centerForAPI]);
 
   useEffect(() => {
     fetchRecs();
@@ -88,18 +180,6 @@ export default function ResultsScreen() {
     [items.length, snapSize]
   );
 
-  const goDetailForIndex = useCallback(
-    (index) => {
-      const it = items[index];
-      if (!it) return;
-      router.push({
-        pathname: "/place-recommend/detail/[id]",
-        params: { id: String(it.location_id) },
-      });
-    },
-    [items, router]
-  );
-
   const scrollToIndex = useCallback(
     (index) => {
       if (!listRef.current) return;
@@ -129,10 +209,8 @@ export default function ResultsScreen() {
         extrapolate: "clamp",
       });
 
-      // 서버 응답 -> PlaceCard props 매핑
-      const imageSource = item?.photos?.[0]
-        ? { uri: item.photos[0] }
-        : null;
+      // 서버 응답 -> PlaceCard 매핑
+      const imageSource = item?.photos?.[0] ? { uri: item.photos[0] } : null;
       const title = item?.location_name ?? "";
       const rating = item?.rating_avg ?? null;
       const categories = item?.category ? [item.category] : [];
@@ -162,19 +240,16 @@ export default function ResultsScreen() {
             onToggleLike={() =>
               setLiked((p) => ({ ...p, [item.location_id]: !p[item.location_id] }))
             }
-            // 제목 눌렀을 
-            // - 중앙 카드가 아니면 먼저 그 카드로 스냅
-            // - 중앙 카드면 상세로 이동
             onPressTitle={() => {
-              const payload = JSON.stringify(item); // item = 백엔드 응답 1개
+              const payload = JSON.stringify(item);
               if (index !== currentIndex) {
                 scrollToIndex(index);
               } else {
                 router.push({
                   pathname: "/place-recommend/detail/[id]",
-                  params: { 
+                  params: {
                     id: String(item.location_id),
-                    initial: encodeURIComponent(payload), // 초기 데이터 전달
+                    initial: encodeURIComponent(payload),
                   },
                 });
               }
@@ -183,7 +258,7 @@ export default function ResultsScreen() {
         </Animated.View>
       );
     },
-    [CARD_W, ITEM_GAP, liked, scrollX, currentIndex, scrollToIndex, goDetailForIndex]
+    [CARD_W, ITEM_GAP, liked, scrollX, currentIndex, scrollToIndex]
   );
 
   const currentItem = items[currentIndex];
@@ -198,7 +273,7 @@ export default function ResultsScreen() {
         onRightPress={() => router.push("/home")}
       />
 
-      {/* 타이틀 + 상단 선택 뱃지 */}
+      {/* 타이틀 + 선택 뱃지 */}
       <View style={{ paddingHorizontal: 25, paddingTop: 5, backgroundColor: "#FFFFFF" }}>
         <Text className="text-title-1 font-pretendardExtraBold">포슬감자님 여긴 어때요?</Text>
 
@@ -212,6 +287,13 @@ export default function ResultsScreen() {
             </View>
           ))}
         </View>
+
+        {/* 에러 시 목업 사용 안내(선택) */}
+        {usedMock && (
+          <Text style={{ color: "#9CA3AF", marginTop: -28, marginBottom: 16 }}>
+            네트워크 문제로 임시 결과를 보여드려요.
+          </Text>
+        )}
       </View>
 
       {/* 본문 */}
@@ -219,11 +301,6 @@ export default function ResultsScreen() {
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
           <ActivityIndicator />
           <Text style={{ marginTop: 8, color: "#6B7280" }}>추천을 불러오는 중이에요…</Text>
-        </View>
-      ) : error ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
-          <Text style={{ color: "#EF4444", marginBottom: 12 }}>{error}</Text>
-          <Button title="다시 시도" size="small" variant="secondary" onPress={fetchRecs} />
         </View>
       ) : items.length === 0 ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
@@ -237,7 +314,7 @@ export default function ResultsScreen() {
           ref={listRef}
           horizontal
           data={items}
-          keyExtractor={(it) => String(it.location_id)}
+          keyExtractor={(it, idx) => `${it.location_id}-${idx}`}
           renderItem={renderItem}
           showsHorizontalScrollIndicator={false}
           snapToInterval={CARD_W + ITEM_GAP}
@@ -270,9 +347,17 @@ export default function ResultsScreen() {
             router.push({
               pathname: "/place-recommend/confirm",
               params: {
+                placeId: String(currentItem.location_id),
                 placeName: String(currentItem.location_name || "선택한 장소"),
                 lat: String(currentItem.latitude ?? ""),
                 lng: String(currentItem.longitude ?? ""),
+                category: currentItem.category,         // 한글 라벨
+                region: currentItem.address || "",
+                // 🔹 다음 화면에서 필요하면 전달
+                moodsKo: JSON.stringify(selectedMoods),
+                keywordsKo: JSON.stringify(selectedKeywords),
+                // 🔹 사용자가 설정했던 중심 좌표도 같이 넘겨두면 이후 단계에서 재사용 가능
+                center: JSON.stringify(centerForAPI),
               },
             });
           }}

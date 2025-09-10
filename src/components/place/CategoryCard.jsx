@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   innerCardPressed: {
     backgroundColor: PRESSED_BG,  // 눌렀을 때 배경색만 바꿈
     borderWidth: 1,
-    borderColor: "#6A8042",
+    borderColor: "#62974F",
   },
   image: {
     width: "100%",

@@ -7,7 +7,7 @@ const BASE_H = 115;
 const IMG_W_RATIO = 92 / 343; // 오른쪽 이미지 비율
 const BADGE = 24; // 뱃지 지름
 
-const BADGE_COLORS = ["#6A8042", "#B3B56C", "#DBDCC1"];
+const BADGE_COLORS = ["#62974F", "#B3B56C", "#DBDCC1"];
 
 export default function RouteStepCard({
   step = 1,
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     width: BADGE,
     height: BADGE,
     borderRadius: BADGE / 2,
-    backgroundColor: "#6A8042",
+    backgroundColor: "#62974F",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   primaryBtn: {
-    backgroundColor: "#6A8042",
+    backgroundColor: "#62974F",
   },
   outlineBtn: {
     borderWidth: 1,
