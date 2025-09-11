@@ -67,11 +67,14 @@ function getReplaceCategories(selectedLabels, fallbackPrimary) {
 
 // 백엔드 → 카드 매핑 유틸 (summary 쪽과 동일 컨벤션)
 function mapApiItemToCard(item) {
-  const photo = Array.isArray(item?.photos) && item.photos[0];
-  const imageSource =
-    photo && typeof photo === "string" && /^https?:\/\//i.test(photo)
-      ? { uri: photo }
-      : require("../../../assets/images/sample.png");
+  // photos: string[] | {url|uri|src:string}[]
+  const photos = Array.isArray(item?.photos) ? item.photos : [];
+  const photoUris = photos
+    .map((p) => (typeof p === "string" ? p : p?.url || p?.uri || p?.src || null))
+    .filter(Boolean);
+
+  const firstUri = photoUris[0] || null;
+  const imageSource = firstUri ? { uri: firstUri } : null;
 
   const lat = Number(item?.latitude ?? item?.lat);
   const lng = Number(item?.longitude ?? item?.lng);
@@ -86,7 +89,7 @@ function mapApiItemToCard(item) {
     imageSource,
     lat: Number.isFinite(lat) ? lat : undefined,
     lng: Number.isFinite(lng) ? lng : undefined,
-    raw: item,
+    raw: { ...item, photos: photoUris },
   };
 }
 
@@ -252,6 +255,13 @@ const handleNext = async () => {
 
     // summary로 넘길 직렬화
     const newFirst = finalThree[0];
+
+    const extractPhotos = (c) => {
+      if (Array.isArray(c?.raw?.photos)) return c.raw.photos;
+      if (c?.imageSource?.uri) return [c.imageSource.uri];
+      return [];
+    };
+
     const newPrefetched = finalThree.slice(1, 3).map((c) => c.raw || ({
       location_id: c.location_id,
       location_name: c.title,
@@ -259,7 +269,7 @@ const handleNext = async () => {
       address: c.address || "",
       latitude: c.lat,
       longitude: c.lng,
-      photos: [],
+      photos: extractPhotos(c),
       rating_avg: c.rating ?? null,
     }));
 
@@ -270,7 +280,7 @@ const handleNext = async () => {
       address: newFirst.address || "",
       latitude: newFirst.lat,
       longitude: newFirst.lng,
-      photos: [],
+      photos: extractPhotos(newFirst),
       rating_avg: newFirst.rating ?? null,
     };
 

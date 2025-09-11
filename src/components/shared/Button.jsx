@@ -6,7 +6,7 @@ const { hs, vs, rp, fs } = scale;
 
 const VARIANT_STYLES = {
   primary: { backgroundColor: '#62974F', textColor: '#FFFFFF' },
-  secondary: { backgroundColor: '#DBDCC1', textColor: '#62974F' },
+  secondary: { backgroundColor: '#C9DCC1', textColor: '#62974F' },
   disabled: { backgroundColor: '#F4F4F4', textColor: '#6B6B6B' },
 };
 

@@ -9,6 +9,9 @@ import Header from "../../../../components/shared/Header";
 import Icon from "../../../../components/shared/Icon";
 
 const { width: SCREEN_W } = Dimensions.get("window");
+const HIGHLIGHT_COLOR = "#62974F";
+const TAG_COLOR = "#6B6B6B";
+
 
 // fallback 목업 데이터
 const MOCK = {
@@ -39,10 +42,26 @@ const MOCK = {
 
 export default function PlaceDetailScreen() {
   const router = useRouter();
-  const { id, initial } = useLocalSearchParams();
+  const { id, initial, moodsKo, keywordsKo } = useLocalSearchParams();
   const scrollX = useRef(new Animated.Value(0)).current;
   const [liked, setLiked] = useState(false);
   const [tab, setTab] = useState("review");
+
+  const parseJsonArr = (v) => {
+    try {
+      const a = JSON.parse(String(v));
+      return Array.isArray(a) ? a : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const highlightedTags = useMemo(
+    () => [...parseJsonArr(moodsKo), ...parseJsonArr(keywordsKo)].map(String),
+    [moodsKo, keywordsKo]
+  );
+
+  const highlightSet = useMemo(() => new Set(highlightedTags), [highlightedTags]);
 
   // 초기 데이터(옵션): results에서 넘겨준 백엔드 아이템
   const initialItem = useMemo(() => {
@@ -163,18 +182,38 @@ export default function PlaceDetailScreen() {
               </View>
             )}
           </View>
+        </View>
+        
 
-          {/* 키워드 칩 */}
+          {/* 해시태그 */}
           {!!place.tags?.length && (
-            <View className="flex-row flex-wrap mt-2">
-              {place.tags.map((t, i) => (
-                <View key={`${t}-${i}`} className="px-3 py-[6px] mr-2 mb-2 rounded-full bg-gray100">
-                  <Text className="text-gray700">{t}</Text>
-                </View>
-              ))}
+            <View
+              style={{
+                marginTop: 7,
+                paddingHorizontal: 25,
+                flexDirection: "row",
+                flexWrap: "wrap",
+              }}
+            >
+              {place.tags.map((t, i) => {
+                const label = String(t);
+                const isHL = highlightSet.has(label);
+                return (
+                  <Text
+                    key={`${label}-${i}`}
+                    style={{
+                      color: isHL ? HIGHLIGHT_COLOR : TAG_COLOR,
+                      marginRight: 6,
+                      marginBottom: 4,
+                    }}
+                    className="text-body-2 font-pretendardMedium"
+                  >
+                    #{label}
+                  </Text>
+                );
+              })}
             </View>
           )}
-        </View>
 
         {/* 정보 목록 */}
         <View style={{ marginTop: 12 }}>
@@ -183,7 +222,12 @@ export default function PlaceDetailScreen() {
               <View style={styles.iconBox}>
                 <Icon name="location_outline" width={24} height={24} />
               </View>
-              <Text className="text-gray700 font-pretendardMedium text-body-1">{place.address}</Text>
+              <Text className="text-gray700 font-pretendardMedium text-body-1"
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+              >
+                {place.address}
+              </Text>
             </View>
           )}
           {!!place.hours && (
@@ -298,9 +342,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 25,
-    paddingVertical: 8,
+    paddingVertical: 0,
   },
   iconBox: {
-    width: 24, height: 24, justifyContent: "center", alignItems: "center", marginRight: 3,
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
