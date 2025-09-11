@@ -718,14 +718,15 @@ const icons = {
       {...props}
     >
       <Path
-        stroke="#6A8042"
+        fill="#62974F"
+        stroke="#62974F"
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={3}
         d="M26.5 1.5c13.807 0 25 11.193 25 25s-11.193 25-25 25-25-11.193-25-25 11.193-25 25-25Z"
       />
       <Path
-        stroke="#6A8042"
+        stroke="#fff"
         strokeWidth={3}
         d="M15 27h21.333M27 15l10.667 12L27 39"
       />

@@ -149,7 +149,12 @@ export default function ResultsScreen() {
               } else {
                 router.push({
                   pathname: "/place-recommend/detail/[id]",
-                  params: { id: String(item.location_id), initial: encodeURIComponent(payload) },
+                  params: {
+                    id: String(item.location_id),
+                    initial: encodeURIComponent(payload),
+                    moodsKo: JSON.stringify(selectedMoods),
+                    keywordsKo: JSON.stringify(selectedKeywords),
+                  },
                 });
               }
             }}

@@ -65,11 +65,11 @@ export default function AddPlaceCard({
         {/* 평점 뱃지 (맨 오른쪽 아래) */}
         {typeof rating === "number" && (
           <View style={styles.ratingBadge}>
-            <Icon name="star" width={16} height={16} color="#6A8042" />
+            <Icon name="star" width={16} height={16} color="#62974F" />
             <Text className="mx-[2px] mr-[13px] text-body-2 font-pretendardMedium text-green500">
               {rating}
             </Text>
-            <Icon name="left_arrow" width={11} height={11} color="#6A8042"flip strokeWidth={4} />
+            <Icon name="left_arrow" width={11} height={11} color="#62974F"flip strokeWidth={4} />
           </View>
         )}
       </View>
