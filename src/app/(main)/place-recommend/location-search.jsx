@@ -3,15 +3,15 @@ import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    DeviceEventEmitter,
-    FlatList,
-    Keyboard,
-    Pressable,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    View
+  ActivityIndicator,
+  DeviceEventEmitter,
+  FlatList,
+  Keyboard,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View
 } from 'react-native';
 import Icon from '../../../components/shared/Icon';
 import SearchHeader from '../../../components/shared/SearchHeader';

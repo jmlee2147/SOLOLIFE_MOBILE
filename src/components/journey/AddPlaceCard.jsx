@@ -14,6 +14,15 @@ export default function AddPlaceCard({
   onPress,
   style,
 }) {
+  console.log('[AddPlaceCard] rating prop =', rating, typeof rating);
+
+  const numericRating = 
+    typeof rating === 'number'
+      ? rating
+      : parseFloat(String(rating).replace(',', '.').replace(/[^\d.]/g, '')); // '4,5' -> 4.5
+
+  const showBadge = Number.isFinite(numericRating) && numericRating > 0;
+
   return (
     <Pressable
       onPress={onPress}
@@ -49,6 +58,7 @@ export default function AddPlaceCard({
           <Text
             className="text-gray700 text-body-2 font-pretendardMedium"
             numberOfLines={1}
+            style={styles.address}
           >
             {address}
           </Text>
@@ -63,11 +73,11 @@ export default function AddPlaceCard({
         </Pressable>
 
         {/* 평점 뱃지 (맨 오른쪽 아래) */}
-        {typeof rating === "number" && (
+        {showBadge && (
           <View style={styles.ratingBadge}>
             <Icon name="star" width={16} height={16} color="#62974F" />
             <Text className="mx-[2px] mr-[13px] text-body-2 font-pretendardMedium text-green500">
-              {rating}
+              {numericRating}
             </Text>
             <Icon name="left_arrow" width={11} height={11} color="#62974F"flip strokeWidth={4} />
           </View>
@@ -124,4 +134,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: "#dbdcc1",
   },
+  address: {
+    paddingRight: 63, // 평점 뱃지 영역 비워주기
+  }
 });

@@ -17,7 +17,7 @@ import Header from "../../../../components/shared/Header";
 import Icon from "../../../../components/shared/Icon";
 
 const HERO_BG = require("../../../../assets/images/background.png");
-const MASCOT  = require("../../../../assets/images/explorer.png");
+const MASCOT  = require("../../../../assets/images/main_background.png");
 const SAMPLE1 = require("../../../../assets/images/sample.png");
 const SAMPLE2 = require("../../../../assets/images/shopping.png");
 
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     transform: [{ rotate: "45deg" }],
   },
-  mascot: { alignSelf: "center", width: 211, height: 211 },
+  mascot: { alignSelf: "center", width: 324, height: 260 },
 
   profileCard: {
     width: "100%",
