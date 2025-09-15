@@ -16,7 +16,7 @@ export default function MainLayout() {
   
   return (
     <SafeScreen>
-      <StatusBar style="dark" translucent={false} />
+      <StatusBar style="dark" translucent={true} />
       <Stack
         screenOptions={{
           headerShown: false,

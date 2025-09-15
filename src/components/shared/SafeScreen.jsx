@@ -6,7 +6,7 @@ const SafeScreen = ({ children }) => {
 
   return (
     <View style={{ 
-        paddingTop: insets.top, 
+        // paddingTop: insets.top, 
         paddingBottom: insets.bottom, 
         paddingLeft: insets.left,
         paddingRight: insets.right,

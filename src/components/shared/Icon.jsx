@@ -565,9 +565,16 @@ const icons = {
       </G>
     </Svg>
   ),
-  previous: ({ width = 24, height = 24, ...props }) => (
-    <Svg width={24} height={24} fill="none" {...props}>
-      <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
+  previous: ({ width = 24, height = 24, flip = false, style, color = "#000", ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      style={[flip && { transform: [{ scaleX: -1 }] }, style]}
+      {...props}
+    >
+      <G stroke={color} strokeWidth={2} clipPath="url(#a)">
         <Path d="M21 12H5M12 21l-8-9 8-9" />
       </G>
       <Defs>
