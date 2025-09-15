@@ -2,13 +2,22 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
+  LayoutAnimation,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
+  UIManager,
   View,
 } from "react-native";
 import Icon from "../shared/Icon";
 
+// ANDROID에서 LayoutAnimation 활성화
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+// 현재 value를 맨 앞으로 보고, 나머지 옵션을 순환해 뒤에 나열
 const rotateFrom = (options, value) => {
   const i = options.findIndex((o) => o.value === value);
   if (i < 0) return options;
@@ -25,16 +34,18 @@ export default function SortDropdown({
     { label: "최신순", value: "latest" },
   ],
   style,
+  disabled = false,
 }) {
   const [open, setOpen] = useState(false);
 
+  // 헤더(라벨) 실제 치수
   const [headerW, setHeaderW] = useState(0);
   const [headerH, setHeaderH] = useState(0);
-  const [optionsHMeasured, setOptionsHMeasured] = useState(0);
-  const measured = headerH > 0;
+  const measured = headerH > 0;      // 헤더가 한 번이라도 측정되었는지
   const HEADER_MIN_H = 30;
 
-  const progress = useRef(new Animated.Value(0)).current; // 0:닫힘, 1:열림
+  // 화살표 회전만 Animated로 (부드럽게)
+  const arrow = useRef(new Animated.Value(0)).current; // 0:닫힘, 1:열림
 
   const currentLabel = useMemo(
     () => options.find((o) => o.value === value)?.label ?? options[0]?.label ?? "",
@@ -42,42 +53,39 @@ export default function SortDropdown({
   );
   const rest = useMemo(() => rotateFrom(options, value), [options, value]);
 
+  // 열고 닫을 때: 레이아웃 애니메이션 + 화살표 회전
+  const toggle = () => {
+    if (disabled) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setOpen((p) => !p);
+  };
+
   useEffect(() => {
-    Animated.timing(progress, {
+    Animated.timing(arrow, {
       toValue: open ? 1 : 0,
-      duration: 220,
+      duration: 200,
       easing: Easing.out(Easing.quad),
-      useNativeDriver: false, // height 보간 필요
+      useNativeDriver: true, // 회전 애니메이션만 -> OK
     }).start();
-  }, [open]);
+  }, [open, arrow]);
 
-  // 옵션영역 높이(0 -> 측정값)
-  const optionsH = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, optionsHMeasured || 0],
-  });
-
-  const cardH = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [Math.max(headerH, HEADER_MIN_H), Math.max(headerH, HEADER_MIN_H) + (optionsHMeasured || 0)],
-  });
-
-  const arrowRotate = progress.interpolate({
+  const arrowRotate = arrow.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "180deg"],
   });
 
-  // 1) 최초 렌더: 헤더 측정
+  // 1) 최초 렌더: 헤더 측정용 간단한 Pill (닫힘 형태)
   if (!measured) {
     return (
       <View style={[styles.anchor, style]}>
         <Pressable
-          style={[styles.headerPill, { minHeight: HEADER_MIN_H }]}
+          style={[styles.headerPill, { minHeight: HEADER_MIN_H, opacity: disabled ? 0.5 : 1 }]}
           onLayout={(e) => {
             setHeaderW(e.nativeEvent.layout.width);
             setHeaderH(e.nativeEvent.layout.height);
           }}
-          onPress={() => setOpen(true)}
+          onPress={toggle}
+          disabled={disabled}
         >
           <Text style={styles.headerText}>{currentLabel}</Text>
           <Icon name="down_arrow" width={14} height={14} style={{ marginLeft: 6 }} />
@@ -86,54 +94,50 @@ export default function SortDropdown({
     );
   }
 
-  // 2) 단일 블록(카드) 확장: 부모엔 헤더 높이만 스페이서로 남김 → 레이아웃 안 밀림
+  // 2) 측정 이후: 카드(절대 배치) + 헤더 자리 유지 스페이서
   return (
     <View style={[styles.anchor, style, { width: headerW }]}>
-      {/* 레이아웃 자리: 헤더 높이만 차지 */}
+      {/* 레이아웃 유지용 스페이서: 헤더 높이만 차지 */}
       <View style={{ height: Math.max(headerH, HEADER_MIN_H), minWidth: headerW }} />
 
-      {/* 절대배치된 '단일 카드' */}
-      <Animated.View style={[styles.cardContainer, { height: cardH, width: headerW }]}>
-        <View style={styles.cardSurface}>
+      {/* 절대배치 카드 (폭 = 헤더 폭 = 라벨 길이 기반) */}
+      <View style={[styles.cardContainer, { width: headerW }]}>
+        <View style={[styles.cardSurface, { minHeight: Math.max(headerH, HEADER_MIN_H) }]}>
           {/* 헤더 */}
           <Pressable
-            style={styles.cardHeader}
+            style={[styles.cardHeader, { opacity: disabled ? 0.5 : 1 }]}
             onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
-            onPress={() => setOpen((p) => !p)}
+            onPress={toggle}
+            disabled={disabled}
             android_ripple={{ color: "rgba(0,0,0,0.06)", borderless: true }}
           >
-            <Text style={styles.headerText}>{currentLabel}</Text>
+            <Text style={styles.headerText} numberOfLines={1}>{currentLabel}</Text>
             <Animated.View style={{ marginLeft: 6, transform: [{ rotate: arrowRotate }] }}>
               <Icon name="down_arrow" width={14} height={14} />
             </Animated.View>
           </Pressable>
 
-          {/* 옵션 영역: 같은 카드 안에서 '확장' */}
-          <Animated.View
-            style={{ height: optionsH, overflow: "hidden" }}
-            pointerEvents={open ? "auto" : "none"}
-          >
-            {/* 실제 높이 측정을 위한 내용 래퍼 */}
-            <View
-              style={styles.options}
-              onLayout={(e) => setOptionsHMeasured(e.nativeEvent.layout.height)}
-            >
+          {/* 옵션 리스트: LayoutAnimation으로 자연스럽게 나타났다 사라짐 */}
+          {open && (
+            <View style={styles.options}>
               {rest.map((o) => (
                 <Pressable
                   key={o.value}
                   style={styles.optionItem}
                   onPress={() => {
                     onChange?.(o.value);
+                    // 선택 후 닫기
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                     setOpen(false);
                   }}
                 >
-                  <Text style={styles.optionText}>{o.label}</Text>
+                  <Text style={styles.optionText} numberOfLines={1}>{o.label}</Text>
                 </Pressable>
               ))}
             </View>
-          </Animated.View>
+          )}
         </View>
-      </Animated.View>
+      </View>
     </View>
   );
 }
@@ -141,7 +145,7 @@ export default function SortDropdown({
 const styles = StyleSheet.create({
   anchor: {
     position: "relative",
-    alignSelf: "flex-start",
+    alignSelf: "flex-start", // 부모 row 안에서 내용 폭만큼만 차지
     zIndex: 10,
   },
 
@@ -154,7 +158,6 @@ const styles = StyleSheet.create({
   },
 
   cardSurface: {
-    flex: 1,
     overflow: "hidden",
     borderRadius: 14,
     backgroundColor: "#fff",
@@ -170,7 +173,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 6,
     minHeight: 30,
-    // backgroundColor: "#FFF112",
   },
 
   // 초기 측정용 단독 헤더(닫힘 상태 외형 동일)
@@ -188,21 +190,21 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 14,
     lineHeight: 14,
-    fontWeight: 500,
+    fontWeight: "500",
   },
 
   options: {
     paddingHorizontal: 15,
     paddingTop: 3,
+    paddingBottom: 6,
   },
   optionItem: {
-    marginTop: 7,
-    marginBottom: 9,
+    paddingVertical: 6,
   },
   optionText: {
     fontSize: 14,
     lineHeight: 18,
-    fontWeight: 500,
+    fontWeight: "500",
     color: "#AFAFAF",
   },
 });

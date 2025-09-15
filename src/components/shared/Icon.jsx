@@ -1,9 +1,15 @@
-import React from 'react';
-import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
+import React from "react";
+import Svg, { Circle, ClipPath, Defs, Ellipse, G, Path, Rect } from "react-native-svg";
 
 const icons = {
   book: ({ width = 24, height = 24, ...props }) => (
-    <Svg width={width} height={height} viewBox="0 0 24 24" fill="none" {...props}>
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
       <G clipPath="url(#clip0)">
         <Rect x="5" y="5" width="14" height="15" fill="#6A8042" />
         <Path
@@ -18,7 +24,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  cafe: ({ width = 24, height = 24, ...props}) => (
+  cafe: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G fillRule="evenodd" clipPath="url(#a)" clipRule="evenodd">
         <Path
@@ -37,11 +43,22 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  calendar: ({ width = 24, height = 24, ...props}) => (
-    <Svg width={24} height={24} fill="none" {...props}>
+  calendar: ({
+    width = 24,
+    height = 24,
+    strokeColor = "#2C81E5",
+    ...props
+  }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
       <G clipPath="url(#a)">
         <Path fill="#D5D5D5" d="M3 5h18v13H3V5Z" />
-        <Path stroke="#2C81E5" strokeWidth={2} d="M3 6h18" />
+        <Path stroke={strokeColor} strokeWidth={2} d="M3 6h18" />
         <Path stroke="#D5D5D5" strokeWidth={2} d="M18 3v3M6 3v3" />
         <Path
           fill="#ACACAC"
@@ -55,7 +72,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  camera: ({ width = 24, height = 24, ...props}) => (
+  camera: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G clipPath="url(#a)">
         <Path
@@ -73,7 +90,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  clock: ({ width = 24, height = 24, ...props}) => (
+  clock: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G clipPath="url(#a)">
         <Path
@@ -89,9 +106,8 @@ const icons = {
         </ClipPath>
       </Defs>
     </Svg>
-
   ),
-  heart: ({ width = 24, height = 24, ...props}) => (
+  heart: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G clipPath="url(#a)">
         <Path
@@ -104,9 +120,9 @@ const icons = {
           <Path fill="#fff" d="M0 0h24v24H0z" />
         </ClipPath>
       </Defs>
-  </Svg>
+    </Svg>
   ),
-  home: ({ width = 24, height = 24, ...props}) => (
+  home: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G clipPath="url(#a)">
         <Path fill="#B3B56C" d="m7 20 5-7 5 7H7Z" />
@@ -122,7 +138,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  journey: ({ width = 24, height = 24, ...props}) => (
+  journey: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G clipPath="url(#a)">
         <Path fill="#B3B56C" d="M4 20h10.91L20 14.91V4H4v16Z" />
@@ -155,7 +171,7 @@ const icons = {
       <Path fill="#fff" d="M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
     </Svg>
   ),
-  map: ({ width = 24, height = 24, ...props}) => (
+  map: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G clipPath="url(#a)">
         <Path
@@ -171,7 +187,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  park: ({ width = 24, height = 24, ...props}) => (
+  park: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G clipPath="url(#a)">
         <Path fill="#B3B56C" d="M10 16h4v6h-4z" />
@@ -184,7 +200,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  photo: ({ width = 24, height = 24, ...props}) => (
+  photo: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G clipPath="url(#a)">
         <Path fill="#B3B56C" d="M2 17V4h16v13H2Z" />
@@ -200,7 +216,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  profile: ({ width = 24, height = 24, ...props}) => (
+  profile: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G fill="#6A8042" clipPath="url(#a)">
         <Path d="M12 20c2.233 0 4.125-.775 5.675-2.325C19.225 16.125 20 14.233 20 12c0-.4-.025-.787-.075-1.162a4.861 4.861 0 0 0-.275-1.088 9.093 9.093 0 0 1-2.15.25 9.786 9.786 0 0 1-4.3-.975A9.983 9.983 0 0 1 9.75 6.3a9.868 9.868 0 0 1-2.287 3.388A9.746 9.746 0 0 1 4 11.85V12c0 2.233.775 4.125 2.325 5.675C7.875 19.225 9.767 20 12 20Zm0 2a9.744 9.744 0 0 1-3.9-.787 10.083 10.083 0 0 1-3.175-2.138c-.9-.9-1.612-1.959-2.137-3.175A9.75 9.75 0 0 1 2 12c0-1.384.262-2.684.788-3.9a10.152 10.152 0 0 1 2.137-3.175A10.04 10.04 0 0 1 8.1 2.788 9.787 9.787 0 0 1 12 2a9.696 9.696 0 0 1 3.9.788 10.13 10.13 0 0 1 3.175 2.137A10.105 10.105 0 0 1 21.213 8.1 9.688 9.688 0 0 1 22 12a9.816 9.816 0 0 1-.788 3.9 10.002 10.002 0 0 1-2.137 3.175c-.901.898-1.96 1.61-3.175 2.138A9.645 9.645 0 0 1 12 22Z" />
@@ -214,7 +230,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  restaurant: ({ width = 24, height = 24, ...props}) => (
+  restaurant: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G fill="#6A8042" clipPath="url(#a)">
         <Path d="M6 12.947c-.53 0-1.04-.188-1.414-.524A1.7 1.7 0 0 1 4 11.158V4h2v4.474h1V4h2v4.474h1V4h2V11.158c0 .475-.21.93-.586 1.265a2.125 2.125 0 0 1-1.414.524V21H6v-8.053ZM20 13.842V21h-4v-5.368h-2V6.684c0-.712.316-1.394.879-1.898A3.188 3.188 0 0 1 17 4h3v9.842Z" />
@@ -226,7 +242,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  search: ({ width = 24, height = 24, ...props}) => (
+  search: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G stroke="#2C81E5" strokeWidth={2} clipPath="url(#a)">
         <Path
@@ -244,23 +260,22 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  shop: ({ width = 24, height = 24, ...props}) => (
+  shop: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
-    <G clipPath="url(#a)">
-      <Path fill="#B3B56C" d="M9 12h11v8H9zM4 12h3v8H4z" />
-      <Path fill="#6A8042" d="M5.813 4h12.375L21 9.79V15H3V9.79L5.813 4Z" />
-      <Path fill="#FFFADD" d="M6 11h2v4H6v-4ZM11 11h2v4h-2zM16 11h2v4h-2z" />
-    </G>
-    <Defs>
-      <ClipPath id="clip-shop">
-        <Path fill="#fff" d="M0 0h24v24H0z" />
-      </ClipPath>
-    </Defs>
-  </Svg>
-
+      <G clipPath="url(#a)">
+        <Path fill="#B3B56C" d="M9 12h11v8H9zM4 12h3v8H4z" />
+        <Path fill="#6A8042" d="M5.813 4h12.375L21 9.79V15H3V9.79L5.813 4Z" />
+        <Path fill="#FFFADD" d="M6 11h2v4H6v-4ZM11 11h2v4h-2zM16 11h2v4h-2z" />
+      </G>
+      <Defs>
+        <ClipPath id="clip-shop">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
   ),
 
-  heart_inactive: ({ width = 24, height = 24, ...props}) => (
+  heart_inactive: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G clipPath="url(#a)">
         <Path
@@ -275,7 +290,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  home_inactive: ({ width = 24, height = 24, ...props}) => (
+  home_inactive: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G clipPath="url(#a)">
         <Path fill="#D4D4D4" d="m7 20 5-7 5 7H7Z" />
@@ -291,14 +306,14 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  journey_inactive: ({ width = 24, height = 24, ...props}) => (
+  journey_inactive: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G clipPath="url(#a)">
-      <Path fill="#D4D4D4" d="M4 20h10.91L20 14.91V4H4v16Z" />
-      <Path
-        fill="#AFAFAF"
-        d="M14.91 14.91V20L20 14.91h-5.09ZM11 13v-3l8.13-8L22 5l-8.13 8H11Z"
-      />
+        <Path fill="#D4D4D4" d="M4 20h10.91L20 14.91V4H4v16Z" />
+        <Path
+          fill="#AFAFAF"
+          d="M14.91 14.91V20L20 14.91h-5.09ZM11 13v-3l8.13-8L22 5l-8.13 8H11Z"
+        />
       </G>
       <Defs>
         <ClipPath id="clip-journey_inactive">
@@ -307,14 +322,14 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  map_inactive: ({ width = 24, height = 24, ...props}) => (
+  map_inactive: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G clipPath="url(#a)">
-      <Path
-        fill="#D4D4D4"
-        d="M8.667 20 2 17.507V3l6.667 2.267L15.333 3 22 4.587V20l-6.667-1.133L8.667 20Z"
-      />
-      <Path fill="#AFAFAF" d="M8.667 5.267 15.333 3v15.867L8.667 20V5.267Z" />
+        <Path
+          fill="#D4D4D4"
+          d="M8.667 20 2 17.507V3l6.667 2.267L15.333 3 22 4.587V20l-6.667-1.133L8.667 20Z"
+        />
+        <Path fill="#AFAFAF" d="M8.667 5.267 15.333 3v15.867L8.667 20V5.267Z" />
       </G>
       <Defs>
         <ClipPath id="clip-map_inactive">
@@ -323,12 +338,12 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  profile_inactive: ({ width = 24, height = 24, ...props}) => (
+  profile_inactive: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G fill="#D4D4D4" clipPath="url(#a)">
-      <Path d="M12 20c2.233 0 4.125-.775 5.675-2.325C19.225 16.125 20 14.233 20 12c0-.4-.025-.787-.075-1.162a4.861 4.861 0 0 0-.275-1.088 9.096 9.096 0 0 1-2.15.25 9.786 9.786 0 0 1-4.3-.975A9.983 9.983 0 0 1 9.75 6.3a9.868 9.868 0 0 1-2.287 3.388A9.746 9.746 0 0 1 4 11.85V12c0 2.233.775 4.125 2.325 5.675C7.875 19.225 9.767 20 12 20Zm0 2a9.744 9.744 0 0 1-3.9-.787 10.083 10.083 0 0 1-3.175-2.138c-.9-.9-1.612-1.959-2.137-3.175A9.75 9.75 0 0 1 2 12c0-1.384.262-2.684.788-3.9a10.152 10.152 0 0 1 2.137-3.175A10.04 10.04 0 0 1 8.1 2.788 9.787 9.787 0 0 1 12 2a9.696 9.696 0 0 1 3.9.788 10.13 10.13 0 0 1 3.175 2.137A10.105 10.105 0 0 1 21.213 8.1 9.688 9.688 0 0 1 22 12a9.816 9.816 0 0 1-.788 3.9 10.002 10.002 0 0 1-2.137 3.175c-.901.898-1.96 1.61-3.175 2.138A9.645 9.645 0 0 1 12 22Z" />
-      <Circle cx={8} cy={13} r={1} />
-      <Circle cx={16} cy={13} r={1} />
+        <Path d="M12 20c2.233 0 4.125-.775 5.675-2.325C19.225 16.125 20 14.233 20 12c0-.4-.025-.787-.075-1.162a4.861 4.861 0 0 0-.275-1.088 9.096 9.096 0 0 1-2.15.25 9.786 9.786 0 0 1-4.3-.975A9.983 9.983 0 0 1 9.75 6.3a9.868 9.868 0 0 1-2.287 3.388A9.746 9.746 0 0 1 4 11.85V12c0 2.233.775 4.125 2.325 5.675C7.875 19.225 9.767 20 12 20Zm0 2a9.744 9.744 0 0 1-3.9-.787 10.083 10.083 0 0 1-3.175-2.138c-.9-.9-1.612-1.959-2.137-3.175A9.75 9.75 0 0 1 2 12c0-1.384.262-2.684.788-3.9a10.152 10.152 0 0 1 2.137-3.175A10.04 10.04 0 0 1 8.1 2.788 9.787 9.787 0 0 1 12 2a9.696 9.696 0 0 1 3.9.788 10.13 10.13 0 0 1 3.175 2.137A10.105 10.105 0 0 1 21.213 8.1 9.688 9.688 0 0 1 22 12a9.816 9.816 0 0 1-.788 3.9 10.002 10.002 0 0 1-2.137 3.175c-.901.898-1.96 1.61-3.175 2.138A9.645 9.645 0 0 1 12 22Z" />
+        <Circle cx={8} cy={13} r={1} />
+        <Circle cx={16} cy={13} r={1} />
       </G>
       <Defs>
         <ClipPath id="clip-profile_inactive">
@@ -338,7 +353,13 @@ const icons = {
     </Svg>
   ),
 
-  bookmark: ({ width = 24, height = 24, strokeColor = "#000", fillColor = "none", ...props }) => (
+  bookmark: ({
+    width = 24,
+    height = 24,
+    strokeColor = "#000",
+    fillColor = "none",
+    ...props
+  }) => (
     <Svg
       width={width}
       height={height}
@@ -348,21 +369,21 @@ const icons = {
     >
       <Path
         d="M20 3v16.426l-7.575-3.554-.425-.2-.425.2L4 19.426V3h16Z"
-        stroke={strokeColor}       
+        stroke={strokeColor}
         strokeWidth={2}
-        fill={fillColor}          
+        fill={fillColor}
       />
     </Svg>
   ),
-  circle_check: ({ width = 24, height = 24, ...props}) => (
+  circle_check: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
-      <Path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"
-      />
-      <Path d="M8 10.575 11.385 14 16 9" />
+        <Path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"
+        />
+        <Path d="M8 10.575 11.385 14 16 9" />
       </G>
       <Defs>
         <ClipPath id="clip-circle-check">
@@ -371,7 +392,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  circle_check2: ({ width = 24, height = 24, ...props}) => (
+  circle_check2: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
         <Path d="M21 11.177v.828a9 9 0 1 1-5.337-8.226" />
@@ -384,7 +405,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  circle_close: ({ width = 24, height = 24, ...props}) => (
+  circle_close: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
         <Path
@@ -401,7 +422,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  circle: ({ width = 24, height = 24, ...props}) => (
+  circle: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G clipPath="url(#a)">
         <Path
@@ -438,7 +459,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  double_left_arrow: ({ width = 24, height = 24, ...props}) => (
+  double_left_arrow: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
         <Path d="m13 21-8-9 8-9" />
@@ -451,17 +472,19 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  down_arrow: ({ width = 24, height = 24, style, ...props}) => (
-    <Svg width={width}
+  down_arrow: ({ width = 24, height = 24, style, ...props }) => (
+    <Svg
+      width={width}
       height={height}
       viewBox="0 0 24 24"
       style={style}
       {...props}
-      fill="none">
+      fill="none"
+    >
       <Path stroke="#000" strokeWidth={2} d="m21 8-9 8-9-8" />
     </Svg>
   ),
-  home_header: ({ width = 24, height = 24, ...props}) => (
+  home_header: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
         <Path strokeLinecap="round" d="m3 9 9-7 9 7v13.5H3V9Z" />
@@ -500,12 +523,12 @@ const icons = {
       />
     </Svg>
   ),
-  menu: ({ width = 24, height = 24, ...props}) => (
+  menu: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <Path stroke="#000" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
     </Svg>
   ),
-  notification: ({ width = 24, height = 24, ...props}) => (
+  notification: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <Defs>
         <ClipPath id="clip">
@@ -527,7 +550,13 @@ const icons = {
       />
     </Svg>
   ),
-  options: ({ width = 24, height = 24, stroke = "none", fill = "#000", ...props }) => (
+  options: ({
+    width = 24,
+    height = 24,
+    stroke = "none",
+    fill = "#000",
+    ...props
+  }) => (
     <Svg width={width} height={height} viewBox="0 0 24 24" {...props}>
       <G fill={fill}>
         <Circle cx={12} cy={5} r={1.5} />
@@ -536,7 +565,7 @@ const icons = {
       </G>
     </Svg>
   ),
-  previous: ({ width = 24, height = 24, ...props}) => (
+  previous: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
         <Path d="M21 12H5M12 21l-8-9 8-9" />
@@ -548,7 +577,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  refresh: ({ width = 24, height = 24, ...props}) => (
+  refresh: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
         <Path d="M3 6v5h5M21 18v-5h-5" />
@@ -561,7 +590,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  reset: ({ width = 24, height = 24, ...props}) => (
+  reset: ({ width = 24, height = 24, ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
         <Path d="M4 4v6h6" />
@@ -577,14 +606,14 @@ const icons = {
   star: ({
     width = 16,
     height = 16,
-    color = "#EE7A13",   // 기본값은 기존 주황색
+    color = "#EE7A13", // 기본값은 기존 주황색
     style,
     ...props
   }) => (
     <Svg
       width={width}
       height={height}
-      viewBox="0 0 16 16"   // 원본 좌표계 지정
+      viewBox="0 0 16 16" // 원본 좌표계 지정
       fill="none"
       style={style}
       {...props}
@@ -595,7 +624,7 @@ const icons = {
       />
     </Svg>
   ),
-  heart_outline: ({ width = 24, height = 24, ...props}) => (
+  heart_outline: ({ width = 24, height = 24, ...props }) => (
     <Svg
       width={width}
       height={height}
@@ -617,12 +646,12 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  checkbox: ({ width = 24, height = 24, ...props}) => (
+  checkbox: ({ width = 24, height = 24, ...props }) => (
     <Svg width={10} height={9} fill="none" {...props}>
       <Path stroke="#fff" strokeWidth={2} d="m1 4.35 2.333 2.4L8.5 1.5" />
     </Svg>
   ),
-  comment_fill: ({ width = 24, height = 24, ...props}) => (
+  comment_fill: ({ width = 24, height = 24, ...props }) => (
     <Svg width={22} height={22} fill="none" {...props}>
       <Path
         fill="#D4D4D4"
@@ -630,7 +659,7 @@ const icons = {
       />
     </Svg>
   ),
-  smile: ({ width = 24, height = 24, ...props}) => (
+  smile: ({ width = 24, height = 24, ...props }) => (
     <Svg width={22} height={22} fill="none" {...props}>
       <Path
         fill="#D4D4D4"
@@ -651,7 +680,7 @@ const icons = {
       />
     </Svg>
   ),
-  location_outline: ({ width = 24, height = 24, ...props}) => (
+  location_outline: ({ width = 24, height = 24, ...props }) => (
     <Svg
       width={width}
       height={height}
@@ -669,7 +698,7 @@ const icons = {
       />
     </Svg>
   ),
-  time: ({ width = 24, height = 24, ...props}) => (
+  time: ({ width = 24, height = 24, ...props }) => (
     <Svg
       width={width}
       height={height}
@@ -677,11 +706,14 @@ const icons = {
       fill="none"
       {...props}
     >
-      <Path stroke="#6B6B6B" d="M12 5.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Z" />
+      <Path
+        stroke="#6B6B6B"
+        d="M12 5.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Z"
+      />
       <Path stroke="#6B6B6B" d="M12 8.4V12l2.1 2.1" />
     </Svg>
   ),
-  phone: ({ width = 24, height = 24, ...props}) => (
+  phone: ({ width = 24, height = 24, ...props }) => (
     <Svg
       width={width}
       height={height}
@@ -692,10 +724,10 @@ const icons = {
       <Path
         stroke="#6B6B6B"
         d="M9.016 5.5v.001a1.707 1.707 0 0 1 1.672 1.312l.03.153v.005c.071.54.204 1.07.395 1.582a1.702 1.702 0 0 1-.384 1.798l-.002.001-.49.489a9.144 9.144 0 0 0 2.912 2.906l.49-.49.004-.001a1.707 1.707 0 0 1 1.8-.384h-.002c.512.19 1.045.323 1.586.395h.004a1.708 1.708 0 0 1 1.468 1.717h.001v1.805l-.009.177a1.7 1.7 0 0 1-.545 1.086 1.71 1.71 0 0 1-1.306.441h-.01a12.456 12.456 0 0 1-5.424-1.927 12.252 12.252 0 0 1-3.768-3.761 12.404 12.404 0 0 1-1.93-5.44l-.001-.008a1.702 1.702 0 0 1 1.01-1.711c.217-.096.451-.146.688-.146h1.81Z"
-      />   
+      />
     </Svg>
   ),
-  price: ({ width = 24, height = 24, ...props}) => (
+  price: ({ width = 24, height = 24, ...props }) => (
     <Svg
       width={width}
       height={height}
@@ -709,7 +741,7 @@ const icons = {
       />
     </Svg>
   ),
-  next_circle: ({ width = 53, height = 53, ...props}) => (
+  next_circle: ({ width = 53, height = 53, ...props }) => (
     <Svg
       width={width}
       height={height}
@@ -732,7 +764,7 @@ const icons = {
       />
     </Svg>
   ),
-  share: ({ width = 17, height = 17, ...props}) => (
+  share: ({ width = 17, height = 17, ...props }) => (
     <Svg
       width={width}
       height={height}
@@ -745,6 +777,260 @@ const icons = {
         d="M12.75 9.208v5.667H2.125V4.25h5.667M10.625 2.125h4.25v4.25"
       />
       <Path stroke="#000" strokeLinejoin="round" d="m7.083 9.917 7.792-7.792" />
+    </Svg>
+  ),
+  grid: ({ width = 21, height = 21, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 21 21"
+      fill="none"
+      {...props}
+    >
+      <Path
+        fill="#D4D4D4"
+        d="M0 0h9.8v9.8H0V0ZM0 11.2h9.8V21H0v-9.8ZM11.2 0H21v9.8h-9.8V0ZM11.2 11.2H21V21h-9.8v-9.8Z"
+      />
+    </Svg>
+  ),
+  list: ({ width = 24, height = 19, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
+      <Path
+        fill="#D4D4D4"
+        d="M0 0h23.385v4.385H0zM0 7.308h23.385v4.385H0zM0 14.615h23.385V19H0z"
+      />
+    </Svg>
+  ),
+  triangle: ({ width = 8, height = 8, ...props }) => (
+    <Svg width={width} height={height} viewBox="0 0 8 9" fill="none" {...props}>
+      <Path fill="#000" d="M0 4.5 7.5.17v8.66L0 4.5Z" />
+    </Svg>
+  ),
+  write: ({ width = 27, height = 26, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 27 26"
+      fill="none"
+      {...props}
+    >
+      <Path
+        stroke="#fff"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.67}
+        d="M13.338 24.47h12.338M19.507 1.852a2.908 2.908 0 1 1 4.112 4.112L6.483 23.1 1 24.47l1.37-5.483L19.508 1.852Z"
+      />
+    </Svg>
+  ),
+  search_outline: ({ width = 21, height = 20, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 21 20"
+      fill="none"
+      {...props}
+    >
+      <Path
+        stroke="#AFAFAF"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M8.535 14.167c3.3 0 5.974-2.612 5.974-5.834 0-3.221-2.675-5.833-5.974-5.833-3.3 0-5.975 2.612-5.975 5.833 0 3.222 2.675 5.834 5.975 5.834Z"
+      />
+      <Path stroke="#AFAFAF" strokeWidth={2} d="m17.923 17.5-5.121-5" />
+    </Svg>
+  ),
+  camera_outline: ({ width = 24, height = 24, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
+      <G clipPath="url(#a)">
+        <Path
+          stroke="#000"
+          strokeWidth={2}
+          d="m15.486 4 1.229 2.587.271.571H22V22H2V7.158h5.014l.271-.571L8.514 4h6.972Z"
+        />
+        <Circle
+          cx={12.078}
+          cy={14.078}
+          r={4.033}
+          stroke="#000"
+          strokeWidth={2}
+        />
+        <Circle cx={18.118} cy={11.059} r={1.007} fill="#000" />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  gallery_outline: ({ width = 24, height = 24, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
+      <G clipPath="url(#a)">
+        <Path stroke="#000" strokeWidth={2} d="M21.863 7v15h-20V7h20Z" />
+        <Circle cx={17.523} cy={10.837} r={1.052} fill="#000" />
+        <Path fill="#000" d="M9.638 13.078 5.49 19.3h8.296l-4.148-6.222Z" />
+        <Path fill="#000" d="M15.114 14.908 12.37 19.3h5.49l-2.745-4.392Z" />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  lock: ({ width = 24, height = 24, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
+      <G stroke="#000" clipPath="url(#a)">
+        <Path strokeWidth={2} d="M1.65 9.053h20.367v14.105H1.65z" />
+        <Circle cx={11.833} cy={15.658} r={1} fill="#000" strokeWidth={0.684} />
+        <Path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M11.833 1.79c-2.718 0-4.92 1.891-4.92 4.225v2.932h9.84V6.015c0-2.334-2.202-4.225-4.92-4.225Z"
+        />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  happy: ({ width = 24, height = 24, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
+      <G
+        stroke="#62974F"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        clipPath="url(#a)"
+      >
+        <Path
+          strokeLinecap="round"
+          d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10Z"
+        />
+        <Path d="M8 14s1.5 2 4 2 4-2 4-2" />
+        <Path strokeLinecap="round" d="M9 9h.01M15 9h.01" />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  funny: ({ width = 24, height = 24, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
+      <G stroke="#62974F" strokeWidth={2} clipPath="url(#a)">
+        <Path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10ZM9 9h.01M15 9h.01"
+        />
+        <Path d="M15 12H9s.723 5 3 5 3-5 3-5Z" />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  sad: ({ width = 24, height = 24, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
+      <G clipPath="url(#a)">
+        <Path
+          stroke="#62974F"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10Z"
+        />
+        <Path
+          fill="#62974F"
+          d="M6.136 13c-.5-1 .5-2.5 1-3 .5.5 1.5 2 1 3-.357.714-1.5 1-2 0Z"
+        />
+        <Path
+          stroke="#62974F"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 9h.01M15 9h.01"
+        />
+        <Path
+          stroke="#62974F"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M16 17s-1.5-2-4-2-4 2-4 2"
+        />
+      </G>
+    </Svg>
+  ),
+  surprise: ({ width = 24, height = 24, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
+      <G stroke="#62974F" strokeWidth={2} clipPath="url(#a)">
+        <Path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10ZM9 9h.01M15 9h.01"
+        />
+        <Ellipse cx={12} cy={14.5} rx={2} ry={2.5} />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
     </Svg>
   ),
 };
