@@ -80,8 +80,11 @@ export default function HomeScreen() {
 
             <View style={styles.pillsCol}>
               <Pill label="미션" icon={IMG_SHORTCUT_MISSION}/>
+              <Pill label="저장소"
+                    icon={IMG_SHORTCUT_BOOKMARK}
+                    onPress={() => router.push("/storage")}
+              />
               <Pill label="출석체크" icon={IMG_SHORTCUT_CHECKIN}/>
-              <Pill label="찜 / 북마크" icon={IMG_SHORTCUT_BOOKMARK} />
             </View>
           </View>
 
