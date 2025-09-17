@@ -4,7 +4,7 @@ import { ActivityIndicator, Image, SafeAreaView, Text, View } from "react-native
 import Header from "../../../components/shared/Header";
 import { postRouteNext } from "../../../services/api";
 
-const CHARACTER = require("../../../assets/images/explorer.png");
+const CHARACTER = require("../../../assets/images/monkey-run.png");
 
 const parseJsonArray = (v) => {
   try { const a = JSON.parse(String(v ?? "[]")); return Array.isArray(a) ? a : []; }
@@ -117,7 +117,7 @@ export default function LoadingRouteScreen() {
         rightIcon="home_header"
         onRightPress={() => router.push("/home")}
       />
-      <View style={{ flex: 1, alignItems: "center", paddingTop: 36 }}>
+      <View style={{ flex: 1, alignItems: "center", paddingTop: 143 }}>
         <Text className="text-title-1 font-pretendardExtraBold">루트 생성 중이에요.</Text>
         <Text className="mt-2 text-heading-3 text-gray700 font-pretendardMedium">
           딱 맞는 루트를 추천해드릴게요!

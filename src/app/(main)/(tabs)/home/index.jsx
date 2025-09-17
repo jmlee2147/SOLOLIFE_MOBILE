@@ -113,7 +113,7 @@ export default function HomeScreen() {
 
           {/* CTA 카드 2 */}
           <Pressable
-            onPress={() => setShowDialog(true)}
+            onPress={() => router.push("/route-recommend")}
             style={[styles.ctaCard, styles.ctaOutline]}
           >
             <Image source={IMG_CARD_ROUTE} style={styles.ctaThumb} />
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
   ctaCard: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 16,
+    borderRadius: 10,
     padding: 14,
     marginHorizontal: 20,
     marginTop: 12,

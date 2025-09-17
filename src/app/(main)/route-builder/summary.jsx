@@ -1,6 +1,12 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, SafeAreaView, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import MapView from "../../../components/map/MapView";
 import RouteStepCard from "../../../components/route/RouteStepCard";
 import Button from "../../../components/shared/Button";
@@ -86,16 +92,19 @@ export default function RouteSummaryScreen() {
 
   useEffect(() => {
     log("params =", JSON.stringify(params));
-  }
-  , [params]);
+  }, [params]);
 
   const parseJsonArr = (v) => {
-    try { const a = JSON.parse(String(v)); return Array.isArray(a) ? a : []; }
-    catch { return []; }
+    try {
+      const a = JSON.parse(String(v));
+      return Array.isArray(a) ? a : [];
+    } catch {
+      return [];
+    }
   };
 
   const prefetchedItems = useMemo(
-    () => parseJsonArr(params. prefetched),
+    () => parseJsonArr(params.prefetched),
     [params.prefetched]
   );
 
@@ -109,73 +118,98 @@ export default function RouteSummaryScreen() {
     try {
       const a = JSON.parse(String(v));
       return Array.isArray(a) ? a : [];
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   };
 
-  const moods =
-    parsedArray(params.moodsKo) // 한글 무드 배열(JSON)
-      .concat(parsedArray(params.moods)); // 혹시 다른 키로 올 수도 있음
+  const moods = parsedArray(params.moodsKo) // 한글 무드 배열(JSON)
+    .concat(parsedArray(params.moods)); // 혹시 다른 키로 올 수도 있음
 
-  useEffect(() => { log("moods =", moods); }, [moods]);
+  useEffect(() => {
+    log("moods =", moods);
+  }, [moods]);
 
   const first = useMemo(() => {
-   // 1순위: confirm.jsx에서 넘긴 first(JSON string, URI 인코딩됨)
-   if (params.first) {
-     try {
-       const raw = decodeURIComponent(String(params.first));
-       const obj = JSON.parse(raw);
-       const lat = Number(obj.latitude ?? obj.lat);
-       const lng = Number(obj.longitude ?? obj.lng);
-       const p0 = Array.isArray(obj?.photos) && obj.photos[0];
-       if (Number.isFinite(lat) && Number.isFinite(lng)) {
-         return {
-           id: Number(obj.location_id) || Date.now(),
-           location_id: Number(obj.location_id) || Date.now(),
-           title: String(obj.location_name ?? "이름없음"),
-           rating: obj.rating_avg ?? undefined,
-           categories: obj.category ? [String(obj.category)] : [],
-           address: String(obj.address ?? ""),
-           imageSource: p0 ? { uri: p0 } : null,
-           lat, lng,
-         };
-       }
-     } catch {}
-   }
-   // 2순위: 예전 파라미터(개별 lat/lng 등)
-   const lat = Number(params.firstLat);
-   const lng = Number(params.firstLng);
-   if (Number.isFinite(lat) && Number.isFinite(lng)) {
-     return {
-       ...FALLBACK_FIRST,
-       id: params.firstId ? Number(params.firstId) : FALLBACK_FIRST.id,
-       location_id: params.firstId ? Number(params.firstId) : FALLBACK_FIRST.location_id,
-       title: params.firstName ? String(params.firstName) : FALLBACK_FIRST.title,
-       categories: params.firstCategory ? [String(params.firstCategory)] : FALLBACK_FIRST.categories,
-       lat, lng,
-     };
-   }
-   // 3순위: 폴백
-   return FALLBACK_FIRST;
- }, [params.first, params.firstId, params.firstName, params.firstCategory, params.firstLat, params.firstLng]);
+    // 1순위: confirm.jsx에서 넘긴 first(JSON string, URI 인코딩됨)
+    if (params.first) {
+      try {
+        const raw = decodeURIComponent(String(params.first));
+        const obj = JSON.parse(raw);
+        const lat = Number(obj.latitude ?? obj.lat);
+        const lng = Number(obj.longitude ?? obj.lng);
+        const p0 = Array.isArray(obj?.photos) && obj.photos[0];
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          return {
+            id: Number(obj.location_id) || Date.now(),
+            location_id: Number(obj.location_id) || Date.now(),
+            title: String(obj.location_name ?? "이름없음"),
+            rating: obj.rating_avg ?? undefined,
+            categories: obj.category ? [String(obj.category)] : [],
+            address: String(obj.address ?? ""),
+            imageSource: p0 ? { uri: p0 } : null,
+            lat,
+            lng,
+          };
+        }
+      } catch {}
+    }
+    // 2순위: 예전 파라미터(개별 lat/lng 등)
+    const lat = Number(params.firstLat);
+    const lng = Number(params.firstLng);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return {
+        ...FALLBACK_FIRST,
+        id: params.firstId ? Number(params.firstId) : FALLBACK_FIRST.id,
+        location_id: params.firstId
+          ? Number(params.firstId)
+          : FALLBACK_FIRST.location_id,
+        title: params.firstName
+          ? String(params.firstName)
+          : FALLBACK_FIRST.title,
+        categories: params.firstCategory
+          ? [String(params.firstCategory)]
+          : FALLBACK_FIRST.categories,
+        lat,
+        lng,
+      };
+    }
+    // 3순위: 폴백
+    return FALLBACK_FIRST;
+  }, [
+    params.first,
+    params.firstId,
+    params.firstName,
+    params.firstCategory,
+    params.firstLat,
+    params.firstLng,
+  ]);
 
-  useEffect(() => { log("first =", first); }, [first]);
+  useEffect(() => {
+    log("first =", first);
+  }, [first]);
 
-  const excludeCats = Array.isArray(first.categories) && first.categories.length
-    ? [first.categories[0]] // 상위 1개만 제외
-    : [];
+  const excludeCats =
+    Array.isArray(first.categories) && first.categories.length
+      ? [first.categories[0]] // 상위 1개만 제외
+      : [];
 
-  const region = typeof params.region === "string" && params.region.trim()
-    ? String(params.region)
-    : "경기도 수원시 영통구"; // 폴백 지역
-  
-  useEffect(() => { log("region =", region); }, [region]);
+  const region =
+    typeof params.region === "string" && params.region.trim()
+      ? String(params.region)
+      : "경기도 수원시 영통구"; // 폴백 지역
+
+  useEffect(() => {
+    log("region =", region);
+  }, [region]);
 
   // API 호출 상태
   const prefetchedMapped = useMemo(
-    () => (prefetchedItems || [])
-      .slice(0, 2)
-      .map((it, idx) => mapApiItemToCard(it, 2 + idx))
-      .filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng)),
+    () =>
+      (prefetchedItems || [])
+        .slice(0, 2)
+        .map((it, idx) => mapApiItemToCard(it, 2 + idx))
+        .filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng)),
     [prefetchedItems]
   );
   const hasPrefetched = prefetchedMapped.length > 0;
@@ -188,122 +222,140 @@ export default function RouteSummaryScreen() {
   const [err, setErr] = useState("");
 
   // API 호출
-const didRunRef = useRef(false);
+  const didRunRef = useRef(false);
 
-useEffect(() => {
-  if (hasPrefetched) {
+  useEffect(() => {
+    if (hasPrefetched) {
+      didRunRef.current = true;
+      setItems((prev) =>
+        prev.length >= 3 ? prev : [first, ...prefetchedMapped]
+      );
+      setLoading(false);
+      return;
+    }
+
+    if (didRunRef.current) return; // 이미 실행됨
     didRunRef.current = true;
-    setItems((prev) => (prev.length >= 3 ? prev : [first, ...prefetchedMapped]));
-    setLoading(false);
-    return;
-  }
 
-  if (didRunRef.current) return; // 이미 실행됨
-  didRunRef.current = true;
+    let canceled = false;
 
-  let canceled = false;
+    async function fetchNextCandidates() {
+      const baseReq = {
+        moods,
+        exclude_location_ids: first.location_id ? [first.location_id] : [],
+        // 상위 1개만 제외
+        exclude_categories:
+          Array.isArray(first.categories) && first.categories.length
+            ? [first.categories[0]]
+            : [],
+        center: { lat: first.lat, lng: first.lng },
+      };
 
-  async function fetchNextCandidates() {
-    const baseReq = {
-      moods,
-      exclude_location_ids: first.location_id ? [first.location_id] : [],
-      // 상위 1개만 제외
-      exclude_categories: Array.isArray(first.categories) && first.categories.length
-        ? [first.categories[0]]
-        : [],
-      center: { lat: first.lat, lng: first.lng },
-    };
+      const tries = [
+        // 1) 기존 조건 (3km, region 포함)
+        { ...baseReq, region, radius_km: 3, note: "strict-3km" },
+        // 2) 5km로 완화
+        { ...baseReq, region, radius_km: 5, note: "relaxed-5km" },
+        // 3) 8km + 카테고리 제외 해제
+        {
+          ...baseReq,
+          region,
+          radius_km: 8,
+          exclude_categories: [],
+          note: "relaxed-8km-noCatEx",
+        },
+        // 4) region 제거
+        { ...baseReq, radius_km: 8, exclude_categories: [], note: "no-region" },
+      ];
 
-    const tries = [
-      // 1) 기존 조건 (3km, region 포함)
-      { ...baseReq, region, radius_km: 3, note: "strict-3km" },
-      // 2) 5km로 완화
-      { ...baseReq, region, radius_km: 5, note: "relaxed-5km" },
-      // 3) 8km + 카테고리 제외 해제
-      { ...baseReq, region, radius_km: 8, exclude_categories: [], note: "relaxed-8km-noCatEx" },
-      // 4) region 제거
-      { ...baseReq, radius_km: 8, exclude_categories: [], note: "no-region" },
-    ];
+      let merged = [];
+      for (const t of tries) {
+        if (canceled) break;
+        try {
+          __DEV__ && console.log("[summary] try:", t.note, t);
+          const res = await postRouteNext(t);
+          const arr = Array.isArray(res?.items) ? res.items : [];
+          __DEV__ && console.log("[summary] got:", t.note, arr.length);
+          merged = merged.concat(arr);
+          if (merged.length >= 2) break; // 2개 모이면 중단
+        } catch (e) {
+          __DEV__ && console.warn("[summary] error try:", t.note, e?.message);
+        }
+      }
 
-    let merged = [];
-    for (const t of tries) {
-      if (canceled) break;
+      // 중복 제거 (location_id 기준)
+      const uniq = [];
+      const seen = new Set();
+      for (const it of merged) {
+        const id = it?.location_id ?? `${it?.location_name}-${it?.category}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        uniq.push(it);
+        if (uniq.length >= 2) break;
+      }
+      return uniq;
+    } // ← 여기 닫는 중괄호가 꼭 필요했어요!
+
+    async function run() {
+      setLoading(true);
+      setErr("");
+
       try {
-        __DEV__ && console.log("[summary] try:", t.note, t);
-        const res = await postRouteNext(t);
-        const arr = Array.isArray(res?.items) ? res.items : [];
-        __DEV__ && console.log("[summary] got:", t.note, arr.length);
-        merged = merged.concat(arr);
-        if (merged.length >= 2) break; // 2개 모이면 중단
+        const apiItems = await fetchNextCandidates();
+        const mapped = apiItems
+          .map((it, idx) => mapApiItemToCard(it, 2 + idx))
+          .filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng));
+
+        let next = [first, ...mapped]; // 항상 첫 장소 포함
+        if (next.length < 3) {
+          const need = 3 - next.length;
+          next = [...next, ...FALLBACK_OTHERS.slice(0, need)];
+        }
+
+        if (!canceled) {
+          __DEV__ && console.log("[summary] mapped items =", mapped);
+          __DEV__ && console.log("[summary] final items =", next);
+          setItems(next);
+        }
       } catch (e) {
-        __DEV__ && console.warn("[summary] error try:", t.note, e?.message);
+        __DEV__ && console.warn("[summary] next error =", e?.message, e);
+        if (!canceled) {
+          setErr(e?.message || "추천을 불러오지 못했어요.");
+          setItems([first, ...FALLBACK_OTHERS]);
+        }
+      } finally {
+        !canceled && setLoading(false);
       }
     }
 
-    // 중복 제거 (location_id 기준)
-    const uniq = [];
-    const seen = new Set();
-    for (const it of merged) {
-      const id = it?.location_id ?? `${it?.location_name}-${it?.category}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      uniq.push(it);
-      if (uniq.length >= 2) break;
-    }
-    return uniq;
-  } // ← 여기 닫는 중괄호가 꼭 필요했어요!
-
-  async function run() {
-    setLoading(true);
-    setErr("");
-
-    try {
-      const apiItems = await fetchNextCandidates();
-      const mapped = apiItems
-        .map((it, idx) => mapApiItemToCard(it, 2 + idx))
-        .filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng));
-
-      let next = [first, ...mapped]; // 항상 첫 장소 포함
-      if (next.length < 3) {
-        const need = 3 - next.length;
-        next = [...next, ...FALLBACK_OTHERS.slice(0, need)];
-      }
-
-      if (!canceled) {
-        __DEV__ && console.log("[summary] mapped items =", mapped);
-        __DEV__ && console.log("[summary] final items =", next);
-        setItems(next);
-      }
-    } catch (e) {
-      __DEV__ && console.warn("[summary] next error =", e?.message, e);
-      if (!canceled) {
-        setErr(e?.message || "추천을 불러오지 못했어요.");
-        setItems([first, ...FALLBACK_OTHERS]);
-      }
-    } finally {
-      !canceled && setLoading(false);
-    }
-  }
-
-  run();
-  return () => { canceled = true; };
-}, [hasPrefetched, first, prefetchedMapped]);
+    run();
+    return () => {
+      canceled = true;
+    };
+  }, [hasPrefetched, first, prefetchedMapped]);
 
   // ------- ④ 지도 마커 구성 -------
   const markers = useMemo(() => {
-    return items
-      .map((p, i) => {
-        const lat = Number(p.lat);
-        const lng = Number(p.lng);
-        return {
-          id: String(p.location_id ?? i),
-          lat,
-          lng,
-          name: p.title,
-        };
-      })
-      // 0,0 또는 NaN 제거 (bounds 깨짐 방지)
-      .filter(m => Number.isFinite(m.lat) && Number.isFinite(m.lng) && !(m.lat === 0 && m.lng === 0));
+    return (
+      items
+        .map((p, i) => {
+          const lat = Number(p.lat);
+          const lng = Number(p.lng);
+          return {
+            id: String(p.location_id ?? i),
+            lat,
+            lng,
+            name: p.title,
+          };
+        })
+        // 0,0 또는 NaN 제거 (bounds 깨짐 방지)
+        .filter(
+          (m) =>
+            Number.isFinite(m.lat) &&
+            Number.isFinite(m.lng) &&
+            !(m.lat === 0 && m.lng === 0)
+        )
+    );
   }, [items]);
 
   useEffect(() => {
@@ -319,9 +371,18 @@ useEffect(() => {
   );
 
   const markersKey = useMemo(
-    () => JSON.stringify(numberedMarkers.map(m => [m.lat, m.lng, m.label])),
+    () => JSON.stringify(numberedMarkers.map((m) => [m.lat, m.lng, m.label])),
     [numberedMarkers]
   );
+
+  const locationIds = useMemo(() => {
+    const arr = items
+      .map((p) => Number(p.location_id))
+      .filter((n) => Number.isFinite(n));
+
+    // 중복 제거
+    return Array.from(new Set(arr));
+  }, [items]);
 
   useEffect(() => {
     if (__DEV__) {
@@ -356,7 +417,10 @@ useEffect(() => {
           showsVerticalScrollIndicator={false}
         >
           {items.map((place, i) => (
-            <View key={`${place.id}-${i}`} style={{ marginBottom: 18, paddingHorizontal: 25 }}>
+            <View
+              key={`${place.id}-${i}`}
+              style={{ marginBottom: 18, paddingHorizontal: 25 }}
+            >
               <RouteStepCard
                 step={i + 1}
                 title={place.title}
@@ -407,7 +471,9 @@ useEffect(() => {
                   items.map((c) => {
                     if (c.raw) return c.raw;
 
-                    const photoUri = c?.imageSource?.uri ? [c.imageSource.uri] : [];
+                    const photoUri = c?.imageSource?.uri
+                      ? [c.imageSource.uri]
+                      : [];
                     return {
                       location_id: c.location_id,
                       location_name: c.title,
@@ -420,8 +486,11 @@ useEffect(() => {
                     };
                   })
                 ),
-                center: JSON.stringify({ lat: items[0]?.lat, lng: items[0]?.lng }),
-                region: params?.region || "",   // 있으면
+                center: JSON.stringify({
+                  lat: items[0]?.lat,
+                  lng: items[0]?.lng,
+                }),
+                region: params?.region || "", // 있으면
               },
             })
           }
@@ -430,7 +499,25 @@ useEffect(() => {
           title="루트 저장하기"
           size="medium"
           variant="primary"
-          onPress={() => router.push("/route-builder/save")}
+          onPress={() =>
+            router.push({
+              pathname: "/route-builder/save",
+              params: {
+                locationIds: JSON.stringify(locationIds),
+                defaultName: `${items[0]?.title ?? "무명"} 루트`,
+                thumbs: JSON.stringify(
+                  items
+                    .slice(0, 3)
+                    .map((c) => c?.imageSource?.uri)
+                    .filter(Boolean)
+                ),
+                placeSummary: items
+                  .slice(0, 3)
+                  .map((c) => c.title)
+                  .join("-"),
+              },
+            })
+          }
         />
       </View>
     </SafeAreaView>

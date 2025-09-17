@@ -1,44 +1,161 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { FlatList, Image, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+    ActivityIndicator,
+    FlatList,
+    Image,
+    StyleSheet,
+    Text,
+    View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Button from "../../../../components/shared/Button";
 import Header from "../../../../components/shared/Header";
 import Icon from "../../../../components/shared/Icon";
 
-const SAMPLE_PLACES = [
-  {
-    id: "p1",
-    name: "국립현대미술관",
-    category: "미술관",
-    address: "서울시 00구 00길",
-    rating: 4.5,
-    thumb: require("../../../../assets/images/sample.png"),
-    tags: ["#핫플", "#감성적", "#조용한", "#밝은", "#실내"],
-  },
-  {
-    id: "p2",
-    name: "리움미술관",
-    category: "미술관",
-    address: "서울시 00구 00길",
-    rating: 4.5,
-    thumb: require("../../../../assets/images/sample.png"),
-    tags: ["#핫플", "#감성적", "#조용한", "#밝은", "#실내"],
-  },
-  {
-    id: "p3",
-    name: "해움미술관",
-    category: "미술관",
-    address: "서울시 00구 00길",
-    rating: 4.5,
-    thumb: require("../../../../assets/images/sample.png"),
-    tags: ["#핫플", "#감성적", "#조용한", "#밝은", "#실내"],
-  },
-];
+const BASE_URL = "http://16.176.24.53:4000";
+const SAMPLE = require("../../../../assets/images/sample.png");
 
 export default function RouteDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const { id } = params;
   const insets = useSafeAreaInsets();
   const router = useRouter();
+
+  const [loading, setLoading] = useState(true);
+  const [meta, setMeta] = useState(null);
+  const [journey, setJourney] = useState(null);
+
+  // ---------- params 우선 사용 ----------
+  const paramTitle =
+    typeof params.title === "string" && params.title.trim() ? params.title : "";
+  const paramDate =
+    typeof params.date === "string" && params.date.trim() ? params.date : "";
+  const paramSummary =
+    typeof params.placeSummary === "string" && params.placeSummary.trim()
+      ? params.placeSummary
+      : "";
+
+  const paramThumbUris = useMemo(() => {
+    try {
+      const arr = JSON.parse(params.thumbs || "[]");
+      return Array.isArray(arr) ? arr.slice(0, 3) : [];
+    } catch {
+      return [];
+    }
+  }, [params.thumbs]);
+
+  const paramThumbs = useMemo(
+    () => paramThumbUris.map((u) => ({ uri: u })),
+    [paramThumbUris]
+  );
+
+  // ---------- meta & 상세 API 로드 ----------
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        // 1) meta
+        const raw = await AsyncStorage.getItem(`journey_meta_${id}`);
+        if (mounted && raw) {
+          try {
+            setMeta(JSON.parse(raw));
+          } catch {}
+        }
+
+        // 2) 상세
+        const token = await AsyncStorage.getItem("jwt");
+        const res = await fetch(`${BASE_URL}/journeys/${id}`, {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (mounted) {
+          if (res.ok) setJourney(data);
+          else console.warn("journey detail error:", data?.error || res.status);
+        }
+      } catch (e) {
+        console.warn("detail exception:", e?.message);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
+
+  // ---------- 화면에 표시할 타이틀/날짜/요약 ----------
+  const titleText =
+    paramTitle || meta?.title || journey?.journey_title || "무명의 루트";
+  const dateText =
+    paramDate ||
+    (journey?.created_at
+      ? `${new Date(journey.created_at).getFullYear()}.${String(
+          new Date(journey.created_at).getMonth() + 1
+        ).padStart(2, "0")}.${String(
+          new Date(journey.created_at).getDate()
+        ).padStart(2, "0")} 저장된 루트`
+      : "저장된 루트");
+  const summaryText = paramSummary || meta?.placeSummary || "";
+
+  // ---------- 썸네일 3장 복원: params > meta > SAMPLE ----------
+  const thumbs = useMemo(() => {
+    if (paramThumbs.length) return paramThumbs.slice(0, 3);
+
+    const fromMeta = Array.isArray(meta?.thumbs) ? meta.thumbs.slice(0, 3) : [];
+    if (fromMeta.length) {
+      return fromMeta.map((t) =>
+        t && typeof t.uri === "string" && t.uri ? { uri: t.uri } : SAMPLE
+      );
+    }
+    return [SAMPLE, SAMPLE, SAMPLE];
+  }, [paramThumbs, meta]);
+
+  // ---------- 리스트에 뿌릴 아이템 ----------
+  const places = useMemo(() => {
+    if (!journey || !Array.isArray(journey.locations)) return [];
+    return journey.locations.map((jl, idx) => {
+      const loc = jl.location || jl || {};
+      return {
+        id:
+          String(loc.location_id ?? jl.location_id ?? jl.journey_location_id) ||
+          String(idx),
+        name: loc.location_name || jl.location_name || "이름없음",
+        category: loc.category || jl.category || "",
+        address: loc.address || jl.address || "",
+        rating:
+          loc.rating_avg ??
+          jl.rating_avg ??
+          (typeof loc.rating === "number" ? loc.rating : null),
+        // 왼쪽 썸네일은 index.jsx에서 저장해 둔 thumbs[i]로 표시
+        thumb: thumbs[idx] || SAMPLE,
+        tags:
+          Array.isArray(loc.keywords) && loc.keywords.length
+            ? loc.keywords
+            : [],
+      };
+    });
+  }, [journey, thumbs]);
+
+  // params만 있고 meta/상세가 아직이면 스피너, params라도 있으면 바로 렌더
+  if (loading && !paramTitle && !paramDate && !paramThumbs.length) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          paddingTop: insets.top,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <ActivityIndicator />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -50,18 +167,19 @@ export default function RouteDetailScreen() {
         onRightPress={() => router.push("/home")}
       />
 
+      {/* 타이틀/날짜/요약 */}
       <View style={{ paddingHorizontal: 25, paddingTop: 10 }}>
         <Text className="text-title-1 font-pretendardExtraBold mb-[6px]">
-          전시투어
+          {titleText}
         </Text>
         <Text className="text-heading-3 font-pretendardSemiBold text-gray700">
-          2025.08.12 저장된 루트
+          {dateText} 저장된 루트
         </Text>
       </View>
 
-      {/* 장소 리스트 */}
+      {/* 장소 리스트 (UI 유지) */}
       <FlatList
-        data={SAMPLE_PLACES}
+        data={places}
         keyExtractor={(it) => it.id}
         renderItem={({ item }) => (
           <View style={styles.placeRow}>
@@ -70,36 +188,39 @@ export default function RouteDetailScreen() {
               {/* 상단: 이름 + 별점 */}
               <View>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <Text className="text-heading-2 font-pretendardSemiBold text-[#244DD3] mr-[9px]">
+                  <Text
+                    className="text-heading-2 font-pretendardSemiBold text-[#244DD3] mr-[9px]"
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={{ flexShrink: 1 }}
+                  >
                     {item.name}
                   </Text>
                   <Icon name="star" width={16} height={16} />
                   <Text className="text-body-2 font-pretendardMedium text-yellow900 ml-[1px]">
-                    {item.rating}
+                    {item.rating ?? "-"}
                   </Text>
                 </View>
                 <Text className="text-body-2 font-pretendardMedium text-gray700 mt-[13px]">
                   {item.category}
                 </Text>
+                {!!item.address && (
+                  <Text className="text-body-3 font-pretendardRegular text-gray700 mt-[4px]">
+                    {item.address}
+                  </Text>
+                )}
               </View>
 
-              <Text className="text-body-3 font-pretendardRegular text-gray700">
-                {item.tags.join(" ")}
-              </Text>
+              {item.tags?.length > 0 && (
+                <Text className="text-body-3 font-pretendardRegular text-gray700">
+                  {item.tags.join(" ")}
+                </Text>
+              )}
             </View>
           </View>
         )}
-        ItemSeparatorComponent={() => (
-          <View
-            style={{
-              height: 1,
-              backgroundColor: "#D4D4D4",
-              marginVertical: 8,
-              marginHorizontal: -25,
-            }}
-          />
-        )}
         contentContainerStyle={{ padding: 20 }}
+        showsVerticalScrollIndicator={false}
       />
 
       {/* 버튼들 */}
@@ -117,20 +238,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     backgroundColor: "#FFF",
+    marginBottom: 17,
   },
   thumb: {
     width: 166,
     height: 166,
     backgroundColor: "#D9D9D9",
-  },
-  tags: {
-    fontSize: 11,
-    color: "#999",
-  },
-  placeName: {
-    fontSize: 16,
-    fontFamily: "Pretendard-SemiBold",
-    color: "#1565C0",
   },
   placeInfo: {
     flex: 1,
@@ -138,43 +251,9 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     justifyContent: "space-between",
   },
-  tags: {
-    fontSize: 11,
-    color: "#999",
-    marginTop: 4,
-  },
-  rating: { marginLeft: 6, fontSize: 13, color: "#FF6F00" },
-  category: { fontSize: 13, color: "#444" },
-  address: { fontSize: 12, color: "#666" },
   bottomRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: "#EEE",
+    paddingHorizontal: 25,
   },
-  editBtn: {
-    flex: 1,
-    marginRight: 8,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#E5F1E8",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  editText: {
-    color: "#2A7A3A",
-    fontSize: 14,
-    fontFamily: "Pretendard-SemiBold",
-  },
-  mapBtn: {
-    flex: 1,
-    marginLeft: 8,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#2A7A3A",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  mapText: { color: "#fff", fontSize: 14, fontFamily: "Pretendard-SemiBold" },
 });

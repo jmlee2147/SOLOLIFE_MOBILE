@@ -1,11 +1,19 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import {
+    ActivityIndicator,
     Dimensions,
     FlatList,
     Image,
     Pressable,
+    RefreshControl,
     StyleSheet,
     Text,
     View,
@@ -20,40 +28,22 @@ const GAP = 14;
 const H_PADDING = 16;
 const ITEM_W = (SCREEN_W - H_PADDING * 2 - GAP * (COLS - 1)) / COLS;
 
-// 데모용 루트 목록 (서버 연동 전)
-const MOCK_ROUTES = [
-  {
-    id: "j101",
-    title: "전시투어",
-    date: "2025-08-29",
-    placeSummary: "어쩌구미술관-저쩌구미술관-어쩌구박물관",
-    thumbs: [
-      require("../../../assets/images/sample.png"),
-      require("../../../assets/images/sample.png"),
-      require("../../../assets/images/sample.png"),
-    ],
-  },
-  {
-    id: "j102",
-    title: "야외산책",
-    date: "2025-08-29",
-    placeSummary: "호수공원-사찰-수변산책로",
-    thumbs: [
-      require("../../../assets/images/sample.png"),
-      require("../../../assets/images/sample.png"),
-      require("../../../assets/images/sample.png"),
-    ],
-  },
-];
-
+const BASE_URL = "http://16.176.24.53:4000";
 const SAMPLE = require("../../../assets/images/sample.png");
+
+// 데모용 로컬 즐찾 (장소 탭)
+const MOCK_FAVORITES = [
+  { id: "p1", title: "모든장소", count: 12, thumb: SAMPLE },
+  { id: "p2", title: "카페", count: 5, thumb: SAMPLE },
+  { id: "p3", title: "산책", count: 8, thumb: SAMPLE },
+];
 
 export default function StorageScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
   // 탭 상태: 'place' | 'route'
-  const [tab, setTab] = useState("place");
+  const [tab, setTab] = useState("route");
 
   // 정렬
   const [sortKey, setSortKey] = useState("latest");
@@ -65,41 +55,174 @@ export default function StorageScreen() {
     []
   );
 
-  // 데이터 (로컬 즐찾 / Journeys)
-  const [favoritePlaces, setFavoritePlaces] = useState([]);
-  const [routes, setRoutes] = useState([]);
+  // ===== 장소(로컬) 데이터 =====
+  const [favoritePlaces, setFavoritePlaces] = useState(MOCK_FAVORITES);
 
   useEffect(() => {
-    // 로컬 즐찾 불러오기
     (async () => {
       try {
         const raw = await AsyncStorage.getItem("favorites");
-        const list = raw ? JSON.parse(raw) : [];
-        setFavoritePlaces(
-          list.map((it, idx) => ({
-            id: String(it.location_id ?? idx),
-            title: it.name ?? "모든장소",
-            count: it.count ?? Math.floor(Math.random() * 95) + 1,
-            thumb: it.thumb ?? SAMPLE,
-          }))
-        );
+        const list = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(list)) {
+          setFavoritePlaces(
+            list.map((it, idx) => ({
+              id: String(it.location_id ?? idx),
+              title: it.name ?? "모든장소",
+              count: it.count ?? Math.floor(Math.random() * 95) + 1,
+              thumbs:
+                Array.isArray(it.thumbs) && it.thumbs.length
+                  ? it.thumbs.map((u) => (u?.uri ? u : SAMPLE)).slice(0, 3)
+                  : [SAMPLE],
+            }))
+          );
+        }
       } catch {}
     })();
   }, []);
 
-  useEffect(() => {
-    // TODO: GET /journeys → setRoutes(items.map(...))
-    setRoutes(MOCK_ROUTES);
-  }, []);
+  // ===== 루트(API) 데이터 =====
+  const [routes, setRoutes] = useState([]);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(12);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const canLoadMore = useMemo(
+    () => routes.length < total,
+    [routes.length, total]
+  );
 
-  // 탭별 데이터 선택 + 정렬
-  const data = useMemo(() => {
-    const list = tab === "place" ? favoritePlaces : routes;
-    if (sortKey === "name") {
-      return [...list].sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+  const tokenRef = useRef(null);
+
+  const formatDate = (iso) => {
+    if (!iso) return "";
+    try {
+      const d = new Date(iso);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    } catch {
+      return "";
     }
-    return [...list].reverse();
-  }, [favoritePlaces, routes, tab, sortKey]);
+  };
+
+  async function fetchJourneys(pageArg = 1, append = false) {
+    const token = tokenRef.current ?? (await AsyncStorage.getItem("jwt"));
+    tokenRef.current = token;
+
+    const url = `${BASE_URL}/journeys?page=${pageArg}&limit=${limit}`;
+    const r = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const msg =
+        data?.error ||
+        (r.status === 401
+          ? "로그인이 필요합니다."
+          : `목록을 불러오지 못했어요. (HTTP ${r.status})`);
+      throw new Error(msg);
+    }
+
+    const mapped = [];
+    for (const it of data.items ?? []) {
+      const id = String(it.journey_id);
+      let placeSummary = "";
+      let thumbs = [SAMPLE, SAMPLE, SAMPLE];
+
+      // AsyncStorage에서 journey_meta_<id> 불러오기
+      try {
+        const metaRaw = await AsyncStorage.getItem(`journey_meta_${id}`);
+        if (metaRaw) {
+          const meta = JSON.parse(metaRaw);
+          if (meta.placeSummary) placeSummary = meta.placeSummary;
+          if (Array.isArray(meta.thumbs) && meta.thumbs.length > 0) {
+            thumbs = meta.thumbs.map((uri) => (uri ? { uri } : SAMPLE));
+          }
+        }
+      } catch {}
+
+      mapped.push({
+        id,
+        title: it.journey_title || "무명의 루트",
+        date: formatDate(it.created_at),
+        placeSummary,
+        thumbs,
+      });
+    }
+
+    setTotal(Number(data.total || 0));
+    setRoutes((prev) => (append ? [...prev, ...mapped] : mapped));
+    setPage(pageArg);
+  }
+
+  const loadInitial = useCallback(async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await fetchJourneys(1, false);
+    } catch (e) {
+      console.warn("[routes] list error:", e?.message);
+      setRoutes([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [loading]);
+
+  const onRefresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await fetchJourneys(1, false);
+    } catch (e) {
+      console.warn("[routes] refresh error:", e?.message);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshing]);
+
+  const loadMore = useCallback(async () => {
+    if (loading || refreshing || !canLoadMore) return;
+    setLoading(true);
+    try {
+      await fetchJourneys(page + 1, true);
+    } catch (e) {
+      console.warn("[routes] loadMore error:", e?.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [loading, refreshing, canLoadMore, page]);
+
+  useEffect(() => {
+    if (tab === "route" && routes.length === 0) {
+      loadInitial();
+    }
+  }, [tab]);
+
+  const placeData = useMemo(() => {
+    if (sortKey === "name") {
+      return [...favoritePlaces].sort((a, b) =>
+        (a.title || "").localeCompare(b.title || "")
+      );
+    }
+    return [...favoritePlaces].reverse();
+  }, [favoritePlaces, sortKey]);
+
+  const routeData = useMemo(() => {
+    const list = [...routes];
+    if (sortKey === "name") {
+      return list.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+    }
+    return list;
+  }, [routes, sortKey]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -112,7 +235,9 @@ export default function StorageScreen() {
       />
 
       {/* Tabs */}
-      <View style={{ position: "relative", paddingHorizontal: 25, paddingTop: 8 }}>
+      <View
+        style={{ position: "relative", paddingHorizontal: 25, paddingTop: 8 }}
+      >
         <View
           style={{
             position: "absolute",
@@ -127,7 +252,12 @@ export default function StorageScreen() {
           {/* 장소 탭 */}
           <Pressable
             onPress={() => setTab("place")}
-            style={{ flex: 1, alignItems: "center", position: "relative", paddingBottom: 8 }}
+            style={{
+              flex: 1,
+              alignItems: "center",
+              position: "relative",
+              paddingBottom: 8,
+            }}
             hitSlop={8}
           >
             <Text
@@ -142,7 +272,7 @@ export default function StorageScreen() {
                   position: "absolute",
                   bottom: -1,
                   height: 2,
-                  width: SCREEN_W / 2,
+                  width: SCREEN_W / 2 - 25,
                   backgroundColor: "#000",
                 }}
               />
@@ -152,7 +282,12 @@ export default function StorageScreen() {
           {/* 루트 탭 */}
           <Pressable
             onPress={() => setTab("route")}
-            style={{ flex: 1, alignItems: "center", position: "relative", paddingBottom: 8 }}
+            style={{
+              flex: 1,
+              alignItems: "center",
+              position: "relative",
+              paddingBottom: 8,
+            }}
             hitSlop={8}
           >
             <Text
@@ -167,7 +302,7 @@ export default function StorageScreen() {
                   position: "absolute",
                   bottom: -1,
                   height: 2,
-                  width: SCREEN_W / 2,
+                  width: SCREEN_W / 2 - 25,
                   backgroundColor: "#000",
                 }}
               />
@@ -176,36 +311,42 @@ export default function StorageScreen() {
         </View>
       </View>
 
-      {/* Toolbar: 정렬 / 편집 */}
+      {/* Toolbar */}
       <View style={styles.toolbarRow}>
-        <SortDropdown value={sortKey} onChange={(v) => setSortKey(v)} options={latestOptions} />
-        <Pressable
-          style={styles.editBtn}
-          onPress={() => {
-            /* 편집 모드 토글 예정 */
-          }}
-        >
+        <SortDropdown
+          value={sortKey}
+          onChange={(v) => setSortKey(v)}
+          options={latestOptions}
+        />
+        <Pressable style={styles.editBtn} onPress={() => {}}>
           <Text className="text-body-2 font-pretendardMedium">편집</Text>
         </Pressable>
       </View>
 
-      {/* 콘텐츠: 장소 그리드 / 루트 리스트 */}
+      {/* 콘텐츠 */}
       {tab === "place" ? (
         <FlatList
-          data={data}
+          data={placeData}
           key="place-grid"
           keyExtractor={(item) => item.id}
           numColumns={COLS}
-          contentContainerStyle={{ paddingHorizontal: H_PADDING, paddingTop: 8, paddingBottom: 24 }}
+          contentContainerStyle={{
+            paddingHorizontal: H_PADDING,
+            paddingTop: 8,
+            paddingBottom: 24,
+          }}
           columnWrapperStyle={{ gap: GAP }}
           renderItem={({ item }) => (
-            <GridItem
+            <CollectionCard
               title={item.title}
               count={item.count}
-              source={item.thumb}
-              onPress={() => {
-                // router.push(`/place/${item.id}`)
-              }}
+              thumbs={item.thumbs}
+              onPress={() =>
+                router.push({
+                  pathname: "/(main)/storage/place/[id]",
+                  params: { id: item.id, title: item.title },
+                })
+              }
             />
           )}
           ListEmptyComponent={<Empty tab="place" />}
@@ -213,7 +354,7 @@ export default function StorageScreen() {
         />
       ) : (
         <FlatList
-          data={data}
+          data={routeData}
           key="route-list"
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingHorizontal: 25, paddingBottom: 24 }}
@@ -225,11 +366,41 @@ export default function StorageScreen() {
               date={item.date}
               thumbs={item.thumbs}
               onPress={() =>
-                router.push({ pathname: "/(main)/storage/route/[id]", params: { id: item.id } })
+                router.push({
+                  pathname: "/(main)/storage/route/[id]",
+                  params: {
+                    id: item.id,
+                    thumbs: JSON.stringify(
+                      (item.thumbs || []).map((t) => (t?.uri ? t.uri : null))
+                    ),
+                    title: item.title || "",
+                    date: item.date || "",
+                  },
+                })
               }
             />
           )}
-          ListEmptyComponent={<Empty tab="route" />}
+          ListEmptyComponent={
+            loading ? (
+              <View style={{ paddingTop: 60, alignItems: "center" }}>
+                <ActivityIndicator />
+              </View>
+            ) : (
+              <Empty tab="route" />
+            )
+          }
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          onEndReachedThreshold={0.2}
+          onEndReached={loadMore}
+          ListFooterComponent={
+            loading && routes.length > 0 ? (
+              <View style={{ paddingVertical: 12 }}>
+                <ActivityIndicator />
+              </View>
+            ) : null
+          }
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -238,7 +409,6 @@ export default function StorageScreen() {
 }
 
 /* ===== Sub Components ===== */
-
 function Empty({ tab }) {
   return (
     <View style={{ alignItems: "center", paddingTop: 60 }}>
@@ -249,28 +419,43 @@ function Empty({ tab }) {
   );
 }
 
-function GridItem({ title, source, count, onPress }) {
+function CollectionCard({ title, thumbs = [], count, onPress }) {
   return (
     <Pressable onPress={onPress} style={{ width: ITEM_W }}>
-      <View style={styles.thumbWrap}>
-        <Image source={source} style={styles.thumb} resizeMode="cover" />
-        {typeof count === "number" && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{count}</Text>
-          </View>
-        )}
-      </View>
+      <StackThumb thumbs={thumbs} />
       <Text style={styles.itemTitle} numberOfLines={1}>
         {title}
       </Text>
+      {typeof count === "number" && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{count}</Text>
+        </View>
+      )}
     </Pressable>
+  );
+}
+
+/** 최대 3장을 ‘겹쳐 보이게’ */
+function StackThumb({ thumbs = [] }) {
+  const size = ITEM_W;
+  const layers = thumbs.slice(0, 3);
+  const bg1 = { top: 12, left: 12, width: size - 12, height: size - 12 };
+  const bg2 = { top: 6, left: 6, width: size - 6, height: size - 6 };
+
+  const topImage = layers[0] || SAMPLE;
+
+  return (
+    <View style={styles.stackWrap}>
+      <View style={[styles.cardBg, bg1]} />
+      <View style={[styles.cardBg, bg2]} />
+      <Image source={topImage} style={styles.thumb} resizeMode="cover" />
+    </View>
   );
 }
 
 function RouteRow({ title, placeSummary, date, thumbs = [], onPress }) {
   return (
     <Pressable onPress={onPress} style={{ backgroundColor: "#fff" }}>
-      {/* 썸네일 3개 가로 */}
       <View style={{ flexDirection: "row", gap: 5 }}>
         {Array.from({ length: 3 }).map((_, i) => (
           <Image
@@ -281,34 +466,32 @@ function RouteRow({ title, placeSummary, date, thumbs = [], onPress }) {
           />
         ))}
       </View>
-
-      {/* 타이틀 & 날짜 */}
       <View
         style={{
           flexDirection: "row",
-          alignItems: "flex-end",
+          alignItems: "center",
           justifyContent: "space-between",
           marginTop: 5,
         }}
       >
-        <Text className="text-heading-1 font-pretendardSemiBold">
-          {title}
-        </Text>
+        <Text className="text-heading-1 font-pretendardSemiBold">{title}</Text>
         <Text className="text-caption font-pretendardRegular text-gray700">
           {date}
         </Text>
       </View>
-
-      {/* 장소 요약 */}
-      <Text
-        numberOfLines={1}
-        className="text-body-3 font-pretendardRegular"
-      >
-        {placeSummary}
-      </Text>
-
-      {/* 구분선 */}
-      <View style={{ height: 1, backgroundColor: "#D4D4D4", marginTop: 15, marginHorizontal: -25, }} />
+      {!!placeSummary && (
+        <Text numberOfLines={1} className="text-body-3 font-pretendardRegular">
+          {placeSummary}
+        </Text>
+      )}
+      <View
+        style={{
+          height: 1,
+          backgroundColor: "#D4D4D4",
+          marginTop: 15,
+          marginHorizontal: -25,
+        }}
+      />
     </Pressable>
   );
 }
@@ -316,7 +499,6 @@ function RouteRow({ title, placeSummary, date, thumbs = [], onPress }) {
 /* ===== Styles ===== */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
-
   toolbarRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -335,7 +517,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   thumbWrap: {
     width: ITEM_W,
     height: ITEM_W,
@@ -343,7 +524,21 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#EEE",
   },
-  thumb: { width: "100%", height: "100%" },
+
+  stackWrap: {
+    width: ITEM_W,
+    height: ITEM_W,
+    overflow: "hidden",
+    marginBottom: 6,
+  },
+  cardBg: {
+    position: "absolute",
+    backgroundColor: "#EEE",
+  },
+  thumb: {
+    width: ITEM_W,
+    height: ITEM_W,
+  },
   badge: {
     position: "absolute",
     top: 6,

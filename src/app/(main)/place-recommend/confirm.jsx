@@ -13,7 +13,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView from "../../../components/map/MapView";
 import Header from "../../../components/shared/Header";
 import Icon from "../../../components/shared/Icon";
@@ -26,9 +26,18 @@ export default function RouteBuilderScreen() {
   const MAP_PLACEHOLDER = require("../../../assets/images/map_placeholder.png");
 
   // 결과 페이지에서 건네준 값들로 일관되게 세팅
-  const placeId = useMemo(() => Number(params.placeId) || Date.now(), [params.placeId]);
-  const placeName = useMemo(() => String(params.placeName ?? "선택한 장소"), [params.placeName]);
-  const category = useMemo(() => String(params.category ?? ""), [params.category]);
+  const placeId = useMemo(
+    () => Number(params.placeId) || Date.now(),
+    [params.placeId]
+  );
+  const placeName = useMemo(
+    () => String(params.placeName ?? "선택한 장소"),
+    [params.placeName]
+  );
+  const category = useMemo(
+    () => String(params.category ?? ""),
+    [params.category]
+  );
   const addressStr = useMemo(
     () => String(params.region ?? params.address ?? ""), // region 우선, 없으면 address
     [params.region, params.address]
@@ -43,20 +52,20 @@ export default function RouteBuilderScreen() {
 
   // 사진
   const photos = useMemo(() => {
-      try {
-        if (!params?.photos) return [];
-        // 1) URI 디코딩 시도
-        const rawStr = decodeURIComponent(String(params.photos));
-        const parsed = JSON.parse(rawStr);
-        const arr = Array.isArray(parsed) ? parsed : [];
-        // 2) 백엔드가 문자열/객체 혼용으로 줄 수 있으니 URL만 추출
-        return arr
-          .map((p) => (typeof p === "string" ? p : p?.url || p?.src || null))
-          .filter(Boolean);
-      } catch {
-        return [];
-      }
-    }, [params?.photos]);
+    try {
+      if (!params?.photos) return [];
+      // 1) URI 디코딩 시도
+      const rawStr = decodeURIComponent(String(params.photos));
+      const parsed = JSON.parse(rawStr);
+      const arr = Array.isArray(parsed) ? parsed : [];
+      // 2) 백엔드가 문자열/객체 혼용으로 줄 수 있으니 URL만 추출
+      return arr
+        .map((p) => (typeof p === "string" ? p : p?.url || p?.src || null))
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  }, [params?.photos]);
 
   // 사용자가 이전 단계에서 고른 무드
   const moodsKo = useMemo(() => {
@@ -132,185 +141,220 @@ export default function RouteBuilderScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
-      <Header
-        title="장소 추천받기"
-        leftIcon="previous"
-        onLeftPress={() => router.back()}
-        rightIcon="home_header"
-        onRightPress={() => router.push("/home")}
-      />
+    <SafeAreaView className="flex-1 bg-white">
+      <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+        <Header
+          title="장소 추천받기"
+          leftIcon="previous"
+          onLeftPress={() => router.back()}
+          rightIcon="home_header"
+          onRightPress={() => router.push("/home")}
+        />
 
-      {/* 타이틀 블록 */}
-      <View style={styles.titleBlock}>
-        <Text className="text-title-1 font-pretendardExtraBold" style={styles.title}>
-          좋은 선택이에요.
-        </Text>
-        <Text className="text-heading-3 font-pretendardMedium text-gray700">
-          “{placeName}” 을 탐험 장소로 결정하셨군요!
-        </Text>
-      </View>
+        {/* 타이틀 블록 */}
+        <View style={styles.titleBlock}>
+          <Text
+            className="text-title-1 font-pretendardExtraBold"
+            style={styles.title}
+          >
+            좋은 선택이에요.
+          </Text>
+          <Text className="text-heading-3 font-pretendardMedium text-gray700">
+            “{placeName}” 을 탐험 장소로 결정하셨군요!
+          </Text>
+        </View>
 
-      {/* 지도 */}
-      <View style={styles.mapArea}>
-        <View style={styles.mapCard}>
-          <View style={styles.mapInner}>
-            <View style={{ flex: 1 }}>
-              <MapView lat={center.lat} lng={center.lng} name={placeName} />
-            </View>
-
-            {/* 지도 위 바텀시트 */}
-            <Animated.View
-              pointerEvents="box-none"
-              style={[styles.sheetWrap, { transform: [{ translateY: sheetY }] }]}
-              {...panResponder.panHandlers}
-            >
-              <View style={styles.sheetCard} onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}>
-                <View className="items-center" style={styles.handle} />
-
-                {/* 상단: 제목 + 액션 */}
-                <View style={styles.placeHeaderRow}>
-                  <View style={styles.titleRatingWrap}>
-                    <Text className="text-heading-2 text-[#244DD3] font-pretendardSemiBold">
-                      {placeName}
-                    </Text>
-                    {/* 평점이 넘어오면 표시 (없으면 숨김) */}
-                    {params?.rating_avg != null && (
-                      <View className="flex-row items-center ml-[9px]">
-                        <Icon name="star" width={16} height={16} />
-                        <Text className="ml-[2px] text-yellow900 text-body-2 font-pretendardMedium">
-                          {String(params.rating_avg)}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  <View style={styles.headerActions}>
-                    <Pressable
-                      onPress={() =>
-                        openNaverDirections({
-                          lat: center.lat,
-                          lng: center.lng,
-                          name: placeName,
-                          mode: "walk",
-                        })
-                      }
-                      style={styles.openMapBtn}
-                      android_ripple={{ color: "rgba(0,0,0,0.06)" }}
-                    >
-                      <Text className="text-white text-body-2 font-pretendardMedium">길찾기</Text>
-                    </Pressable>
-
-                    <Pressable
-                      onPress={async () => {
-                        try {
-                          const msg =
-                            `${placeName}\n` +
-                            `${addressStr || ""}\n\n` + // ✅ CHANGED: 하드코딩 제거
-                            `지도 보기: https://map.naver.com/v5/?c=${center.lng},${center.lat},15,0,0,0`;
-                          await Share.share({ message: msg });
-                        } catch {}
-                      }}
-                      style={styles.shareBtn}
-                      android_ripple={{ color: "rgba(0,0,0,0.06)" }}
-                    >
-                      <Text className="text-body-2 font-pretendardMedium mr-[3px]">공유</Text>
-                      <Icon name="share" width={17} height={17} />
-                    </Pressable>
-                  </View>
-                </View>
-
-                {/* 카테고리/주소 (있을 때만) */}
-                {!!category && (
-                  <Text className="mt-1 text-body-2 font-pretendardMedium text-gray700">{category}</Text>
-                )}
-                {!!addressStr && (
-                  <Text className="mt-1 text-body-2 font-pretendardMedium text-gray700">{addressStr}</Text>
-                )}
-
-                {/* 썸네일 3개: 넘어온 사진 우선, 없으면 샘플 */}
-                <View style={styles.thumbRow}>
-                  {[0, 1, 2].map((i) => {
-                    const uri = photos[i];
-                    if (uri) {
-                      return (
-                        <Image
-                          key={i}
-                          source={{ uri }}
-                          style={styles.thumb}
-                          resizeMode="cover"
-                        />
-                      );
-                    } else {
-                      return (
-                        <View
-                          key={i}
-                          style={[
-                            styles.thumb,
-                            { alignItems: "center", justifyContent: "center" },
-                          ]}
-                        >
-                          <Image
-                            source={MAP_PLACEHOLDER}
-                            style={{ width: "60%", height: "60%", opacity: 0.9 }}
-                            resizeMode="contain"
-                          />
-                        </View>
-                      );
-                    }
-                  })}
-                </View>
-
-                {/* CTA */}
-                <View
-                  style={styles.ctaRow}
-                  onLayout={(e) => {
-                    const { y, height } = e.nativeEvent.layout;
-                    setCtaBox({ y, h: height });
-                  }}
-                >
-                  <View style={{ flex: 1, paddingRight: 16 }}>
-                    <Text className="text-heading-2 font-pretendardSemiBold">이 장소를 포함한</Text>
-                    <Text className="text-heading-2 font-pretendardSemiBold">탐험루트를 만들어볼까요?</Text>
-                  </View>
-
-                  <Pressable
-                    onPress={() => {
-                      // first payload를 실제 params 기반으로
-                      const firstPayload = {
-                        location_id: placeId,
-                        location_name: placeName,
-                        category,
-                        address: addressStr,
-                        latitude: center.lat,
-                        longitude: center.lng,
-                        rating_avg: params?.rating_avg ?? undefined,
-                        photos: photos, // 넘어왔다면 같이 전달
-                      };
-
-                      router.push({
-                        pathname: "/route-builder", // index.jsx
-                        params: {
-                          first: encodeURIComponent(JSON.stringify(firstPayload)),
-                          region: addressStr, // region 역할로 활용
-                          moodsKo: JSON.stringify(moodsKo),
-                        },
-                      });
-                    }}
-                    style={styles.ctaCircle}
-                    android_ripple={{ color: "rgba(0,0,0,0.06)", borderless: true }}
-                    accessibilityRole="button"
-                    accessibilityLabel="다음"
-                  >
-                    <Icon name="next_circle" width={53} height={53} />
-                  </Pressable>
-                </View>
+        {/* 지도 */}
+        <View style={styles.mapArea}>
+          <View style={styles.mapCard}>
+            <View style={styles.mapInner}>
+              <View style={{ flex: 1 }}>
+                <MapView lat={center.lat} lng={center.lng} name={placeName} />
               </View>
-            </Animated.View>
+
+              {/* 지도 위 바텀시트 */}
+              <Animated.View
+                pointerEvents="box-none"
+                style={[
+                  styles.sheetWrap,
+                  { transform: [{ translateY: sheetY }] },
+                ]}
+                {...panResponder.panHandlers}
+              >
+                <View
+                  style={styles.sheetCard}
+                  onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}
+                >
+                  <View className="items-center" style={styles.handle} />
+
+                  {/* 상단: 제목 + 액션 */}
+                  <View style={styles.placeHeaderRow}>
+                    <View style={styles.titleRatingWrap}>
+                      <Text className="text-heading-2 text-[#244DD3] font-pretendardSemiBold">
+                        {placeName}
+                      </Text>
+                      {/* 평점이 넘어오면 표시 (없으면 숨김) */}
+                      {params?.rating_avg != null && (
+                        <View className="flex-row items-center ml-[9px]">
+                          <Icon name="star" width={16} height={16} />
+                          <Text className="ml-[2px] text-yellow900 text-body-2 font-pretendardMedium">
+                            {String(params.rating_avg)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <View style={styles.headerActions}>
+                      <Pressable
+                        onPress={() =>
+                          openNaverDirections({
+                            lat: center.lat,
+                            lng: center.lng,
+                            name: placeName,
+                            mode: "walk",
+                          })
+                        }
+                        style={styles.openMapBtn}
+                        android_ripple={{ color: "rgba(0,0,0,0.06)" }}
+                      >
+                        <Text className="text-white text-body-2 font-pretendardMedium">
+                          길찾기
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={async () => {
+                          try {
+                            const msg =
+                              `${placeName}\n` +
+                              `${addressStr || ""}\n\n` + // ✅ CHANGED: 하드코딩 제거
+                              `지도 보기: https://map.naver.com/v5/?c=${center.lng},${center.lat},15,0,0,0`;
+                            await Share.share({ message: msg });
+                          } catch {}
+                        }}
+                        style={styles.shareBtn}
+                        android_ripple={{ color: "rgba(0,0,0,0.06)" }}
+                      >
+                        <Text className="text-body-2 font-pretendardMedium mr-[3px]">
+                          공유
+                        </Text>
+                        <Icon name="share" width={17} height={17} />
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  {/* 카테고리/주소 (있을 때만) */}
+                  {!!category && (
+                    <Text className="mt-1 text-body-2 font-pretendardMedium text-gray700">
+                      {category}
+                    </Text>
+                  )}
+                  {!!addressStr && (
+                    <Text className="mt-1 text-body-2 font-pretendardMedium text-gray700">
+                      {addressStr}
+                    </Text>
+                  )}
+
+                  {/* 썸네일 3개: 넘어온 사진 우선, 없으면 샘플 */}
+                  <View style={styles.thumbRow}>
+                    {[0, 1, 2].map((i) => {
+                      const uri = photos[i];
+                      if (uri) {
+                        return (
+                          <Image
+                            key={i}
+                            source={{ uri }}
+                            style={styles.thumb}
+                            resizeMode="cover"
+                          />
+                        );
+                      } else {
+                        return (
+                          <View
+                            key={i}
+                            style={[
+                              styles.thumb,
+                              {
+                                alignItems: "center",
+                                justifyContent: "center",
+                              },
+                            ]}
+                          >
+                            <Image
+                              source={MAP_PLACEHOLDER}
+                              style={{
+                                width: "60%",
+                                height: "60%",
+                                opacity: 0.9,
+                              }}
+                              resizeMode="contain"
+                            />
+                          </View>
+                        );
+                      }
+                    })}
+                  </View>
+
+                  {/* CTA */}
+                  <View
+                    style={styles.ctaRow}
+                    onLayout={(e) => {
+                      const { y, height } = e.nativeEvent.layout;
+                      setCtaBox({ y, h: height });
+                    }}
+                  >
+                    <View style={{ flex: 1, paddingRight: 16 }}>
+                      <Text className="text-heading-2 font-pretendardSemiBold">
+                        이 장소를 포함한
+                      </Text>
+                      <Text className="text-heading-2 font-pretendardSemiBold">
+                        탐험루트를 만들어볼까요?
+                      </Text>
+                    </View>
+
+                    <Pressable
+                      onPress={() => {
+                        // first payload를 실제 params 기반으로
+                        const firstPayload = {
+                          location_id: placeId,
+                          location_name: placeName,
+                          category,
+                          address: addressStr,
+                          latitude: center.lat,
+                          longitude: center.lng,
+                          rating_avg: params?.rating_avg ?? undefined,
+                          photos: photos, // 넘어왔다면 같이 전달
+                        };
+
+                        router.push({
+                          pathname: "/route-builder", // index.jsx
+                          params: {
+                            first: encodeURIComponent(
+                              JSON.stringify(firstPayload)
+                            ),
+                            region: addressStr, // region 역할로 활용
+                            moodsKo: JSON.stringify(moodsKo),
+                          },
+                        });
+                      }}
+                      style={styles.ctaCircle}
+                      android_ripple={{
+                        color: "rgba(0,0,0,0.06)",
+                        borderless: true,
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="다음"
+                    >
+                      <Icon name="next_circle" width={53} height={53} />
+                    </Pressable>
+                  </View>
+                </View>
+              </Animated.View>
+            </View>
           </View>
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -335,7 +379,12 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 16,
     ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.14, shadowRadius: 13, shadowOffset: { width: 0, height: 0 } },
+      ios: {
+        shadowColor: "#000",
+        shadowOpacity: 0.14,
+        shadowRadius: 13,
+        shadowOffset: { width: 0, height: 0 },
+      },
       android: { elevation: 8 },
     }),
   },
@@ -348,8 +397,19 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
   placeHeaderRow: { flexDirection: "row", alignItems: "center" },
-  titleRatingWrap: { flexDirection: "row", alignItems: "center", flex: 1, paddingRight: 12, minWidth: 0 },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: 5, flexShrink: 0 },
+  titleRatingWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    paddingRight: 12,
+    minWidth: 0,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    flexShrink: 0,
+  },
   openMapBtn: {
     marginLeft: "auto",
     paddingHorizontal: 13.5,
@@ -373,15 +433,27 @@ const styles = StyleSheet.create({
   thumbRow: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 18
+    marginTop: 18,
   },
-  thumb: { 
+  thumb: {
     flex: 1,
     width: 100,
     aspectRatio: 1,
     backgroundColor: "#E2E2E2",
     overflow: "hidden",
   },
-  ctaRow: { flexDirection: "row", alignItems: "center", marginTop: 67, marginBottom: 36 },
-  ctaCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
+  ctaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 67,
+    marginBottom: 36,
+  },
+  ctaCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });
