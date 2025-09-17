@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useState } from "react";
 import {
@@ -12,6 +12,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useToast } from "../../../../providers/ToastProvider";
+import { consumePendingToast, peekPendingToast } from "../../../../utils/toastNext";
 
 
 import AppDialog from "../../../../components/shared/AppDialog";
@@ -35,6 +37,24 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [showDialog, setShowDialog] = useState(false);
   const [dontShow, setDontShow] = useState(false);
+
+  const { showToast } = useToast();
+  const pathname = usePathname(); // 현재 라우트 경로
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let mounted = true;
+      (async () => {
+        const pending = await peekPendingToast();
+        if (!pending) return;
+        if (!pending.targetRoute || pending.targetRoute === pathname) {
+          const toast = await consumePendingToast();
+          if (mounted && toast) showToast(toast);
+        }
+      })();
+      return () => { mounted = false; };
+    }, [pathname, showToast])
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: "#B9E09D" }}>
