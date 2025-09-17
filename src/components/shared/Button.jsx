@@ -48,7 +48,7 @@ const Button = ({
         {
           width: hs(widthPx),
           height: vs(heightPx),
-          borderRadius: rp(10),
+          borderRadius: 999,
           backgroundColor,
           justifyContent: 'center',
           alignItems: 'center',
