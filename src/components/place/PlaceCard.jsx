@@ -1,5 +1,5 @@
 import React, { memo, useMemo, useState } from "react";
-import { Image, Platform, Pressable, Text, View } from "react-native";
+import { Image, Pressable, Text, View } from "react-native";
 import { hs } from "../../utils/scale";
 import Icon from "../shared/Icon";
 
@@ -16,6 +16,7 @@ function PlaceCard({
   liked = false,
   onToggleLike = () => {},
   onPressTitle = () => {},
+  borderWidth = 1,
 }) {
   const [imageError, setImageError] = useState(false);
   const normalize = (v) => String(v).replace(/^#/, "").trim().toLowerCase();
@@ -31,18 +32,9 @@ function PlaceCard({
         {
           width: 317,
           height: 479,
-          borderWidth: 1,
-          borderColor: "#62974F",
+          borderWidth: borderWidth,
+          borderColor: "#D4D4D4",
         },
-        Platform.select({
-          ios: {
-            shadowColor: "#204500",
-            shadowOpacity: 0.25,
-            shadowRadius: hs(4),
-            shadowOffset: { width: 0, height: 0 },
-          },
-          android: { elevation: 4 },
-        }),
       ]}
     >
       {/* 이미지 영역 */}

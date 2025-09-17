@@ -25,25 +25,18 @@ import Header from "../../../components/shared/Header";
 const { width: SCREEN_W } = Dimensions.get("window");
 const COLS = 3;
 const GAP = 14;
-const H_PADDING = 16;
+const H_PADDING = 25;
 const ITEM_W = (SCREEN_W - H_PADDING * 2 - GAP * (COLS - 1)) / COLS;
 
 const BASE_URL = "http://16.176.24.53:4000";
 const SAMPLE = require("../../../assets/images/sample.png");
-
-// 데모용 로컬 즐찾 (장소 탭)
-const MOCK_FAVORITES = [
-  { id: "p1", title: "모든장소", count: 12, thumb: SAMPLE },
-  { id: "p2", title: "카페", count: 5, thumb: SAMPLE },
-  { id: "p3", title: "산책", count: 8, thumb: SAMPLE },
-];
 
 export default function StorageScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
   // 탭 상태: 'place' | 'route'
-  const [tab, setTab] = useState("route");
+  const [tab, setTab] = useState("place");
 
   // 정렬
   const [sortKey, setSortKey] = useState("latest");
@@ -55,44 +48,121 @@ export default function StorageScreen() {
     []
   );
 
-  // ===== 장소(로컬) 데이터 =====
-  const [favoritePlaces, setFavoritePlaces] = useState(MOCK_FAVORITES);
+  const [favoritePlaces, setFavoritePlaces] = useState([]); // [{id,title,thumbs:[...]}]
+  const [favLoading, setFavLoading] = useState(false);
+  const [favRefreshing, setFavRefreshing] = useState(false);
+  const favPageRef = useRef(1);
+  const favTotalRef = useRef(0);
+  const favLimit = 60; // 한 번에 넉넉히
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem("favorites");
-        const list = raw ? JSON.parse(raw) : null;
-        if (Array.isArray(list)) {
-          setFavoritePlaces(
-            list.map((it, idx) => ({
-              id: String(it.location_id ?? idx),
-              title: it.name ?? "모든장소",
-              count: it.count ?? Math.floor(Math.random() * 95) + 1,
-              thumbs:
-                Array.isArray(it.thumbs) && it.thumbs.length
-                  ? it.thumbs.map((u) => (u?.uri ? u : SAMPLE)).slice(0, 3)
-                  : [SAMPLE],
-            }))
-          );
-        }
-      } catch {}
-    })();
-  }, []);
+  const tokenRef = useRef(null);
 
-  // ===== 루트(API) 데이터 =====
+  async function getToken() {
+    // 네가 로그인 시 저장해 둔 키와 맞춰줘 (아래는 routes에서 쓰던 'jwt' 키를 재사용)
+    const token = tokenRef.current ?? (await AsyncStorage.getItem("jwt"));
+    tokenRef.current = token;
+    return token;
+  }
+
+  function mapLikedItemsToGrid(items = []) {
+    return items.map((entry, idx) => {
+      const loc = entry?.location ?? {};
+      const id = String(loc.location_id ?? idx);
+      const title = loc.location_name || "이름 없는 장소";
+  
+      const firstPhoto =
+        Array.isArray(loc.photos) && loc.photos.length > 0
+          ? { uri: loc.photos[0] }
+          : SAMPLE;
+  
+      return {
+        id,
+        title,
+        thumbs: [firstPhoto],
+        count: undefined,
+        raw: loc,
+      };
+    });
+  }
+
+  async function fetchLikedPlaces(pageArg = 1, append = false) {
+    const token = await getToken();
+    const url = `${BASE_URL}/me/locations/likes?page=${pageArg}&limit=${favLimit}`;
+    const r = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const msg =
+        data?.error ||
+        (r.status === 401
+          ? "로그인이 필요합니다."
+          : `저장한 장소를 불러오지 못했어요. (HTTP ${r.status})`);
+      throw new Error(msg);
+    }
+
+    favTotalRef.current = Number(data.total || 0);
+    const mapped = mapLikedItemsToGrid(data.items || []);
+    setFavoritePlaces((prev) => (append ? [...prev, ...mapped] : mapped));
+    favPageRef.current = pageArg;
+  }
+
+  const loadLikedInitial = useCallback(async () => {
+    if (favLoading) return;
+    setFavLoading(true);
+    try {
+      await fetchLikedPlaces(1, false);
+    } catch (e) {
+      console.warn("[places] list error:", e?.message);
+      setFavoritePlaces([]);
+      favTotalRef.current = 0;
+    } finally {
+      setFavLoading(false);
+    }
+  }, [favLoading]);
+
+  const refreshLiked = useCallback(async () => {
+    if (favRefreshing) return;
+    setFavRefreshing(true);
+    try {
+      await fetchLikedPlaces(1, false);
+    } catch (e) {
+      console.warn("[places] refresh error:", e?.message);
+    } finally {
+      setFavRefreshing(false);
+    }
+  }, [favRefreshing]);
+
+  const canLoadMoreLiked = useMemo(
+    () => favoritePlaces.length < favTotalRef.current,
+    [favoritePlaces.length]
+  );
+
+  const loadMoreLiked = useCallback(async () => {
+    if (favLoading || favRefreshing || !canLoadMoreLiked) return;
+    setFavLoading(true);
+    try {
+      await fetchLikedPlaces(favPageRef.current + 1, true);
+    } catch (e) {
+      console.warn("[places] loadMore error:", e?.message);
+    } finally {
+      setFavLoading(false);
+    }
+  }, [favLoading, favRefreshing, canLoadMoreLiked]);
+
   const [routes, setRoutes] = useState([]);
   const [page, setPage] = useState(1);
   const [limit] = useState(12);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const canLoadMore = useMemo(
-    () => routes.length < total,
-    [routes.length, total]
-  );
-
-  const tokenRef = useRef(null);
+  const canLoadMore = useMemo(() => routes.length < total, [routes.length, total]);
 
   const formatDate = (iso) => {
     if (!iso) return "";
@@ -108,8 +178,7 @@ export default function StorageScreen() {
   };
 
   async function fetchJourneys(pageArg = 1, append = false) {
-    const token = tokenRef.current ?? (await AsyncStorage.getItem("jwt"));
-    tokenRef.current = token;
+    const token = await getToken();
 
     const url = `${BASE_URL}/journeys?page=${pageArg}&limit=${limit}`;
     const r = await fetch(url, {
@@ -137,7 +206,6 @@ export default function StorageScreen() {
       let placeSummary = "";
       let thumbs = [SAMPLE, SAMPLE, SAMPLE];
 
-      // AsyncStorage에서 journey_meta_<id> 불러오기
       try {
         const metaRaw = await AsyncStorage.getItem(`journey_meta_${id}`);
         if (metaRaw) {
@@ -178,6 +246,11 @@ export default function StorageScreen() {
   }, [loading]);
 
   const onRefresh = useCallback(async () => {
+    // 탭별로 새로고침 분기
+    if (tab === "place") {
+      await refreshLiked();
+      return;
+    }
     if (refreshing) return;
     setRefreshing(true);
     try {
@@ -187,9 +260,13 @@ export default function StorageScreen() {
     } finally {
       setRefreshing(false);
     }
-  }, [refreshing]);
+  }, [tab, refreshing, refreshLiked]);
 
   const loadMore = useCallback(async () => {
+    if (tab === "place") {
+      await loadMoreLiked();
+      return;
+    }
     if (loading || refreshing || !canLoadMore) return;
     setLoading(true);
     try {
@@ -199,21 +276,22 @@ export default function StorageScreen() {
     } finally {
       setLoading(false);
     }
-  }, [loading, refreshing, canLoadMore, page]);
+  }, [tab, loading, refreshing, canLoadMore, page, loadMoreLiked]);
 
+  // 초기 로드
   useEffect(() => {
-    if (tab === "route" && routes.length === 0) {
-      loadInitial();
-    }
+    if (tab === "route" && routes.length === 0) loadInitial();
+    if (tab === "place" && favoritePlaces.length === 0) loadLikedInitial();
   }, [tab]);
 
+  // 정렬
   const placeData = useMemo(() => {
+    const list = [...favoritePlaces];
     if (sortKey === "name") {
-      return [...favoritePlaces].sort((a, b) =>
-        (a.title || "").localeCompare(b.title || "")
-      );
+      return list.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
     }
-    return [...favoritePlaces].reverse();
+    // 최신순: API가 최신순으로 내려주므로 그대로 사용
+    return list;
   }, [favoritePlaces, sortKey]);
 
   const routeData = useMemo(() => {
@@ -235,9 +313,7 @@ export default function StorageScreen() {
       />
 
       {/* Tabs */}
-      <View
-        style={{ position: "relative", paddingHorizontal: 25, paddingTop: 8 }}
-      >
+      <View style={{ position: "relative", paddingHorizontal: 25, paddingTop: 8 }}>
         <View
           style={{
             position: "absolute",
@@ -252,60 +328,28 @@ export default function StorageScreen() {
           {/* 장소 탭 */}
           <Pressable
             onPress={() => setTab("place")}
-            style={{
-              flex: 1,
-              alignItems: "center",
-              position: "relative",
-              paddingBottom: 8,
-            }}
+            style={{ flex: 1, alignItems: "center", position: "relative", paddingBottom: 8 }}
             hitSlop={8}
           >
-            <Text
-              className="text-heading-3 font-pretendardSemiBold"
-              style={{ color: tab === "place" ? "#000" : "#AFAFAF" }}
-            >
+            <Text className="text-heading-3 font-pretendardSemiBold" style={{ color: tab === "place" ? "#000" : "#AFAFAF" }}>
               장소
             </Text>
             {tab === "place" && (
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: -1,
-                  height: 2,
-                  width: SCREEN_W / 2 - 25,
-                  backgroundColor: "#000",
-                }}
-              />
+              <View style={{ position: "absolute", bottom: -1, height: 2, width: SCREEN_W / 2 - 25, backgroundColor: "#000" }} />
             )}
           </Pressable>
 
           {/* 루트 탭 */}
           <Pressable
             onPress={() => setTab("route")}
-            style={{
-              flex: 1,
-              alignItems: "center",
-              position: "relative",
-              paddingBottom: 8,
-            }}
+            style={{ flex: 1, alignItems: "center", position: "relative", paddingBottom: 8 }}
             hitSlop={8}
           >
-            <Text
-              className="text-heading-3 font-pretendardSemiBold"
-              style={{ color: tab === "route" ? "#000" : "#AFAFAF" }}
-            >
+            <Text className="text-heading-3 font-pretendardSemiBold" style={{ color: tab === "route" ? "#000" : "#AFAFAF" }}>
               루트
             </Text>
             {tab === "route" && (
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: -1,
-                  height: 2,
-                  width: SCREEN_W / 2 - 25,
-                  backgroundColor: "#000",
-                }}
-              />
+              <View style={{ position: "absolute", bottom: -1, height: 2, width: SCREEN_W / 2 - 25, backgroundColor: "#000" }} />
             )}
           </Pressable>
         </View>
@@ -313,11 +357,7 @@ export default function StorageScreen() {
 
       {/* Toolbar */}
       <View style={styles.toolbarRow}>
-        <SortDropdown
-          value={sortKey}
-          onChange={(v) => setSortKey(v)}
-          options={latestOptions}
-        />
+        <SortDropdown value={sortKey} onChange={(v) => setSortKey(v)} options={latestOptions} />
         <Pressable style={styles.editBtn} onPress={() => {}}>
           <Text className="text-body-2 font-pretendardMedium">편집</Text>
         </Pressable>
@@ -330,11 +370,7 @@ export default function StorageScreen() {
           key="place-grid"
           keyExtractor={(item) => item.id}
           numColumns={COLS}
-          contentContainerStyle={{
-            paddingHorizontal: H_PADDING,
-            paddingTop: 8,
-            paddingBottom: 24,
-          }}
+          contentContainerStyle={{ paddingHorizontal: H_PADDING, paddingTop: 8, paddingBottom: 24 }}
           columnWrapperStyle={{ gap: GAP }}
           renderItem={({ item }) => (
             <CollectionCard
@@ -343,13 +379,39 @@ export default function StorageScreen() {
               thumbs={item.thumbs}
               onPress={() =>
                 router.push({
-                  pathname: "/(main)/storage/place/[id]",
-                  params: { id: item.id, title: item.title },
+                  pathname: "/(main)/place-recommend/detail/[id]",
+                  params: {
+                    id: item.id,
+                    // 상세 페이지에서 썸네일/이름만 먼저 보여줄 수 있도록 넘김(옵션)
+                    initial: JSON.stringify({
+                      location_id: Number(item.id),
+                      location_name: item.title,
+                      photos: item.thumbs?.[0]?.uri ? [item.thumbs[0].uri] : [],
+                    }),
+                  },
                 })
               }
             />
           )}
-          ListEmptyComponent={<Empty tab="place" />}
+          ListEmptyComponent={
+            favLoading ? (
+              <View style={{ paddingTop: 60, alignItems: "center" }}>
+                <ActivityIndicator />
+              </View>
+            ) : (
+              <Empty tab="place" />
+            )
+          }
+          refreshControl={<RefreshControl refreshing={favRefreshing} onRefresh={refreshLiked} />}
+          onEndReachedThreshold={0.2}
+          onEndReached={loadMoreLiked}
+          ListFooterComponent={
+            favLoading && favoritePlaces.length > 0 ? (
+              <View style={{ paddingVertical: 12 }}>
+                <ActivityIndicator />
+              </View>
+            ) : null
+          }
           showsVerticalScrollIndicator={false}
         />
       ) : (
@@ -370,9 +432,7 @@ export default function StorageScreen() {
                   pathname: "/(main)/storage/route/[id]",
                   params: {
                     id: item.id,
-                    thumbs: JSON.stringify(
-                      (item.thumbs || []).map((t) => (t?.uri ? t.uri : null))
-                    ),
+                    thumbs: JSON.stringify((item.thumbs || []).map((t) => (t?.uri ? t.uri : null))),
                     title: item.title || "",
                     date: item.date || "",
                   },
@@ -389,9 +449,7 @@ export default function StorageScreen() {
               <Empty tab="route" />
             )
           }
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           onEndReachedThreshold={0.2}
           onEndReached={loadMore}
           ListFooterComponent={
@@ -423,7 +481,7 @@ function CollectionCard({ title, thumbs = [], count, onPress }) {
   return (
     <Pressable onPress={onPress} style={{ width: ITEM_W }}>
       <StackThumb thumbs={thumbs} />
-      <Text style={styles.itemTitle} numberOfLines={1}>
+      <Text className="text-heading-3 font-pretendardSemiBold mb-[22px]" numberOfLines={1}>
         {title}
       </Text>
       {typeof count === "number" && (
@@ -517,14 +575,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  thumbWrap: {
-    width: ITEM_W,
-    height: ITEM_W,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: "#EEE",
-  },
-
   stackWrap: {
     width: ITEM_W,
     height: ITEM_W,

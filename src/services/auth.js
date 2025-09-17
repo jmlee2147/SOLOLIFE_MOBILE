@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-// 파일 상단 어딘가
 
-const BASE_URL = "http://16.176.24.53:4000"; // 지금 쓰는 값 그대로
+const BASE_URL = "http://16.176.24.53:4000";
 
 async function debugLogin() {
   const url = `${BASE_URL}/auth/login`;
@@ -34,10 +33,10 @@ async function debugLogin() {
       let data = {};
       try { data = JSON.parse(text); } catch(_) {}
       if (r.ok && data?.token) {
-        console.log("[debugLogin] ✅ token:", data.token.slice(0, 20) + "..."); // 일부만
+        console.log("[debugLogin] token:", data.token.slice(0, 20) + "..."); // 일부만
         return data.token;
       } else {
-        console.log("[debugLogin] ❌ not ok. data.error:", data?.error);
+        console.log("[debugLogin] not ok. data.error:", data?.error);
       }
     } catch (e) {
       console.warn("[debugLogin] exception:", e?.message);

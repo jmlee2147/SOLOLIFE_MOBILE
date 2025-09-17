@@ -94,34 +94,22 @@ export default function RouteSaveScreen() {
   }
 
   async function ensureToken() {
-    // 저장 전에 토큰이 없으면 dev 계정으로 로그인
     let token = await AsyncStorage.getItem("jwt");
     if (token) return token;
-
-    // 1) email+password 시도
-    let r = await fetch(`${BASE_URL}/auth/login`, {
+  
+    // dev fallback 로그인
+    const r = await fetch(`${BASE_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: "test@test.com", password: "test" }),
     });
-    let data = await r.json().catch(() => ({}));
+    const data = await r.json().catch(() => ({}));
+  
     if (r.ok && data?.token) {
-      await AsyncStorage.setItem("jwt", data.token);
+      await AsyncStorage.setItem("jwt", data.token);  // << 통일
       return data.token;
     }
-
-    // 2) username+password로도 한 번 더 시도(백엔드 구현체에 따라 다름)
-    r = await fetch(`${BASE_URL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: "test", password: "test" }),
-    });
-    data = await r.json().catch(() => ({}));
-    if (r.ok && data?.token) {
-      await AsyncStorage.setItem("jwt", data.token);
-      return data.token;
-    }
-
+  
     throw new Error(data?.error || "로그인 실패");
   }
 
