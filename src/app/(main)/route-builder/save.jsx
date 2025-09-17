@@ -14,12 +14,15 @@ import {
 import Button from "../../../components/shared/Button";
 import Header from "../../../components/shared/Header";
 import { MOODS } from "../../../config/category.config";
+import { useToast } from "../../../providers/ToastProvider";
+import { setPendingToast } from "../../../utils/toastNext";
 
 const BASE_URL = "http://16.176.24.53:4000";
 
 export default function RouteSaveScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { showToast } = useToast();
 
   /** ---------- 파라미터 파싱 ---------- */
   const routeNameDefault = params?.defaultName
@@ -96,7 +99,7 @@ export default function RouteSaveScreen() {
   async function ensureToken() {
     let token = await AsyncStorage.getItem("jwt");
     if (token) return token;
-  
+
     // dev fallback 로그인
     const r = await fetch(`${BASE_URL}/auth/login`, {
       method: "POST",
@@ -104,12 +107,12 @@ export default function RouteSaveScreen() {
       body: JSON.stringify({ email: "test@test.com", password: "test" }),
     });
     const data = await r.json().catch(() => ({}));
-  
+
     if (r.ok && data?.token) {
-      await AsyncStorage.setItem("jwt", data.token);  // << 통일
+      await AsyncStorage.setItem("jwt", data.token); // << 통일
       return data.token;
     }
-  
+
     throw new Error(data?.error || "로그인 실패");
   }
 
@@ -209,10 +212,17 @@ export default function RouteSaveScreen() {
       }
 
       // 5) 성공 → 저장소/루트 상세로 이동
-      router.replace({
-        pathname: "/home",
-        params: { id: journeyId },
+      // 토스트 예약
+      await setPendingToast({
+        type: "success",
+        message: "루트 저장 완료!",
+        subText: "저장소에 추가됨",
+        duration: 3000, 
+        targetRoute: "/home",
       });
+
+      // 라우팅 (홈으로)
+      router.replace("/home");
     } catch (e) {
       Alert.alert(
         "루트 저장 실패",
