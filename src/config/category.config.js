@@ -18,7 +18,7 @@ export const CATEGORY = {
     },
     activity: {
       label: "활동",
-      desc: "다양한 체험과 활동",
+      desc: "다양한 활동",
       subcategories: {
         experience: { label: "체험", keywords: [] },
         exhibition: { label: "전시/박물관", keywords: ["사진찍기 좋은"] },
@@ -29,7 +29,7 @@ export const CATEGORY = {
     },
     shopping: {
       label: "쇼핑",
-      desc: "내 마음에 쏙 들어!",
+      desc: "마음에 쏙 들어!",
       subcategories: {
         clothing: { label: "옷", keywords: ["빈티지"] },
         prop: { label: "소품샵", keywords: [] },

@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -13,7 +14,10 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import MapView from "../../../components/map/MapView";
 import Header from "../../../components/shared/Header";
 import Icon from "../../../components/shared/Icon";
@@ -227,7 +231,7 @@ export default function RouteBuilderScreen() {
                           try {
                             const msg =
                               `${placeName}\n` +
-                              `${addressStr || ""}\n\n` + // ✅ CHANGED: 하드코딩 제거
+                              `${addressStr || ""}\n\n` +
                               `지도 보기: https://map.naver.com/v5/?c=${center.lng},${center.lat},15,0,0,0`;
                             await Share.share({ message: msg });
                           } catch {}
@@ -297,56 +301,74 @@ export default function RouteBuilderScreen() {
 
                   {/* CTA */}
                   <View
-                    style={styles.ctaRow}
+                    style={{ marginTop: 56, marginBottom: 0, borderRadius: 10 }}
                     onLayout={(e) => {
                       const { y, height } = e.nativeEvent.layout;
                       setCtaBox({ y, h: height });
                     }}
                   >
-                    <View style={{ flex: 1, paddingRight: 16 }}>
-                      <Text className="text-heading-2 font-pretendardSemiBold">
-                        이 장소를 포함한
-                      </Text>
-                      <Text className="text-heading-2 font-pretendardSemiBold">
-                        탐험루트를 만들어볼까요?
-                      </Text>
-                    </View>
-
-                    <Pressable
-                      onPress={() => {
-                        // first payload를 실제 params 기반으로
-                        const firstPayload = {
-                          location_id: placeId,
-                          location_name: placeName,
-                          category,
-                          address: addressStr,
-                          latitude: center.lat,
-                          longitude: center.lng,
-                          rating_avg: params?.rating_avg ?? undefined,
-                          photos: photos, // 넘어왔다면 같이 전달
-                        };
-
-                        router.push({
-                          pathname: "/route-builder", // index.jsx
-                          params: {
-                            first: encodeURIComponent(
-                              JSON.stringify(firstPayload)
-                            ),
-                            region: addressStr, // region 역할로 활용
-                            moodsKo: JSON.stringify(moodsKo),
-                          },
-                        });
-                      }}
-                      style={styles.ctaCircle}
-                      android_ripple={{
-                        color: "rgba(0,0,0,0.06)",
-                        borderless: true,
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel="다음"
+                    <LinearGradient
+                      colors={["#64BC2E", "#2E7A45"]} // 원하는 색상 배열
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={{ borderRadius: 11, padding: 1 }} // padding = border 두께
                     >
-                      <Icon name="next_circle" width={53} height={53} />
-                    </Pressable>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          borderRadius: 10,
+                          backgroundColor: "#fff",
+                          paddingVertical: 11,
+                          paddingHorizontal: 10,
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text className="text-heading-2 font-pretendardSemiBold">
+                            이 장소를 포함한
+                          </Text>
+                          <Text className="text-heading-2 font-pretendardSemiBold">
+                            탐험루트를 만들어볼까요?
+                          </Text>
+                        </View>
+
+                        <Pressable
+                          onPress={() => {
+                            // first payload를 실제 params 기반으로
+                            const firstPayload = {
+                              location_id: placeId,
+                              location_name: placeName,
+                              category,
+                              address: addressStr,
+                              latitude: center.lat,
+                              longitude: center.lng,
+                              rating_avg: params?.rating_avg ?? undefined,
+                              photos: photos, // 넘어왔다면 같이 전달
+                            };
+
+                            router.push({
+                              pathname: "/route-builder", // index.jsx
+                              params: {
+                                first: encodeURIComponent(
+                                  JSON.stringify(firstPayload)
+                                ),
+                                region: addressStr, // region 역할로 활용
+                                moodsKo: JSON.stringify(moodsKo),
+                              },
+                            });
+                          }}
+                          style={styles.ctaCircle}
+                          android_ripple={{
+                            color: "rgba(0,0,0,0.06)",
+                            borderless: true,
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel="다음"
+                        >
+                          <Icon name="next_circle" width={53} height={53} />
+                        </Pressable>
+                      </View>
+                    </LinearGradient>
                   </View>
                 </View>
               </Animated.View>
@@ -377,7 +399,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     paddingHorizontal: 25,
     paddingTop: 20,
-    paddingBottom: 16,
+    paddingBottom: 0,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -441,19 +463,5 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     backgroundColor: "#E2E2E2",
     overflow: "hidden",
-  },
-  ctaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 67,
-    marginBottom: 36,
-  },
-  ctaCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

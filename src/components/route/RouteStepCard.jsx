@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import Icon from "../shared/Icon";
 
 const BASE_W = 343;
@@ -28,11 +35,12 @@ export default function RouteStepCard({
   // 카드 폭(최대 343) = 화면 - 좌우 패딩*2
   const cardW = Math.min(BASE_W, screenW - horizontalPadding * 2);
   const cardH = (BASE_H / BASE_W) * cardW;
-  const imgW  = cardW * (92 / 343); // 오른쪽 이미지 폭
-  const imgH  = cardW * IMG_W_RATIO; // 오른쪽 이미지 높이
+  const imgW = cardW * (92 / 343); // 오른쪽 이미지 폭
+  const imgH = cardW * IMG_W_RATIO; // 오른쪽 이미지 높이
 
   const stepNum = Number(step) || 1;
-  const badgeColor = BADGE_COLORS[(Math.max(1, stepNum) - 1) % BADGE_COLORS.length];
+  const badgeColor =
+    BADGE_COLORS[(Math.max(1, stepNum) - 1) % BADGE_COLORS.length];
 
   const [imgError, setImageError] = useState(false);
 
@@ -40,15 +48,23 @@ export default function RouteStepCard({
     <View style={[styles.card, { width: cardW, height: cardH }, style]}>
       {/* 왼쪽 정보 영역 */}
       <View style={styles.left}>
+      <View style={styles.fullVerticalLine} />
         {/* 1줄: 뱃지 + 제목 + 평점 */}
         <View style={styles.firstRow}>
-          <View style={[styles.badge, { backgroundColor: badgeColor }]}>
-            <Text className="text-white font-pretendardMedium text-body-2">{step}</Text>
+          <View style={[styles.badge, { backgroundColor: "#FFF" }]}>
+            <Text className="text-gray700 font-pretendardMedium text-body-2">
+              {step}.
+            </Text>
           </View>
+
+          {/* 세로줄 */}
+          <View style={styles.verticalLine} />
 
           <Text
             className="font-pretendardSemiBold text-[#244DD3] text-heading-2 ml-[15px]"
             numberOfLines={1}
+            ellipsizeMode="tail"
+            style={{ flexShrink: 1 }}
           >
             {title}
           </Text>
@@ -65,26 +81,45 @@ export default function RouteStepCard({
 
         {/* 2줄: 카테고리 (뱃지 폭만큼 들여쓰기) */}
         {categories?.length > 0 && (
-          <Text className="mb-1 text-gray700 text-body-2" numberOfLines={1} style={styles.indent}>
+          <Text
+            className="mb-1 text-gray700 text-body-2"
+            numberOfLines={1}
+            style={styles.indent}
+          >
             {categories.join(", ")}
           </Text>
         )}
 
         {/* 3줄: 주소 (동일 들여쓰기) */}
         {!!address && (
-          <Text className="text-gray700 text-body-2" numberOfLines={1} style={styles.indent}>
+          <Text
+            className="text-gray700 text-body-2"
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            style={styles.indent}
+          >
             {address}
           </Text>
         )}
 
         {/* 하단 액션 버튼(길찾기 / 공유) */}
         <View style={styles.actionsRow}>
-          <Pressable onPress={onPressDirections} style={[styles.actionBtn, styles.primaryBtn]}>
-            <Text className="text-white font-pretendardMedium text-body-2">길찾기</Text>
+          <Pressable
+            onPress={onPressDirections}
+            style={[styles.actionBtn, styles.primaryBtn]}
+          >
+            <Text className="text-white font-pretendardMedium text-body-2">
+              길찾기
+            </Text>
           </Pressable>
 
-          <Pressable onPress={onPressShare} style={[styles.actionBtn, styles.outlineBtn]}>
-            <Text className="text-gray800 font-pretendardMedium text-body-2">공유</Text>
+          <Pressable
+            onPress={onPressShare}
+            style={[styles.actionBtn, styles.outlineBtn]}
+          >
+            <Text className="text-gray800 font-pretendardMedium text-body-2">
+              공유
+            </Text>
             <Icon name="share" width={16} height={16} />
           </Pressable>
         </View>
@@ -100,9 +135,10 @@ export default function RouteStepCard({
           overflow: "hidden",
           alignItems: "center",
           justifyContent: "center",
+          marginLeft: 10,
         }}
       >
-        {(!imageSource || imgError) ? (
+        {!imageSource || imgError ? (
           <Image
             source={MAP_PLACEHOLDER}
             resizeMode="contain"
@@ -151,6 +187,14 @@ const styles = StyleSheet.create({
     borderRadius: BADGE / 2,
     alignItems: "center",
     justifyContent: "center",
+  },
+  fullVerticalLine: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 24,            
+    width: 0.5,
+    backgroundColor: "#AFAFAF",
   },
   indent: {
     marginLeft: BADGE + 15,

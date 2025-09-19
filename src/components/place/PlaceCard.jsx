@@ -16,7 +16,6 @@ function PlaceCard({
   liked = false,
   onToggleLike = () => {},
   onPressTitle = () => {},
-  borderWidth = 1,
 }) {
   const [imageError, setImageError] = useState(false);
   const normalize = (v) => String(v).replace(/^#/, "").trim().toLowerCase();
@@ -32,7 +31,7 @@ function PlaceCard({
         {
           width: 317,
           height: 479,
-          borderWidth: borderWidth,
+          borderWidth: 1,
           borderColor: "#D4D4D4",
         },
       ]}
@@ -104,10 +103,10 @@ function PlaceCard({
 
         {/* 주소 */}
         {address && (
-          <View className="flex-row items-center mt-1">
+          <View className="flex-row items-center mt-1 ml-[-6px]">
             <Icon name="location_outline" width={24} height={24} />
             <Text
-              className="text-gray700 text-body-2 font-pretendardMedium ml-[-3px]"
+              className="text-gray700 text-body-2 font-pretendardMedium ml-[3px]"
               style={{
                 flexShrink: 1,      // 길면 줄어들도록
                 numberOfLines: 1,   // 한 줄로 제한
@@ -144,7 +143,7 @@ function PlaceCard({
                   key={`${label}-${i}`}
                   className="text-body-2 font-pretendardMedium"
                   style={{
-                    color: isHL ? "#62974F" : "#6B6B6B", // 하이라이트: 그린톤, 기본: 회색톤
+                    color: isHL ? "#EE7A13" : "#6B6B6B", // 하이라이트: 그린톤, 기본: 회색톤
                     marginRight: 5,
                   }}
                 >

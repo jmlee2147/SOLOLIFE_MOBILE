@@ -706,7 +706,7 @@ const icons = {
     <Svg
       width={width}
       height={height}
-      viewBox="6 0 18 24"
+      viewBox="0 0 24 24"
       fill="none"
       {...props}
     >
@@ -1055,7 +1055,7 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  success: ({ width = 22, height = 22, ...props }) => (
+  warn: ({ width = 22, height = 22, ...props }) => (
     <Svg
       width={width}
       height={height}
@@ -1072,7 +1072,7 @@ const icons = {
     </Svg>
   ),
 
-  warn: ({ width = 22, height = 22, ...props }) => (
+  success: ({ width = 22, height = 22, ...props }) => (
     <Svg
       width={width}
       height={height}
@@ -1085,6 +1085,21 @@ const icons = {
         stroke="#fff"
         strokeWidth={2.166}
         d="m4.952 9.904 4.951 4.023 6.809-7.118"
+      />
+    </Svg>
+  ),
+  star_outline: ({ width = 16, height = 16, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 16 16"
+      fill="none"
+      {...props}
+    >
+      <Path
+        stroke="#000"
+        strokeWidth={0.87}
+        d="M7.493 2.01a.565.565 0 0 1 1.014 0l1.222 2.475c.209.424.613.717 1.08.785l2.732.397a.565.565 0 0 1 .313.964l-1.977 1.927c-.338.33-.492.805-.412 1.27l.466 2.72a.565.565 0 0 1-.82.597l-2.443-1.286a1.436 1.436 0 0 0-1.336 0l-2.443 1.286a.565.565 0 0 1-.82-.596l.466-2.72c.08-.466-.074-.942-.412-1.271L2.146 6.63a.565.565 0 0 1 .313-.964l2.732-.397c.468-.068.871-.361 1.08-.785L7.493 2.01Z"
       />
     </Svg>
   ),

@@ -11,14 +11,16 @@ export default function MoodSelectScreen() {
   const [selected, setSelected] = useState([]);
 
   const toggle = (k) =>
-    setSelected((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]));
+    setSelected((prev) =>
+      prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]
+    );
 
   const goNext = () => {
     router.push({
       pathname: "/route-builder/loading",
       params: {
-        ...paramsFromPrev,                     // 기존 파라미터 그대로 전달
-        moodsKo: JSON.stringify(selected),     // 이번 화면에서 고른 무드 전달
+        ...paramsFromPrev, // 기존 파라미터 그대로 전달
+        moodsKo: JSON.stringify(selected), // 이번 화면에서 고른 무드 전달
       },
     });
   };
@@ -34,7 +36,9 @@ export default function MoodSelectScreen() {
       />
 
       <View style={{ flex: 1, paddingHorizontal: 25, paddingTop: 5 }}>
-        <Text className="text-title-1 mb-[6px] font-pretendardExtraBold">어떤 곳을 좋아하세요?</Text>
+        <Text className="text-title-1 mb-[6px] font-pretendardExtraBold">
+          어떤 곳을 좋아하세요?
+        </Text>
         <Text className="mb-12 leading-6 text-heading-3 text-gray700 font-pretendardMedium">
           키워드를 선택해주세요.
         </Text>
@@ -48,25 +52,31 @@ export default function MoodSelectScreen() {
                 onPress={() => toggle(k)}
                 className={[
                   "px-7 py-4 rounded-full mr-3 mb-5",
-                  active ? "bg-green500" : "bg-gray50",
+                  active ? "bg-[#FCFFFA]" : "bg-gray50",
                 ].join(" ")}
                 android_ripple={{ color: "rgba(0,0,0,0.06)", borderless: true }}
-                style={Platform.select({
-                  ios: { shadowColor: "#000", shadowOpacity: 0, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
-                  android: { elevation: 1 },
-                })}
+                style={[
+                  {
+                    borderWidth: active ? 1.5 : 1.5,
+                    borderColor: active ? "#42790E" : "transparent",
+                  },
+                ]}
                 accessibilityRole="button"
                 accessibilityLabel={k}
               >
                 <Text
                   className={[
                     "text-[18px] font-pretendardMedium",
-                    active ? "text-white" : "text-gray700",
+                    active ? "text-green900" : "text-gray700",
                   ].join(" ")}
                 >
                   {k}
                 </Text>
-                {active && <View className="absolute w-3 h-3 rounded-full bg-yellow900 -top-1 -right-1" />}
+
+                {/* 선택 표시 점 */}
+                {active && (
+                  <View className="absolute w-3 h-3 rounded-full bg-yellow900 -top-1.5 -right-1.5" />
+                )}
               </Pressable>
             );
           })}
@@ -78,7 +88,12 @@ export default function MoodSelectScreen() {
           onPress={goNext}
           className="w-[64px] h-[64px] rounded-full bg-white items-center justify-center"
           style={Platform.select({
-            ios: { shadowColor: "#000", shadowOpacity: 0, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
+            ios: {
+              shadowColor: "#000",
+              shadowOpacity: 0,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 4 },
+            },
             android: { elevation: 4 },
           })}
           android_ripple={{ color: "rgba(0,0,0,0.08)", borderless: true }}
@@ -87,7 +102,9 @@ export default function MoodSelectScreen() {
         >
           <Icon name="next_circle" width={53} height={53} />
         </Pressable>
-        <Text className="mt-[6px] text-heading-3 text-green500 font-pretendardSemiBold">다음</Text>
+        <Text className="mt-[6px] text-heading-3 text-green500 font-pretendardSemiBold">
+          다음
+        </Text>
       </View>
     </SafeAreaView>
   );

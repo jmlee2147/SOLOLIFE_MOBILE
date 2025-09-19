@@ -6,7 +6,7 @@ import {
   SafeAreaView,
   ScrollView,
   Text,
-  View
+  View,
 } from "react-native";
 import EditStepCard from "../../../components/route/EditStepCard";
 import Button from "../../../components/shared/Button";
@@ -50,7 +50,9 @@ const MOCK_PLACES = [
 const EDIT_CATEGORY_LABELS = Object.keys(EDIT_CATEGORY_MAP);
 
 function getReplaceCategories(selectedLabels, fallbackPrimary) {
-  const labels = Array.isArray(selectedLabels) ? selectedLabels : [selectedLabels].filter(Boolean);
+  const labels = Array.isArray(selectedLabels)
+    ? selectedLabels
+    : [selectedLabels].filter(Boolean);
   const out = [];
 
   for (const label of labels) {
@@ -70,7 +72,9 @@ function mapApiItemToCard(item) {
   // photos: string[] | {url|uri|src:string}[]
   const photos = Array.isArray(item?.photos) ? item.photos : [];
   const photoUris = photos
-    .map((p) => (typeof p === "string" ? p : p?.url || p?.uri || p?.src || null))
+    .map((p) =>
+      typeof p === "string" ? p : p?.url || p?.uri || p?.src || null
+    )
     .filter(Boolean);
 
   const firstUri = photoUris[0] || null;
@@ -113,7 +117,11 @@ export default function RouteEditScreen() {
   const center = useMemo(() => {
     try {
       const c = params?.center ? JSON.parse(String(params.center)) : null;
-      if (c && Number.isFinite(Number(c.lat)) && Number.isFinite(Number(c.lng))) {
+      if (
+        c &&
+        Number.isFinite(Number(c.lat)) &&
+        Number.isFinite(Number(c.lng))
+      ) {
         return { lat: Number(c.lat), lng: Number(c.lng) };
       }
     } catch {}
@@ -154,153 +162,178 @@ export default function RouteEditScreen() {
     );
   };
 
-  const canProceed = useMemo(() => selectedIds.length > 0, [selectedIds.length]);
+  const canProceed = useMemo(
+    () => selectedIds.length > 0,
+    [selectedIds.length]
+  );
 
   // 교체 API 호출 → 새 루트 구성 → summary로 이동
   // 교체 1개 요청 (선호 카테고리들을 순서대로 시도)
-async function requestReplaceForCard({ card, center, region, selectedPills }) {
-  const tryOnce = async (category, withRegion = true) => {
-    const body = {
-      category, // 사용자가 고른 EDIT_CATEGORY를 그대로 보냄
-      exclude_location_ids: [Number(card.location_id)].filter(Boolean),
-      center,                // {lat, lng}
-      radius_km: 3,
-      ...(withRegion ? { region } : {}), // region 포함/제외 토글
+  async function requestReplaceForCard({
+    card,
+    center,
+    region,
+    selectedPills,
+  }) {
+    const tryOnce = async (category, withRegion = true) => {
+      const body = {
+        category, // 사용자가 고른 EDIT_CATEGORY를 그대로 보냄
+        exclude_location_ids: [Number(card.location_id)].filter(Boolean),
+        center, // {lat, lng}
+        radius_km: 3,
+        ...(withRegion ? { region } : {}), // region 포함/제외 토글
+      };
+      const res = await postReplaceOne(body);
+      const it =
+        Array.isArray(res?.items) && res.items[0] ? res.items[0] : null;
+      return it;
     };
-    const res = await postReplaceOne(body);
-    const it = Array.isArray(res?.items) && res.items[0] ? res.items[0] : null;
-    return it;
-  };
 
-  // 1) 선택한 카테고리들 순서대로 시도 (region 포함)
-  for (const cat of selectedPills) {
-    const found = await tryOnce(cat, true);
-    if (found) return found;
-  }
-  // 2) 선택한 카테고리들 순서대로 시도 (region 제거)
-  for (const cat of selectedPills) {
-    const found = await tryOnce(cat, false);
-    if (found) return found;
-  }
-  // 3) 마지막 폴백: 원래 카드 카테고리로 시도 (있다면)
-  const fallbackCat = card.categories?.[0] || card.raw?.category || "";
-  if (fallbackCat) {
-    const found = (await tryOnce(fallbackCat, true)) || (await tryOnce(fallbackCat, false));
-    if (found) return found;
-  }
+    // 1) 선택한 카테고리들 순서대로 시도 (region 포함)
+    for (const cat of selectedPills) {
+      const found = await tryOnce(cat, true);
+      if (found) return found;
+    }
+    // 2) 선택한 카테고리들 순서대로 시도 (region 제거)
+    for (const cat of selectedPills) {
+      const found = await tryOnce(cat, false);
+      if (found) return found;
+    }
+    // 3) 마지막 폴백: 원래 카드 카테고리로 시도 (있다면)
+    const fallbackCat = card.categories?.[0] || card.raw?.category || "";
+    if (fallbackCat) {
+      const found =
+        (await tryOnce(fallbackCat, true)) ||
+        (await tryOnce(fallbackCat, false));
+      if (found) return found;
+    }
 
-  return null;
-}
-
-const handleNext = async () => {
-  if (!canProceed || submitting) return;
-
-  if (!selectedPills.length) {
-    Alert.alert("안내", "교체할 상위 카테고리를 하나 이상 선택해 주세요.");
-    return;
+    return null;
   }
 
-  const selectedCards = cards.filter((c) => selectedIds.includes(String(c.location_id)));
-  if (selectedCards.length === 0) return;
+  const handleNext = async () => {
+    if (!canProceed || submitting) return;
 
-  setSubmitting(true);
-  try {
-    const original = [...cards];
-    const replacedByIndex = {};
+    if (!selectedPills.length) {
+      Alert.alert("안내", "교체할 상위 카테고리를 하나 이상 선택해 주세요.");
+      return;
+    }
 
-    // 선택한 상위 라벨들을 하위 카테고리로 확장(공통 부분)
-    const baseTargets = getReplaceCategories(selectedPills); // 중복 제거된 배열을 반환하도록 구현되어 있어야 함
-
-    await Promise.all(
-      selectedCards.map(async (card) => {
-        const idx = cards.findIndex((c) => String(c.location_id) === String(card.location_id));
-        if (idx < 0) return;
-
-        // 카드의 1차 카테고리(폴백용)
-        const cardPrimaryCat = card.categories?.[0] || card.raw?.category || "";
-
-        // 카드별로 최종 시도 순서 구성: 선택 라벨 확장 → (마지막에) 폴백 카테고리
-        const targets = Array.from(new Set([
-          ...baseTargets,
-          ...(cardPrimaryCat ? [cardPrimaryCat] : []),
-        ]));
-
-        let picked = null;
-        for (const cat of targets) {
-          const body = {
-            category: cat,                                   // 실제 하위 카테고리 하나씩 시도
-            exclude_location_ids: [Number(card.location_id)].filter(Boolean),
-            center,                                          // {lat, lng}
-            radius_km: 3,
-            // region: region || undefined, // 필요시만 사용
-          };
-
-          try {
-            const res = await postReplaceOne(body);
-            const item = Array.isArray(res?.items) && res.items[0] ? res.items[0] : null;
-            if (item) {
-              picked = mapApiItemToCard(item);
-              break; // 첫 성공으로 종료
-            }
-          } catch (_) {
-            // 다음 카테고리 계속 시도
-          }
-        }
-
-        if (picked) replacedByIndex[idx] = picked;
-      })
+    const selectedCards = cards.filter((c) =>
+      selectedIds.includes(String(c.location_id))
     );
+    if (selectedCards.length === 0) return;
 
-    const finalThree = original.map((c, i) => replacedByIndex[i] || c);
+    setSubmitting(true);
+    try {
+      const original = [...cards];
+      const replacedByIndex = {};
 
-    // summary로 넘길 직렬화
-    const newFirst = finalThree[0];
+      // 선택한 상위 라벨들을 하위 카테고리로 확장(공통 부분)
+      const baseTargets = getReplaceCategories(selectedPills); // 중복 제거된 배열을 반환하도록 구현되어 있어야 함
 
-    const extractPhotos = (c) => {
-      if (Array.isArray(c?.raw?.photos)) return c.raw.photos;
-      if (c?.imageSource?.uri) return [c.imageSource.uri];
-      return [];
-    };
+      await Promise.all(
+        selectedCards.map(async (card) => {
+          const idx = cards.findIndex(
+            (c) => String(c.location_id) === String(card.location_id)
+          );
+          if (idx < 0) return;
 
-    const newPrefetched = finalThree.slice(1, 3).map((c) => c.raw || ({
-      location_id: c.location_id,
-      location_name: c.title,
-      category: c.categories?.[0] || "",
-      address: c.address || "",
-      latitude: c.lat,
-      longitude: c.lng,
-      photos: extractPhotos(c),
-      rating_avg: c.rating ?? null,
-    }));
+          // 카드의 1차 카테고리(폴백용)
+          const cardPrimaryCat =
+            card.categories?.[0] || card.raw?.category || "";
 
-    const firstPayload = {
-      location_id: newFirst.location_id,
-      location_name: newFirst.title,
-      category: newFirst.categories?.[0] || "",
-      address: newFirst.address || "",
-      latitude: newFirst.lat,
-      longitude: newFirst.lng,
-      photos: extractPhotos(newFirst),
-      rating_avg: newFirst.rating ?? null,
-    };
+          // 카드별로 최종 시도 순서 구성: 선택 라벨 확장 → (마지막에) 폴백 카테고리
+          const targets = Array.from(
+            new Set([
+              ...baseTargets,
+              ...(cardPrimaryCat ? [cardPrimaryCat] : []),
+            ])
+          );
 
-    router.push({
-      pathname: "/route-builder/summary",
-      params: {
-        first: encodeURIComponent(JSON.stringify(firstPayload)),
-        prefetched: JSON.stringify(newPrefetched),
-        region: region || "",
-        center: JSON.stringify(center),
-        selectedPills: JSON.stringify(selectedPills),
-        edited: "1",
-      },
-    });
-  } catch (e) {
-    Alert.alert("오류", e?.message || "교체 추천에 실패했어요. 잠시 후 다시 시도해주세요.");
-  } finally {
-    setSubmitting(false);
-  }
-};
+          let picked = null;
+          for (const cat of targets) {
+            const body = {
+              category: cat, // 실제 하위 카테고리 하나씩 시도
+              exclude_location_ids: [Number(card.location_id)].filter(Boolean),
+              center, // {lat, lng}
+              radius_km: 3,
+              // region: region || undefined, // 필요시만 사용
+            };
+
+            try {
+              const res = await postReplaceOne(body);
+              const item =
+                Array.isArray(res?.items) && res.items[0] ? res.items[0] : null;
+              if (item) {
+                picked = mapApiItemToCard(item);
+                break; // 첫 성공으로 종료
+              }
+            } catch (_) {
+              // 다음 카테고리 계속 시도
+            }
+          }
+
+          if (picked) replacedByIndex[idx] = picked;
+        })
+      );
+
+      const finalThree = original.map((c, i) => replacedByIndex[i] || c);
+
+      // summary로 넘길 직렬화
+      const newFirst = finalThree[0];
+
+      const extractPhotos = (c) => {
+        if (Array.isArray(c?.raw?.photos)) return c.raw.photos;
+        if (c?.imageSource?.uri) return [c.imageSource.uri];
+        return [];
+      };
+
+      const newPrefetched = finalThree.slice(1, 3).map(
+        (c) =>
+          c.raw || {
+            location_id: c.location_id,
+            location_name: c.title,
+            category: c.categories?.[0] || "",
+            address: c.address || "",
+            latitude: c.lat,
+            longitude: c.lng,
+            photos: extractPhotos(c),
+            rating_avg: c.rating ?? null,
+          }
+      );
+
+      const firstPayload = {
+        location_id: newFirst.location_id,
+        location_name: newFirst.title,
+        category: newFirst.categories?.[0] || "",
+        address: newFirst.address || "",
+        latitude: newFirst.lat,
+        longitude: newFirst.lng,
+        photos: extractPhotos(newFirst),
+        rating_avg: newFirst.rating ?? null,
+      };
+
+      router.push({
+        pathname: "/route-builder/summary",
+        params: {
+          first: encodeURIComponent(JSON.stringify(firstPayload)),
+          prefetched: JSON.stringify(newPrefetched),
+          region: region || "",
+          center: JSON.stringify(center),
+          selectedPills: JSON.stringify(selectedPills),
+          edited: "1",
+        },
+      });
+    } catch (e) {
+      Alert.alert(
+        "오류",
+        e?.message || "교체 추천에 실패했어요. 잠시 후 다시 시도해주세요."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -329,7 +362,10 @@ const handleNext = async () => {
           {cards.map((p) => {
             const selected = selectedIds.includes(String(p.location_id));
             return (
-              <View key={String(p.location_id)} style={{ paddingHorizontal: 25, marginBottom: 10 }}>
+              <View
+                key={String(p.location_id)}
+                style={{ paddingHorizontal: 25, marginBottom: 10 }}
+              >
                 <EditStepCard
                   title={p.title}
                   rating={p.rating}
@@ -362,20 +398,31 @@ const handleNext = async () => {
                   onPress={() => togglePill(label)}
                   className={[
                     "px-[22px] py-[11px] mr-[10px] mb-[13px] rounded-full",
-                    active ? "bg-green500" : "bg-[#F3F4F6]",
+                    active ? "bg-[#FCFFFA]" : "bg-gray50",
                   ].join(" ")}
-                  android_ripple={{ color: "rgba(0,0,0,0.06)", borderless: true }}
+                  android_ripple={{
+                    color: "rgba(0,0,0,0.06)",
+                    borderless: true,
+                  }}
+                  style={[
+                    {
+                      borderWidth: active ? 1.5 : 1.5,
+                      borderColor: active ? "#42790E" : "transparent",
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
                 >
                   <Text
                     className={[
-                      "text-heading-3 font-pretendardMedium",
-                      active ? "text-white" : "text-gray500",
+                      "text-body-2 font-pretendardMedium",
+                      active ? "text-green900" : "text-gray700",
                     ].join(" ")}
                   >
                     {label}
                   </Text>
                   {active && (
-                    <View className="absolute w-3 h-3 rounded-full bg-yellow900 -top-1 -right-1" />
+                    <View className="absolute w-3 h-3 rounded-full bg-yellow900 -top-1.5 -right-1.5" />
                   )}
                 </Pressable>
               );

@@ -1,91 +1,57 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 const { width } = Dimensions.get("window");
-const cardWidth = (width - 24 * 2 - 12) / 2;
-
-const DEFAULT_BG = "#F4F4F4";
-const PRESSED_BG = "#FDFFFA";
+const GAP = 14;
+const COLS = 2;
+const H_PADDING = 24;
+const ITEM_W = (width - H_PADDING * 2 - GAP * (COLS - 1)) / COLS;
 
 const CategoryCard = ({ image, title, description, style, onPress }) => {
-  const [pressed, setPressed] = useState(false);
-  const timerRef = useRef(null);
-
-  const handlePress = () => {
-    // 눌림색이 눈에 보이도록 아주 살짝 딜레이 후 이동
-    timerRef.current = setTimeout(() => {
-      onPress?.();
-    }, 90);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
-  }, []);
-
   return (
-    <View style={[styles.outerCard, style, { width: cardWidth }]}>
-      <TouchableOpacity
-        activeOpacity={1}                 // 투명도 변화 끔 (색상만 바꾸려는 의도)
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
-        onPress={handlePress}
-        style={[
-          styles.innerCard,
-          pressed && styles.innerCardPressed, // 배경색만 변경
-        ]}
-      >
-        <Image source={image} style={styles.image} resizeMode="contain" />
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.description}>{description}</Text>
-      </TouchableOpacity>
-    </View>
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      style={[styles.card, { width: ITEM_W }, style]}
+    >
+      {/* 왼쪽 아이콘 */}
+      <Image source={image} style={styles.image} resizeMode="contain" />
+
+      {/* 오른쪽 텍스트 */}
+      <View style={styles.textCol}>
+        <Text className="text-heading-2 font-pretendardSemiBold">
+          {title}
+        </Text>
+        {!!description && (
+          <Text className="text-body-3 font-pretendardRegular text-gray700">
+            {description}
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  outerCard: {
-    borderWidth: 0,
-    borderColor: "#B3B56C",
-    borderRadius: 12,
-    marginBottom: 16,
-    overflow: "hidden",           // 모서리 안으로 깔끔히
-  },
-  innerCard: {
-    backgroundColor: DEFAULT_BG,  // 기본 배경
-    borderRadius: 12,
-    padding: width * 0.05,        // ⬅️ 기존 사이즈/레이아웃 그대로
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: "transparent",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  innerCardPressed: {
-    backgroundColor: PRESSED_BG,  // 눌렀을 때 배경색만 바꿈
-    borderWidth: 1,
-    borderColor: "#62974F",
-  },
-  image: {
-    width: "100%",
-    height: width * 0.25,
-    borderRadius: 12,
+    borderColor: "#E1E1E1",
+    paddingHorizontal: 9,
+    paddingVertical: 12,
     marginBottom: 12,
   },
-  title: {
-    fontSize: width * 0.045,
-    fontWeight: "600",
-    marginBottom: 4,
+  image: {
+    width: 58,
+    height: 58,
+    marginRight: 4,
   },
-  description: {
-    fontSize: width * 0.035,
-    fontWeight: "500",
-    color: "#555",
+  textCol: {
+    flex: 1,
+    justifyContent: "center",
   },
 });
 

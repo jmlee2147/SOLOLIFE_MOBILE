@@ -1,5 +1,4 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, {
   useCallback,
@@ -322,7 +321,6 @@ export default function ResultsScreen() {
           tags={tags}
           highlightedTags={[...selectedMoods, ...selectedKeywords]}
           liked={!!liked[item.location_id]}
-          borderWidth={index === currentIndex ? 0 : 1}
           onToggleLike={() => handleToggleLike(item)} // API 연동 호출
           onPressTitle={() => {
             const payload = JSON.stringify(item);
@@ -368,19 +366,9 @@ export default function ResultsScreen() {
                 backgroundColor: "transparent",
               }}
             >
-              <LinearGradient
-                colors={["#64BC2E", "#2E7A45"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{
-                  borderRadius: 18,
-                  padding: 1.7,
-                }}
-              >
-                <View style={{ borderRadius: 16, overflow: "hidden" }}>
-                  {cardContent}
-                </View>
-              </LinearGradient>
+              <View style={{ borderRadius: 16 }}>
+                {cardContent}
+              </View>
             </View>
           ) : (
             cardContent

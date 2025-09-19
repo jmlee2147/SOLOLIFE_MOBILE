@@ -3,7 +3,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Platform, Pressable, SafeAreaView, Text, View } from "react-native";
 import Header from "../../../components/shared/Header";
 import Icon from "../../../components/shared/Icon";
-import { CATEGORY, MOODS, resolveCategoryKeyByLabel } from "../../../config/category.config";
+import {
+  CATEGORY,
+  MOODS,
+  resolveCategoryKeyByLabel,
+} from "../../../config/category.config";
 
 export default function KeywordsScreen() {
   const router = useRouter();
@@ -40,7 +44,9 @@ export default function KeywordsScreen() {
 
     // 서브카테고리(예: 활동/전시)
     const subKw =
-      cfg.subcategories && cfg.subcategories[subKey] && Array.isArray(cfg.subcategories[subKey].keywords)
+      cfg.subcategories &&
+      cfg.subcategories[subKey] &&
+      Array.isArray(cfg.subcategories[subKey].keywords)
         ? cfg.subcategories[subKey].keywords
         : [];
 
@@ -50,7 +56,9 @@ export default function KeywordsScreen() {
   // 4) 선택 상태
   const [selected, setSelected] = useState([]);
   const toggle = (k) =>
-    setSelected((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]));
+    setSelected((prev) =>
+      prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]
+    );
 
   // 5) 타이틀
   const title = useMemo(() => {
@@ -66,8 +74,8 @@ export default function KeywordsScreen() {
       router.replace({
         pathname: "/place-recommend/results",
         params: {
-          category: categoryForAPI,     // 라벨로 전달
-          subcategory: subKey,          // 필요하면 유지
+          category: categoryForAPI, // 라벨로 전달
+          subcategory: subKey, // 필요하면 유지
           keywordsKo: JSON.stringify([]),
           moodsKo: JSON.stringify([]),
         },
@@ -85,10 +93,10 @@ export default function KeywordsScreen() {
     router.push({
       pathname: "/place-recommend/results",
       params: {
-        category: categoryForAPI,                
-        subcategory: subKey,                      
+        category: categoryForAPI,
+        subcategory: subKey,
         keywordsKo: JSON.stringify(selectedKeywords), // 개별 키워드(한글 배열)
-        moodsKo: JSON.stringify(selectedMoods),       // 공통 무드(한글 배열)
+        moodsKo: JSON.stringify(selectedMoods), // 공통 무드(한글 배열)
       },
     });
   };
@@ -107,7 +115,9 @@ export default function KeywordsScreen() {
 
       <View style={{ flex: 1, paddingHorizontal: 25, paddingTop: 5 }}>
         {/* 타이틀 */}
-        <Text className="text-title-1 mb-[6px] font-pretendardExtraBold">{title}</Text>
+        <Text className="text-title-1 mb-[6px] font-pretendardExtraBold">
+          {title}
+        </Text>
         <Text className="mb-12 leading-6 text-heading-3 text-gray700 font-pretendardMedium">
           선호하는 키워드를 선택해주세요.
         </Text>
@@ -122,25 +132,22 @@ export default function KeywordsScreen() {
                 onPress={() => toggle(k)}
                 className={[
                   "px-7 py-4 rounded-full mr-3 mb-5",
-                  active ? "bg-green500" : "bg-gray50",
+                  active ? "bg-[#FCFFFA]" : "bg-gray50",
                 ].join(" ")}
                 android_ripple={{ color: "rgba(0,0,0,0.06)", borderless: true }}
-                style={Platform.select({
-                  ios: {
-                    shadowColor: "#000",
-                    shadowOpacity: 0,
-                    shadowRadius: 6,
-                    shadowOffset: { width: 0, height: 2 },
+                style={[
+                  {
+                    borderWidth: active ? 1.5 : 1.5,
+                    borderColor: active ? "#42790E" : "transparent",
                   },
-                  android: { elevation: 1 },
-                })}
+                ]}
                 accessibilityRole="button"
                 accessibilityLabel={k}
               >
                 <Text
                   className={[
                     "text-[18px] font-pretendardMedium",
-                    active ? "text-white" : "text-gray700",
+                    active ? "text-green900" : "text-gray700",
                   ].join(" ")}
                 >
                   {k}
@@ -148,7 +155,7 @@ export default function KeywordsScreen() {
 
                 {/* 선택 표시 점 */}
                 {active && (
-                  <View className="absolute w-3 h-3 rounded-full bg-yellow900 -top-1 -right-1" />
+                  <View className="absolute w-3 h-3 rounded-full bg-yellow900 -top-1.5 -right-1.5" />
                 )}
               </Pressable>
             );
@@ -174,9 +181,11 @@ export default function KeywordsScreen() {
           accessibilityRole="button"
           accessibilityLabel="다음"
         >
-          <Icon name="next_circle" width={53} height={53}/>
+          <Icon name="next_circle" width={53} height={53} />
         </Pressable>
-        <Text className="mt-[6px] text-heading-3 text-green500 font-pretendardSemiBold">다음</Text>
+        <Text className="mt-[6px] text-heading-3 text-green500 font-pretendardSemiBold">
+          다음
+        </Text>
       </View>
     </SafeAreaView>
   );
