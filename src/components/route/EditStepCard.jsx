@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import Icon from "../shared/Icon";
 
-const BASE_W = 343;
+const BASE_W = 311;
 const BASE_H = 109;
 const DEFAULT_BG = "#FFFFFF";
 const PRESSED_BG = "#FDFFFA";
@@ -173,6 +173,7 @@ const styles = StyleSheet.create({
     width: 92,
     height: 92,
     marginRight: 12,
+    marginLeft: 12,
     overflow: "hidden",
     backgroundColor: "#E2E2E2",
     alignItems: "center",
