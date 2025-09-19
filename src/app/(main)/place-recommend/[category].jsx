@@ -1,9 +1,18 @@
 // src/app/(main)/place-recommend/[category].jsx
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo } from "react";
-import { Image, Platform, Pressable, SafeAreaView, Text, View } from "react-native";
+import {
+  Image,
+  Pressable,
+  SafeAreaView,
+  Text,
+  View
+} from "react-native";
 import Header from "../../../components/shared/Header";
-import { CATEGORY, resolveCategoryKeyByLabel } from "../../../config/category.config";
+import {
+  CATEGORY,
+  resolveCategoryKeyByLabel,
+} from "../../../config/category.config";
 
 // (선택) 카테고리별 서브타이틀만 별도 관리하고 싶으면 여기에 둠
 const SUBTITLE = {
@@ -23,7 +32,7 @@ const CAT_IMAGE = {
 
 export default function CategoryScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();              // { category: "cafe" | "카페", ... }
+  const params = useLocalSearchParams(); // { category: "cafe" | "카페", ... }
   const raw = params.category;
 
   // 1) 파라미터를 key로 정규화
@@ -45,7 +54,10 @@ export default function CategoryScreen() {
   // 3) 카페처럼 최상위에 keywords가 있으면 이 화면 스킵
   useEffect(() => {
     if (cfg?.keywords?.length) {
-      router.replace({ pathname: "/place-recommend/keywords", params: { category: catKey } });
+      router.replace({
+        pathname: "/place-recommend/keywords",
+        params: { category: catKey },
+      });
     }
   }, [cfg, catKey, router]);
 
@@ -55,15 +67,17 @@ export default function CategoryScreen() {
   }
 
   // 4) 서브카테고리 옵션 생성 (key/label 동시 보관)
-  const options = Object.entries(cfg.subcategories ?? {}).map(([subKey, sub]) => ({
-    key: subKey,
-    label: sub.label,
-  }));
+  const options = Object.entries(cfg.subcategories ?? {}).map(
+    ([subKey, sub]) => ({
+      key: subKey,
+      label: sub.label,
+    })
+  );
 
   const onSelect = (sub) => {
     router.push({
       pathname: "/place-recommend/keywords",
-      params: { category: catKey, subcategory: sub.key }, // 👉 key 기반으로 이동
+      params: { category: catKey, subcategory: sub.key }, 
     });
   };
 
@@ -77,41 +91,47 @@ export default function CategoryScreen() {
         onRightPress={() => router.push("/home")}
       />
 
-      <View style={{ paddingHorizontal: 25, marginTop: 5 }}>
+      <View style={{ paddingHorizontal: 25 }}>
         {/* Hero */}
-        <View className="items-center mt-6 mb-3">
-          <Image source={CAT_IMAGE[catKey]} className="w-[220px] h-[220px]" resizeMode="contain" />
+        <View className="items-center">
+          <Image
+            source={CAT_IMAGE[catKey]}
+            className="w-[264px] h-[264px]"
+            resizeMode="contain"
+          />
         </View>
 
         {/* Title & Subtitle (가운데 정렬) */}
-        <Text className="mt-3 text-center text-title-1 font-pretendardExtraBold">
+        <Text className="mt-[-26px] text-center text-title-1 font-pretendardExtraBold">
           {cfg.label /* 한글 라벨: 카페/활동/쇼핑/먹거리 */}
         </Text>
-        <Text className="mt-2 leading-6 text-center whitespace-pre-line text-heading-3">
+        <Text className="mt-2 text-center whitespace-pre-line text-heading-3 text-gray700 font-pretendardSemiBold">
           {SUBTITLE[catKey] ?? "원하는 테마를 선택하세요."}
         </Text>
 
-        {/* Options Grid (2열, 카드 166x74) */}
-        <View className="flex-row flex-wrap justify-between mt-20">
+        {/* Options List (1열, 버튼 전체폭) */}
+        <View style={{ marginTop: 40 }}>
           {options.map((opt) => (
             <Pressable
               key={opt.key}
               onPress={() => onSelect(opt)}
-              className="w-[166px] h-[74px] rounded-[5px] bg-gray50 items-center justify-center mb-4"
-              android_ripple={{ color: "rgba(0,0,0,0.08)" }}
-              style={Platform.select({
-                ios: {
-                  shadowColor: "#000",
-                  shadowOpacity: 0,
-                  shadowRadius: 6,
-                  shadowOffset: { width: 0, height: 2 },
+              style={[
+                {
+                  width: "100%",
+                  height: 56,
+                  borderRadius: 999,
+                  backgroundColor: "#FFF", // gray50
+                  borderWidth: 1,
+                  borderColor: "#D4D4D4",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: 8,
                 },
-                android: { elevation: 2 },
-              })}
-              accessibilityRole="button"
-              accessibilityLabel={opt.label}
+              ]}
             >
-              <Text className="text-heading-2">{opt.label}</Text>
+              <Text className="text-heading-2 font-pretendardSemiBold">
+                {opt.label}
+              </Text>
             </Pressable>
           ))}
         </View>

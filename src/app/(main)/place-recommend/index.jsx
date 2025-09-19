@@ -1,7 +1,14 @@
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { DeviceEventEmitter, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import {
+  DeviceEventEmitter,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import CategoryCard from "../../../components/place/CategoryCard";
 import Header from "../../../components/shared/Header";
 import Icon from "../../../components/shared/Icon";
@@ -51,19 +58,22 @@ export default function PlaceRecommendScreen() {
       setLabel(`${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`);
     }
   };
-  
+
   useEffect(() => {
     let mounted = true;
 
-    const sub = DeviceEventEmitter.addListener("location:selected", (payload) => {
-      if (!payload) return;
-      setLabel(payload.label || "선택된 위치");
-      lastCoordsRef.current = {
-        latitude: Number(payload.latitude),
-        longitude: Number(payload.longitude),
-      };
-    });
-  
+    const sub = DeviceEventEmitter.addListener(
+      "location:selected",
+      (payload) => {
+        if (!payload) return;
+        setLabel(payload.label || "선택된 위치");
+        lastCoordsRef.current = {
+          latitude: Number(payload.latitude),
+          longitude: Number(payload.longitude),
+        };
+      }
+    );
+
     const run = async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -71,13 +81,13 @@ export default function PlaceRecommendScreen() {
           if (mounted) setLabel("위치 권한 거부됨");
           return;
         }
-  
+
         const enabled = await Location.hasServicesEnabledAsync();
         if (!enabled) {
           if (mounted) setLabel("위치 서비스 꺼짐");
           return;
         }
-  
+
         // 초기 좌표
         const initial = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
@@ -86,13 +96,13 @@ export default function PlaceRecommendScreen() {
         });
         lastCoordsRef.current = initial.coords;
         if (mounted) await reverseToLabel(initial.coords);
-  
+
         // 변화 감시
         watcherRef.current = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Balanced,
-            timeInterval: 15000,   // 최소 15초 간격
-            distanceInterval: 50,  // 50m 이상 이동 시 업데이트
+            timeInterval: 15000, // 최소 15초 간격
+            distanceInterval: 50, // 50m 이상 이동 시 업데이트
           },
           async (loc) => {
             const prev = lastCoordsRef.current;
@@ -104,10 +114,10 @@ export default function PlaceRecommendScreen() {
           }
         );
       } catch {
-        if (mounted) setLabel("위치를 불러오지 못했습니다");
+        if (mounted) setLabel("위치를 불러오지 못했어요.");
       }
     };
-  
+
     run();
     return () => {
       mounted = false;
@@ -121,11 +131,16 @@ export default function PlaceRecommendScreen() {
     const cfg = CATEGORY[catKey];
     if (cfg?.keywords?.length) {
       console.log("go keywords");
-      router.push({ pathname: "/place-recommend/keywords", params: { category: catKey }});
-    }
-    else {
+      router.push({
+        pathname: "/place-recommend/keywords",
+        params: { category: catKey },
+      });
+    } else {
       console.log("go subcategory");
-      router.push({ pathname: "/place-recommend/[category]", params: { category: catKey }});
+      router.push({
+        pathname: "/place-recommend/[category]",
+        params: { category: catKey },
+      });
     }
   };
 
@@ -139,22 +154,31 @@ export default function PlaceRecommendScreen() {
         onRightPress={() => router.push("/home")}
       />
       <View style={styles.container}>
-        <Text className="mb-[6px] text-title-1 font-pretendardExtraBold">포슬감자님 반가워요.</Text>
-        <Text className="mb-8 text-heading-3 font-pretendardMedium text-gray700">오늘은 어디를 탐험해볼까요?</Text>
-        
+        <Text className="mb-[6px] text-title-1 font-pretendardExtraBold">
+          포슬감자님 반가워요.
+        </Text>
+        <Text className="mb-8 text-heading-3 font-pretendardMedium text-gray700">
+          오늘은 어디를 탐험해볼까요?
+        </Text>
+
         {/* 위치 표시 필터 */}
-        <Pressable style={styles.locPill} onPress={() => router.push("place-recommend/location-search")}>
-          <Icon name="location" width={24} height={24} color="#EE7A13" />
+        <Pressable
+          style={styles.locPill}
+          onPress={() => router.push("place-recommend/location-search")}
+        >
+          <Icon name="location" width={24} height={24} color="#62974F" />
           <View style={{ marginLeft: 6, flex: 1 }}>
-            <Text numberOfLines={1}
-                  className="text-[18px] font-pretendardMedium text-green900">
+            <Text
+              numberOfLines={1}
+              className="text-[18px] font-pretendardMedium text-green900"
+            >
               {label}
             </Text>
           </View>
         </Pressable>
 
         <View style={styles.grid}>
-          {categories.map(( { key, image }) => (
+          {categories.map(({ key, image }) => (
             <CategoryCard
               key={key}
               image={image}
@@ -165,11 +189,12 @@ export default function PlaceRecommendScreen() {
             />
           ))}
         </View>
-
-        <View style={[styles.longCard, { marginTop: -16 }]}>
-          <Text style={styles.longCardTitle}>추천받기</Text>
-          <Text style={styles.longCardDesc}>가고 싶은 곳이 없다면 랜덤 추천을 받아보세요!</Text>
-          <Text style={styles.longCardDesc}>우연한 계기가 운명의 장소가 될 수 있어요.</Text>
+        <View style={{ marginTop: -12 }}>
+          <CategoryCard
+            title="추천받기"
+            image={require("../../../assets/images/explorer.png")}
+            description="나만의 장소 추천"
+          />
         </View>
       </View>
     </SafeAreaView>
@@ -181,16 +206,25 @@ const styles = StyleSheet.create({
   locPill: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#B3B56C",     
     borderRadius: 999,
+    backgroundColor: "#F4F4F4",
     paddingHorizontal: 18,
     paddingVertical: 9,
     marginBottom: 32,
-    },
+  },
 
-  grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginBottom: CARD_GAP },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginBottom: CARD_GAP,
+  },
   longCard: { backgroundColor: "#F4F4F4", borderRadius: 12, padding: 20 },
-  longCardTitle: { fontSize: 18, fontWeight: "500", marginBottom: 8, textAlign: "center" },
+  longCardTitle: {
+    fontSize: 18,
+    fontWeight: "500",
+    marginBottom: 8,
+    textAlign: "center",
+  },
   longCardDesc: { fontSize: 14, fontWeight: "500", textAlign: "center" },
 });

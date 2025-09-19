@@ -9,23 +9,21 @@ export function ToastProvider({ children }) {
 
   const showToast = useCallback((toast) => {
     const id = Date.now();
-    const { duration = 3000 } = toast;
-    setToasts((prev) => [...prev, { id, ...toast }]);
-
-    if (duration !== Infinity && duration > 0) {
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, duration);
-    }
+    const { duration = 1600 } = toast;
+    setToasts((prev) => [...prev, { id, ...toast, duration }]);
   }, []);
-  
+
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <View style={styles.wrapper}>
+      <View pointerEvents="box-none" style={styles.wrapper}>
+        {/* 최근 것이 아래로 깔리게 하려면 필요시 [...toasts].reverse().map(...) 사용 */}
         {toasts.map((t) => (
-          <Toast key={t.id} {...t} />
+          <Toast key={t.id} {...t} onClose={removeToast} />
         ))}
       </View>
     </ToastContext.Provider>
