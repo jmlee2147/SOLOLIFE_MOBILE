@@ -22,7 +22,8 @@ import { CATEGORY } from "../../../config/category.config";
 import {
   postLocationRecommendations,
   toggleLocationLike,
-} from "../../../services/api"; // ✅ 추가
+} from "../../../services/api";
+import { getOpenBadge } from "../../../utils/openingHours";
 import { vs } from "../../../utils/scale";
 
 const MOCK_ITEMS = [
@@ -322,6 +323,7 @@ export default function ResultsScreen() {
         ...(Array.isArray(item?.keywords) ? item.keywords : []),
         ...(Array.isArray(item?.features_flat) ? item.features_flat : []),
       ];
+      const { openNow, hoursText, hasHours } = getOpenBadge(item?.opening_hours || null);
 
       const cardContent = (
         <PlaceCard
@@ -332,6 +334,9 @@ export default function ResultsScreen() {
           address={address}
           tags={tags}
           highlightedTags={[...selectedMoods, ...selectedKeywords]}
+          openNow={openNow}
+          hoursText={hoursText}
+          hasHours={hasHours}
           liked={!!liked[item.location_id]}
           onToggleLike={() => handleToggleLike(item)} // API 연동 호출
           onPressTitle={() => {

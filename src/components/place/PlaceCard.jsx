@@ -16,25 +16,32 @@ function PlaceCard({
   liked = false,
   onToggleLike = () => {},
   onPressTitle = () => {},
+  // 영업 상태/시간
+  openNow = null, // true | false | null(모름)
+  hoursText = "아직 정보가 없어요.",
 }) {
   const [imageError, setImageError] = useState(false);
   const normalize = (v) => String(v).replace(/^#/, "").trim().toLowerCase();
   const highlightSet = useMemo(
-    () => new Set((highlightedTags || []).map(String)), 
+    () => new Set((highlightedTags || []).map((x) => normalize(x))),
     [highlightedTags]
+  );
+
+  // "~" 포맷이 들어와도 안전하게 "-"로 통일
+  const displayHours = useMemo(
+    () => String(hoursText || "아직 정보가 없어요.").replace(/\s*~\s*/g, " - "),
+    [hoursText]
   );
 
   return (
     <View
       className="bg-[#FFFFFF] rounded-[10px]"
-      style={[
-        {
-          width: 317,
-          height: 479,
-          borderWidth: 1,
-          borderColor: "#D4D4D4",
-        },
-      ]}
+      style={{
+        width: 317,
+        height: 479,
+        borderWidth: 1,
+        borderColor: "#D4D4D4",
+      }}
     >
       {/* 이미지 영역 */}
       <View
@@ -44,15 +51,15 @@ function PlaceCard({
           marginBottom: 17,
           marginHorizontal: 0,
           height: 277,
-          backgroundColor: "#E2E2E2", // 로딩/에러 시 회색 배경
+          backgroundColor: "#E2E2E2",
           borderTopLeftRadius: 10,
           borderTopRightRadius: 10,
           alignItems: "center",
           justifyContent: "center",
+          position: "relative",
         }}
       >
         {imageError || !imageSource ? (
-          // 이미지 실패/없음 -> 회색 박스만
           <Image
             source={MAP_PLACEHOLDER}
             resizeMode="contain"
@@ -79,7 +86,10 @@ function PlaceCard({
               </Text>
 
               {rating != null && (
-                <View className="flex-row items-center" style={{ marginLeft: hs(6) }}>
+                <View
+                  className="flex-row items-center"
+                  style={{ marginLeft: hs(6) }}
+                >
                   <Icon name="star" width={16} height={16} />
                   <Text className="text-yellow900 text-body-2 font-pretendardMedium ml-[1px]">
                     {String(rating)}
@@ -90,7 +100,11 @@ function PlaceCard({
           </Pressable>
 
           <Pressable onPress={onToggleLike} hitSlop={8} className="ml-2">
-            <Icon name={liked ? "heart" : "heart_outline"} width={24} height={24} />
+            <Icon
+              name={liked ? "heart" : "heart_outline"}
+              width={24}
+              height={24}
+            />
           </Pressable>
         </View>
 
@@ -107,11 +121,7 @@ function PlaceCard({
             <Icon name="location_outline" width={24} height={24} />
             <Text
               className="text-gray700 text-body-2 font-pretendardMedium ml-[3px]"
-              style={{
-                flexShrink: 1,      // 길면 줄어들도록
-                numberOfLines: 1,   // 한 줄로 제한
-                ellipsizeMode: "tail", // ... 처리
-              }}
+              style={{ flexShrink: 1 }}
               numberOfLines={1}
               ellipsizeMode="tail"
             >
@@ -120,8 +130,30 @@ function PlaceCard({
           </View>
         )}
 
-        {/* 영업시간 */}
-        
+        {/* 오늘 영업시간 한 줄 요약 + 상태 */}
+        <View className="flex-row items-center mt-1 ml-[-6px]">
+          <Icon name="time" width={24} height={24} />
+          <Text
+            className="mt-[2px] text-gray700 text-body-2 font-pretendardMedium ml-[3px]"
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            style={{ flexShrink: 1 }}
+          >
+            {displayHours}
+            {openNow !== null && (
+              <Text
+                style={{
+                  color: openNow ? "#62974F" : "#DC2626",
+                  fontWeight: "600",
+                }}
+              >
+                {"  •  "}
+                {openNow ? "영업 중" : "영업 종료"}
+              </Text>
+            )}
+          </Text>
+        </View>
+
         {/* 태그 */}
         {tags.length > 0 && (
           <View
@@ -134,7 +166,6 @@ function PlaceCard({
               flexWrap: "wrap",
             }}
           >
-            
             {tags.map((t, i) => {
               const label = String(t);
               const isHL = highlightSet.has(normalize(label));
@@ -143,7 +174,7 @@ function PlaceCard({
                   key={`${label}-${i}`}
                   className="text-body-2 font-pretendardMedium"
                   style={{
-                    color: isHL ? "#EE7A13" : "#6B6B6B", // 하이라이트: 그린톤, 기본: 회색톤
+                    color: isHL ? "#EE7A13" : "#6B6B6B",
                     marginRight: 5,
                   }}
                 >
