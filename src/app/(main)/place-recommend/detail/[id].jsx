@@ -15,43 +15,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Button from "../../../../components/shared/Button";
 import Header from "../../../../components/shared/Header";
 import Icon from "../../../../components/shared/Icon";
+import { getOpenBadge } from "../../../../utils/openingHours";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const HIGHLIGHT_COLOR = "#EE7A13";
 const TAG_COLOR = "#6B6B6B";
 
-// 필요하면 MOCK 유지
-const MOCK = {
-  1: {
-    id: "1",
-    name: "55 데시벨",
-    rating: 4.5,
-    categories: ["카페", "디저트"],
-    images: [
-      require("../../../../assets/images/sample.png"),
-      require("../../../../assets/images/cafe.png"),
-      require("../../../../assets/images/shopping.png"),
-      require("../../../../assets/images/eat.png"),
-    ],
-    tags: ["어두운", "조용한"],
-    address: "경기도 수원시 영통구",
-    hours: "10:00 - 21:00",
-    phone: "031-1234-5678",
-    price: "100만원",
-    reviews: [
-      { id: "r1", user: "집가고 싶은 나", rating: 4, content: "..." },
-      {
-        id: "r2",
-        user: "감자튀김",
-        rating: 5,
-        content: "조용해서 작업하기 좋았어요.",
-      },
-    ],
-    coords: { lat: 37.251, lng: 127.071 },
-  },
-};
-
-// (TAG_COLOR 바로 아래 등 상단 상수 구역에 추가)
 const REVIEWS_MOCK = [
   {
     id: "rv-1",
@@ -68,7 +37,8 @@ const REVIEWS_MOCK = [
     id: "rv-2",
     user: "감자튀김",
     rating: 5,
-    content: "조용해서 작업하기 좋았어요. 디저트도 깔끔! 콘센트 자리도 많네요.",
+    content:
+      "조용해서 작업하기 좋았어요. 디저트도 깔끔! 콘센트 자리도 많네요.",
     photos: ["https://picsum.photos/seed/rev2a/600/400"],
   },
   {
@@ -79,6 +49,19 @@ const REVIEWS_MOCK = [
     photos: [],
   },
 ];
+
+// 문자열/객체/require 섞여도 안전하게 이미지 소스로 변환
+function normalizeToImageSources(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map((v) => {
+      if (typeof v === "number") return v; // require()
+      if (v && typeof v === "object" && v.uri) return { uri: String(v.uri) };
+      if (typeof v === "string" && v.trim().length) return { uri: v };
+      return null;
+    })
+    .filter(Boolean);
+}
 
 export default function PlaceDetailScreen() {
   const router = useRouter();
@@ -114,14 +97,42 @@ export default function PlaceDetailScreen() {
     }
   }, [initial]);
 
-  const placeFromApi = useMemo(() => {
-    if (!initialItem) return null;
+  // initialItem 기반으로 상세 뷰 모델 생성
+  const place = useMemo(() => {
+    if (!initialItem) {
+      // 안전 기본값 (MOCK 의존성 제거)
+      return {
+        id: String(id || ""),
+        name: "",
+        rating: null,
+        categories: [],
+        images: [],
+        tags: [],
+        address: "",
+        hoursText: null,
+        openNow: null,
+        hasHours: false,
+        phone: "",
+        price: "",
+        reviews: [],
+        coords: { lat: "", lng: "" },
+      };
+    }
+
+    // 사진: 원본 + __thumbs__ 백업 → 최대 3장
+    const photosPrimary = normalizeToImageSources(initialItem.photos);
+    const thumbsBackup = normalizeToImageSources(initialItem.__thumbs__);
+    const mergedImages = (photosPrimary.length ? photosPrimary : thumbsBackup).slice(0, 3);
+
+    // 영업시간/상태 파싱
+    const { openNow, hoursText, hasHours } = getOpenBadge(initialItem.opening_hours);
+
     return {
       id: String(initialItem.location_id),
       name: initialItem.location_name,
       rating: initialItem.rating_avg ?? null,
       categories: initialItem.category ? [initialItem.category] : [],
-      images: (initialItem.photos || []).map((u) => ({ uri: u })),
+      images: mergedImages,
       tags: [
         ...(Array.isArray(initialItem.keywords) ? initialItem.keywords : []),
         ...(Array.isArray(initialItem.features_flat)
@@ -129,21 +140,19 @@ export default function PlaceDetailScreen() {
           : []),
       ],
       address: initialItem.address ?? "",
-      hours: "",
+      hoursText,     // "오전 9:30 - 오후 10:30" 또는 null
+      openNow,       // true/false/null
+      hasHours,      // boolean
       phone: "",
       price: initialItem.price_level ? `₩ Lv.${initialItem.price_level}` : "",
       reviews: [],
       coords: { lat: initialItem.latitude, lng: initialItem.longitude },
     };
-  }, [initialItem]);
-
-  const place = useMemo(
-    () => (placeFromApi ? placeFromApi : MOCK[String(id)] ?? MOCK["1"]),
-    [placeFromApi, id]
-  );
+  }, [initialItem, id]);
 
   const insets = useSafeAreaInsets();
 
+  // 캐러셀 이미지
   const images = place.images?.length
     ? place.images
     : [require("../../../../assets/images/sample.png")];
@@ -151,9 +160,14 @@ export default function PlaceDetailScreen() {
   const IMG_W = SCREEN_W;
   const IMG_H = 346 - insets.top;
 
-  const pageIndexText = useMemo(() => `1 / ${images.length}`, [images.length]);
+  // 페이지 인덱스 동적 반영
+  const [imgIndex, setImgIndex] = useState(0);
+  const pageIndexText = useMemo(
+    () => `${imgIndex + 1} / ${images.length}`,
+    [imgIndex, images.length]
+  );
 
-  // —— 탭 (JourneyScreen과 동일한 방식)
+  // —— 탭
   const [tab, setTab] = useState("review");
   const [wReview, setWReview] = useState(0);
   const [wRoute, setWRoute] = useState(0);
@@ -189,11 +203,17 @@ export default function PlaceDetailScreen() {
             )}
             onScroll={Animated.event(
               [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-              {
-                useNativeDriver: false,
-              }
+              { useNativeDriver: false }
             )}
             scrollEventThrottle={16}
+            onMomentumScrollEnd={(e) => {
+              const x = e?.nativeEvent?.contentOffset?.x ?? 0;
+              const idx = Math.max(
+                0,
+                Math.min(images.length - 1, Math.round(x / IMG_W))
+              );
+              setImgIndex(idx);
+            }}
           />
           <View
             style={{
@@ -221,7 +241,7 @@ export default function PlaceDetailScreen() {
               ellipsizeMode="tail"
               style={{ flexShrink: 1 }}
             >
-              {place.name}
+              {place.name || "알 수 없는 장소"}
             </Text>
             <Pressable onPress={() => setLiked((v) => !v)} hitSlop={8}>
               <Icon
@@ -281,6 +301,7 @@ export default function PlaceDetailScreen() {
 
         {/* 정보 목록 */}
         <View style={{ marginTop: 12 }}>
+          {/* 주소 */}
           <View style={styles.infoRow}>
             <View style={styles.iconBox}>
               <Icon name="location_outline" width={24} height={24} />
@@ -298,6 +319,7 @@ export default function PlaceDetailScreen() {
             </View>
           </View>
 
+          {/* 오늘 영업시간 · 상태 */}
           <View style={styles.infoRow}>
             <View style={styles.iconBox}>
               <Icon name="time" width={24} height={24} />
@@ -308,13 +330,39 @@ export default function PlaceDetailScreen() {
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
-                {place.hours?.trim()?.length
-                  ? place.hours
-                  : "아직 정보가 없어요."}
+                {place.hasHours && place.hoursText ? (
+                  <>
+                    {place.hoursText}
+                    {typeof place.openNow === "boolean" && (
+                      <Text
+                        style={{
+                          color: place.openNow ? "#62974F" : "#DC2626",
+                          fontWeight: "500",
+                        }}
+                      >
+                        {"  •  "}
+                        {place.openNow ? "영업 중" : "영업 종료"}
+                      </Text>
+                    )}
+                  </>
+                ) : typeof place.openNow === "boolean" ? (
+                  // 시간은 없고 상태만 있을 때 → 상태만 표시
+                  <Text
+                    style={{
+                      color: place.openNow ? "#62974F" : "#DC2626",
+                      fontWeight: "500",
+                    }}
+                  >
+                    {place.openNow ? "영업 중" : "영업 종료"}
+                  </Text>
+                ) : (
+                  "아직 정보가 없어요."
+                )}
               </Text>
             </View>
           </View>
 
+          {/* 전화 */}
           <View style={styles.infoRow}>
             <View style={styles.iconBox}>
               <Icon name="phone" width={24} height={24} />
@@ -332,6 +380,7 @@ export default function PlaceDetailScreen() {
             </View>
           </View>
 
+          {/* 가격 */}
           <View style={styles.infoRow}>
             <View style={styles.iconBox}>
               <Icon name="price" width={24} height={24} />
@@ -350,7 +399,7 @@ export default function PlaceDetailScreen() {
           </View>
         </View>
 
-        {/* 탭 — JourneyScreen 방식 그대로 */}
+        {/* 탭 */}
         <View style={{ paddingHorizontal: 25, paddingTop: 24 }}>
           <View style={{ position: "relative" }}>
             {/* 회색 바닥선(전폭) */}
@@ -440,7 +489,6 @@ export default function PlaceDetailScreen() {
                         placeId: place.id,
                         placeName: place.name,
                         address: place.address ?? "",
-                        
                       },
                     })
                   }
@@ -525,18 +573,10 @@ function ReviewItem({ review }) {
   const photos = Array.isArray(review.photos) ? review.photos : [];
 
   return (
-    <View
-      style={{
-        paddingVertical: 16,
-      }}
-    >
+    <View style={{ paddingVertical: 16 }}>
       {/* 헤더 */}
       <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
+        style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
       >
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <View
@@ -569,10 +609,7 @@ function ReviewItem({ review }) {
 
       {/* 본문 */}
       {!!review.content && (
-        <Text
-          style={{ marginTop: 7 }}
-          className="text-gray700 text-body-2 font-pretendardMedium"
-        >
+        <Text style={{ marginTop: 7 }} className="text-gray700 text-body-2 font-pretendardMedium">
           {review.content}
         </Text>
       )}
