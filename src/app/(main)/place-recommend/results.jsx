@@ -188,6 +188,18 @@ export default function ResultsScreen() {
         radius_km: 3,
       });
       const arr = Array.isArray(res?.items) ? res.items : [];
+      console.log("[API] total items:", arr.length);
+
+      arr.forEach((p, i) => {
+        console.log(
+          `[API] item ${i} (${p.location_name}) photos length:`,
+          Array.isArray(p?.photos) ? p.photos.length : 0
+        );
+      });
+
+      if (arr.length) {
+        console.log("[API] raw item 0:", JSON.stringify(arr[0], null, 2));
+      }
       setItems(arr.length ? arr : MOCK_ITEMS);
       setUsedMock(!arr.length);
     } catch (e) {
@@ -324,6 +336,7 @@ export default function ResultsScreen() {
           onToggleLike={() => handleToggleLike(item)} // API 연동 호출
           onPressTitle={() => {
             const payload = JSON.stringify(item);
+            const thumbs = getThumbsFromPlace(item);
             if (index !== currentIndex) {
               scrollToIndex(index);
             } else {
@@ -331,7 +344,9 @@ export default function ResultsScreen() {
                 pathname: "/place-recommend/detail/[id]",
                 params: {
                   id: String(item.location_id),
-                  initial: encodeURIComponent(payload),
+                  initial: encodeURIComponent(
+                    JSON.stringify({ ...item, __thumbs__: thumbs })
+                  ),
                   moodsKo: JSON.stringify(selectedMoods),
                   keywordsKo: JSON.stringify(selectedKeywords),
                 },
@@ -366,9 +381,7 @@ export default function ResultsScreen() {
                 backgroundColor: "transparent",
               }}
             >
-              <View style={{ borderRadius: 16 }}>
-                {cardContent}
-              </View>
+              <View style={{ borderRadius: 16 }}>{cardContent}</View>
             </View>
           ) : (
             cardContent

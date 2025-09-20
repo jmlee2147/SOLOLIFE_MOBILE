@@ -68,7 +68,8 @@ const REVIEWS_MOCK = [
     id: "rv-2",
     user: "감자튀김",
     rating: 5,
-    content: "조용해서 작업하기 좋았어요. 디저트도 깔끔! 콘센트 자리도 많네요.",
+    content:
+      "조용해서 작업하기 좋았어요. 디저트도 깔끔! 콘센트 자리도 많네요.",
     photos: ["https://picsum.photos/seed/rev2a/600/400"],
   },
   {
@@ -79,6 +80,19 @@ const REVIEWS_MOCK = [
     photos: [],
   },
 ];
+
+// 문자열/객체/require 섞여도 안전하게 이미지 소스로 변환
+function normalizeToImageSources(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map((v) => {
+      if (typeof v === "number") return v; // require()
+      if (v && typeof v === "object" && v.uri) return { uri: String(v.uri) };
+      if (typeof v === "string" && v.trim().length) return { uri: v };
+      return null;
+    })
+    .filter(Boolean);
+}
 
 export default function PlaceDetailScreen() {
   const router = useRouter();
@@ -99,10 +113,7 @@ export default function PlaceDetailScreen() {
     () => [...parseJsonArr(moodsKo), ...parseJsonArr(keywordsKo)].map(String),
     [moodsKo, keywordsKo]
   );
-  const highlightSet = useMemo(
-    () => new Set(highlightedTags),
-    [highlightedTags]
-  );
+  const highlightSet = useMemo(() => new Set(highlightedTags), [highlightedTags]);
 
   // 초기(옵션) 데이터 파싱
   const initialItem = useMemo(() => {
@@ -116,12 +127,18 @@ export default function PlaceDetailScreen() {
 
   const placeFromApi = useMemo(() => {
     if (!initialItem) return null;
+
+    // photos(원본) + __thumbs__(백업) 머지 → 최대 3장
+    const photosPrimary = normalizeToImageSources(initialItem.photos);
+    const thumbsBackup = normalizeToImageSources(initialItem.__thumbs__);
+    const mergedImages = (photosPrimary.length ? photosPrimary : thumbsBackup).slice(0, 3);
+
     return {
       id: String(initialItem.location_id),
       name: initialItem.location_name,
       rating: initialItem.rating_avg ?? null,
       categories: initialItem.category ? [initialItem.category] : [],
-      images: (initialItem.photos || []).map((u) => ({ uri: u })),
+      images: mergedImages,
       tags: [
         ...(Array.isArray(initialItem.keywords) ? initialItem.keywords : []),
         ...(Array.isArray(initialItem.features_flat)
@@ -144,14 +161,22 @@ export default function PlaceDetailScreen() {
 
   const insets = useSafeAreaInsets();
 
+  const mockImages = normalizeToImageSources(MOCK[String(id)]?.images).slice(0, 3);
   const images = place.images?.length
     ? place.images
+    : mockImages.length
+    ? mockImages
     : [require("../../../../assets/images/sample.png")];
 
   const IMG_W = SCREEN_W;
   const IMG_H = 346 - insets.top;
 
-  const pageIndexText = useMemo(() => `1 / ${images.length}`, [images.length]);
+  // 페이지 인덱스 동적 반영
+  const [imgIndex, setImgIndex] = useState(0);
+  const pageIndexText = useMemo(
+    () => `${imgIndex + 1} / ${images.length}`,
+    [imgIndex, images.length]
+  );
 
   // —— 탭 (JourneyScreen과 동일한 방식)
   const [tab, setTab] = useState("review");
@@ -189,11 +214,17 @@ export default function PlaceDetailScreen() {
             )}
             onScroll={Animated.event(
               [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-              {
-                useNativeDriver: false,
-              }
+              { useNativeDriver: false }
             )}
             scrollEventThrottle={16}
+            onMomentumScrollEnd={(e) => {
+              const x = e?.nativeEvent?.contentOffset?.x ?? 0;
+              const idx = Math.max(
+                0,
+                Math.min(images.length - 1, Math.round(x / IMG_W))
+              );
+              setImgIndex(idx);
+            }}
           />
           <View
             style={{
@@ -440,7 +471,6 @@ export default function PlaceDetailScreen() {
                         placeId: place.id,
                         placeName: place.name,
                         address: place.address ?? "",
-                        
                       },
                     })
                   }
@@ -525,18 +555,10 @@ function ReviewItem({ review }) {
   const photos = Array.isArray(review.photos) ? review.photos : [];
 
   return (
-    <View
-      style={{
-        paddingVertical: 16,
-      }}
-    >
+    <View style={{ paddingVertical: 16 }}>
       {/* 헤더 */}
       <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
+        style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
       >
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <View
@@ -569,10 +591,7 @@ function ReviewItem({ review }) {
 
       {/* 본문 */}
       {!!review.content && (
-        <Text
-          style={{ marginTop: 7 }}
-          className="text-gray700 text-body-2 font-pretendardMedium"
-        >
+        <Text style={{ marginTop: 7 }} className="text-gray700 text-body-2 font-pretendardMedium">
           {review.content}
         </Text>
       )}
