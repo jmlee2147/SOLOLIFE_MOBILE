@@ -2,33 +2,48 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Icon from "./Icon";
 
-const Header = ({ title, leftIcon, onLeftPress, rightIcon, onRightPress, backgroundColor = "#FFFFFF" }) => {
+const Header = ({
+  title,
+  leftIcon,
+  onLeftPress,
+  rightIcon,
+  onRightPress,
+  backgroundColor = "#FFFFFF", // 기본 배경
+  titleColor = "#000000",      // 타이틀 색상
+  iconColor = "#000000",       // 아이콘 색상
+}) => {
   return (
     <View style={[styles.container, { backgroundColor }]}>
       {/* 좌측 아이콘 */}
       {leftIcon ? (
-        <TouchableOpacity 
-          onPress={onLeftPress} 
+        <TouchableOpacity
+          onPress={onLeftPress}
           style={styles.iconWrapper}
           activeOpacity={1}
         >
-          <Icon name={leftIcon} width={24} height={24} />
+          <Icon name={leftIcon} width={24} height={24} color={iconColor} />
         </TouchableOpacity>
-      ) : <View style={styles.iconPlaceholder} />}
+      ) : (
+        <View style={styles.iconPlaceholder} />
+      )}
 
       {/* 가운데 타이틀 */}
-      <Text style={styles.title}>{title}</Text>
+      <Text style={[styles.title, { color: titleColor }]} numberOfLines={1}>
+        {title}
+      </Text>
 
       {/* 우측 아이콘 */}
       {rightIcon ? (
-        <TouchableOpacity 
-          onPress={onRightPress} 
+        <TouchableOpacity
+          onPress={onRightPress}
           style={styles.iconWrapper}
           activeOpacity={1}
         >
-          <Icon name={rightIcon} width={24} height={24} />
+          <Icon name={rightIcon} width={24} height={24} color={iconColor} />
         </TouchableOpacity>
-      ) : <View style={styles.iconPlaceholder} />}
+      ) : (
+        <View style={styles.iconPlaceholder} />
+      )}
     </View>
   );
 };
@@ -41,7 +56,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 12,
     borderBottomWidth: 0,
-    backgroundColor: "#FFFFFF",
   },
   title: {
     fontSize: 16,

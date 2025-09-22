@@ -3,7 +3,6 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "../../global.css";
-import SafeScreen from "../components/shared/SafeScreen";
 import { ToastProvider } from "../providers/ToastProvider";
 
 export default function MainLayout() {
@@ -19,7 +18,7 @@ export default function MainLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ToastProvider>
-        <SafeScreen>
+        
           <StatusBar style="dark" translucent={true} />
           <Stack
             screenOptions={{
@@ -27,28 +26,11 @@ export default function MainLayout() {
               presentation: "card", // 모달/풀스크린 금지
               animation: "slide_from_right", // iOS 기본 슬라이드
               gestureEnabled: true,
-              contentStyle: { backgroundColor: "#fff" },
+              contentStyle: { backgroundColor: "transparent" },
             }}
           >
-            {/* 탭 루트 */}
-            <Stack.Screen
-              name="(main)/(tabs)"
-              options={{ headerShown: false }}
-            />
-
-            {/* 장소 추천 플로우 */}
-            <Stack.Screen
-              name="(main)/place-recommend/index"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="(main)/place-recommend/[category]"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen name="(main)/place-recommend/keywords" />
-            <Stack.Screen name="(main)/place-recommend/results" />
           </Stack>
-        </SafeScreen>
+        
       </ToastProvider>
     </GestureHandlerRootView>
   );

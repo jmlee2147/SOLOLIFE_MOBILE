@@ -351,7 +351,7 @@ export default function JourneyScreen() {
                     }}
                   >
                     <LinearGradient
-                      colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.5r)"]}
+                      colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.5)"]}
                       style={{
                         position: "absolute",
                         left: 0,

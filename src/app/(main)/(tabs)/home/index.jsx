@@ -99,7 +99,9 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.pillsCol}>
-              <Pill label="미션" icon={IMG_SHORTCUT_MISSION}/>
+              <Pill label="미션" 
+                    icon={IMG_SHORTCUT_MISSION}
+                    onPress={() => router.push("/(fullscreen)/mission")}/>
               <Pill label="저장소"
                     icon={IMG_SHORTCUT_BOOKMARK}
                     onPress={() => router.push("/storage")}
