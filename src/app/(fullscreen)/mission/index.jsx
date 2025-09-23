@@ -18,15 +18,23 @@ export default function RewardScreen() {
   const router = useRouter();
   const [runKey, setRunKey] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const isRunningRef = React.useRef(false);
 
   const playOnce = useCallback(() => {
-    if (playing) return;
+    if (isRunningRef.current) return;
+    isRunningRef.current = true;
     setPlaying(true);
     setRunKey((k) => k + 1);
-  }, [playing]);
+  }, []);
 
   return (
-    <View style={{ backgroundColor: "#2C2C35", flex: 1, paddingBottom: insets.bottom}}>
+    <View
+      style={{
+        backgroundColor: "#2C2C35",
+        flex: 1,
+        paddingBottom: insets.bottom,
+      }}
+    >
       {/* 레이어 2: 보석 배경 */}
       <StatusBar style="light" translucent backgroundColor="transparent" />
       <View style={{ height: insets.top }} />
@@ -42,7 +50,6 @@ export default function RewardScreen() {
         title="뽑기"
         leftIcon="previous"
         onLeftPress={() => router.back()}
-        rightIcon="settings"
         backgroundColor="transparent" // 배경 투명
         titleColor="#FFFFFF" // 타이틀 흰색
         iconColor="#FFF" // 아이콘 노란색
@@ -63,15 +70,16 @@ export default function RewardScreen() {
 
         {/* Center: Chest */}
         <View style={styles.center}>
-          <Pressable onPress={playOnce} hitSlop={12}>
-            <TreasureOpening
-              key={`chest-${runKey}`}
-              size={280}
-              play
-              loop={false}
-              onComplete={() => setPlaying(false)}
-            />
-          </Pressable>
+          <TreasureOpening
+            key={`chest-${runKey}`}
+            size={280}
+            play={playing}
+            loop={false}
+            onComplete={() => {
+              setPlaying(false);
+              isRunningRef.current = false;
+            }}
+          />
         </View>
 
         {/* Bottom CTA */}
@@ -81,6 +89,7 @@ export default function RewardScreen() {
             variant="primary"
             size="large"
             onPress={playOnce}
+            disabled={playing}
           />
         </View>
       </View>
@@ -120,7 +129,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-
+  
   hudRow: {
     paddingHorizontal: 20,
     paddingTop: 8,
