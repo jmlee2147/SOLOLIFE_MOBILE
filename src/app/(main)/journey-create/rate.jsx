@@ -3,12 +3,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-    Image,
-    Pressable,
-    SafeAreaView,
-    Text,
-    useWindowDimensions,
-    View,
+  Image,
+  Pressable,
+  SafeAreaView,
+  Text,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import Button from "../../../components/shared/Button";
 import Icon from "../../../components/shared/Icon";
@@ -38,11 +38,7 @@ function clamp01to5(n) {
 function parseInitRating(raw) {
   if (raw == null) return 0;
   const v = Array.isArray(raw) ? raw[0] : raw;
-  const n = parseFloat(
-    String(v)
-      .replace(",", ".")
-      .replace(/[^\d.]/g, "")
-  );
+  const n = parseFloat(String(v).replace(",", ".").replace(/[^\d.]/g, ""));
   return Number.isFinite(n) ? clamp01to5(n) : 0;
 }
 
@@ -51,24 +47,45 @@ export default function RateScreen() {
   const router = useRouter();
 
   // search-place에서 넘어오는 파라미터
-  const { savedName, savedAddress, savedCategory, savedRating } =
-    useLocalSearchParams();
+  const {
+    savedName,
+    savedAddress,
+    savedCategory,
+    savedRating,
+    locationId, // ★ 넘어온 locationId(path param 기반)
+  } = useLocalSearchParams();
 
   const placeName = useMemo(() => String(savedName ?? ""), [savedName]);
   const placeAddr = useMemo(() => String(savedAddress ?? ""), [savedAddress]);
   const placeCatg = useMemo(() => String(savedCategory ?? ""), [savedCategory]);
 
+  // 숫자 locationId 파싱 (숫자 아니면 null)
+  const numericLocationId = (() => {
+    const n = Number(Array.isArray(locationId) ? locationId[0] : locationId);
+    return Number.isFinite(n) ? n : null;
+  })();
+
   const [rating, setRating] = useState(() => parseInitRating(savedRating));
 
   // 확정 시 드래프트에 저장 → index로 replace
   const onConfirm = async () => {
+    // 로컬용 임시 id(문자열) + 서버용 locationId(정수)
     const item = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      locationId: numericLocationId, // ★ 드래프트에 서버 id 저장
       name: placeName,
       address: placeAddr,
       category: placeCatg,
       rating: clamp01to5(Number(rating) || 0),
     };
+
+    // 디버깅에 도움
+    console.log("[rate] save item", {
+      id: item.id,
+      locationId: item.locationId,
+      name: item.name,
+      address: item.address,
+    });
 
     const prev = await loadDraft();
     const deduped = prev.filter(
@@ -106,16 +123,8 @@ export default function RateScreen() {
         <View style={{ flex: 1 }}>
           {/* 첫 줄: 아이콘 + 이름 */}
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Icon
-              name="location"
-              width={16}
-              height={16}
-              style={{ marginRight: 5 }}
-            />
-            <Text
-              className="text-body-1 font-pretendardMedium"
-              numberOfLines={1}
-            >
+            <Icon name="location" width={16} height={16} style={{ marginRight: 5 }} />
+            <Text className="text-body-1 font-pretendardMedium" numberOfLines={1}>
               {placeName || "선택한 장소"}
             </Text>
           </View>
@@ -125,7 +134,7 @@ export default function RateScreen() {
             <Text
               className="text-gray700 text-body-2 font-pretendardRegular"
               numberOfLines={1}
-              style={{ marginTop: 2 }} // 아이콘+이름과 들여쓰기 맞추기
+              style={{ marginTop: 2 }}
             >
               {placeAddr}
             </Text>
@@ -147,13 +156,7 @@ export default function RateScreen() {
           colors={["rgba(0,0,0,0.08)", "rgba(0,0,0,0)"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: 1,
-            height: 4,
-          }}
+          style={{ position: "absolute", left: 0, right: 0, top: 1, height: 4 }}
           pointerEvents="none"
         />
       </View>
@@ -187,14 +190,8 @@ export default function RateScreen() {
         <Text className="text-title-2 font-pretendardExtraBold">{rating}</Text>
       </View>
 
-      {/* 별점 5개 (Icon star 사용) */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "center",
-          marginTop: 12,
-        }}
-      >
+      {/* 별점 5개 */}
+      <View style={{ flexDirection: "row", justifyContent: "center", marginTop: 12 }}>
         {[1, 2, 3, 4, 5].map((i) => {
           const active = rating >= i;
           return (
@@ -216,14 +213,7 @@ export default function RateScreen() {
       </View>
 
       {/* 얇은 구분선 */}
-      <View
-        style={{
-          height: 1,
-          backgroundColor: "#D4D4D4",
-          marginTop: 37,
-          marginHorizontal: 0,
-        }}
-      />
+      <View style={{ height: 1, backgroundColor: "#D4D4D4", marginTop: 37, marginHorizontal: 0 }} />
 
       {/* 하단 고정 영역 */}
       <View
@@ -238,12 +228,11 @@ export default function RateScreen() {
           backgroundColor: "#fff",
         }}
       >
-        {/* 공통 버튼 */}
         <Button
           onPress={onConfirm}
           title={isSkip ? "건너뛰기" : "저장하기"}
-          variant={isSkip ? "secondary" : "primary"} // ✅ 건너뛰기=secondary, 저장하기=primary
-          size="large" // ✅ 큰 버튼 중앙 배치
+          variant={isSkip ? "secondary" : "primary"}
+          size="large"
         />
       </View>
     </SafeAreaView>
