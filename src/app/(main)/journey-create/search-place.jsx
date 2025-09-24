@@ -16,7 +16,10 @@ import {
 import Icon from '../../../components/shared/Icon';
 import SearchHeader from '../../../components/shared/SearchHeader';
 
-// 최근 검색
+// ====== 설정 ======
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL;
+
+// ====== 최근 검색 ======
 const RECENT_KEY = 'recent_locations_v1';
 async function loadRecent() {
   try { const raw = await AsyncStorage.getItem(RECENT_KEY); return raw ? JSON.parse(raw) : []; }
@@ -38,7 +41,7 @@ async function removeRecent(label) {
   } catch { return loadRecent(); }
 }
 
-// 저장 장소
+// ====== 저장 장소 ======
 const SAVED_KEY = 'saved_locations_v1';
 async function loadSaved() {
   try { const raw = await AsyncStorage.getItem(SAVED_KEY); return raw ? JSON.parse(raw) : []; }
@@ -60,17 +63,24 @@ async function removeSaved(label) {
   } catch { return loadSaved(); }
 }
 
-// 검색 API
-async function geocodeSearch(q) {
-  if (!q?.trim()) return [];
-  const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=10&q=${encodeURIComponent(q)}`;
-  const res = await fetch(url, { headers: { 'Accept-Language': 'ko' }});
+// ====== 검색 API 교체: GET /search/locations-lite ======
+async function locationsLiteSearch(q, page = 1, limit = 20) {
+  if (!q?.trim()) return { items: [], page: 1, limit, total: 0 };
+  const url = `${API_BASE}/search/locations?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`;
+  console.log('[locationsLiteSearch] GET', url);
+  const res = await fetch(url, { headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } });
+  console.log('[locationsLiteSearch] status', res.status);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
-  return (data || []).map(item => ({
-    label: item.display_name,
-    latitude: Number(item.lat),
-    longitude: Number(item.lon),
+  // 리스트 화면용 경량 스키마 매핑
+  const items = (data.items || []).map(({ location_id, title, address }) => ({
+    id: location_id,
+    title,
+    address,
+    // label은 로컬 저장/표시에 사용 (고유성 위해 id 포함)
+    label: `${title} · ${address}`,
   }));
+  return { items, page: data.page, limit: data.limit, total: data.total };
 }
 
 export default function LocationSearchScreen() {
@@ -95,25 +105,34 @@ export default function LocationSearchScreen() {
     Keyboard.dismiss();
     setLoading(true);
     try {
-      const list = await geocodeSearch(q);
-      setResults(list);
+      const { items } = await locationsLiteSearch(q, 1, 20);
+      setResults(items);
+    } catch (e) {
+      setResults([]);
     } finally { setLoading(false); }
   }, [query]);
 
   const choose = useCallback(async (item) => {
-    await saveRecent(item);
-    // item.label 전체가 주소일 수 있으니, 적절히 name/address 나눠서 넘겨도 좋고
-    // 일단 name: 첫 콤마 앞, address: 전체처럼 보이게 처리 예시
-    const [first, ...rest] = String(item.label).split(",");
-    const name = first.trim();
-    const address = rest.join(",").trim();
-  
+    // 백엔드 응답 구조 기반: title / address 사용
+    const name = String(item.title || '').trim();
+    const address = String(item.address || '').trim();
+
+    await saveRecent({
+      // 로컬 저장용 최소 필드
+      id: item.id,
+      title: name,
+      address,
+      label: name,
+    });
+
     router.push({
       pathname: "/journey-create/rate",
       params: {
         savedName: name,
         savedAddress: address,
         savedCategory: "",
+        // 필요시 location_id 전달
+        locationId: String(item.id ?? ''),
       },
     });
   }, [router]);
@@ -124,16 +143,14 @@ export default function LocationSearchScreen() {
       if (status !== 'granted') return;
       if (!(await Location.hasServicesEnabledAsync())) return;
 
-      const pos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const coords = pos.coords;
       const [geo] = await Location.reverseGeocodeAsync(coords);
       const label = [geo?.city || geo?.region, geo?.district, geo?.name]
         .filter(Boolean).join(' ')
         || `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`;
-      const item = { label, latitude: coords.latitude, longitude: coords.longitude };
 
+      const item = { label, title: label, address: '', id: undefined };
       await saveRecent(item);
       router.back();
     } catch {}
@@ -141,14 +158,19 @@ export default function LocationSearchScreen() {
 
   const renderRow = ({ item }) => (
     <Pressable style={styles.row} onPress={() => choose(item)}>
-      <Text numberOfLines={2} className="text-body-0 font-pretendardRegular">{item.label}</Text>
+      <View style={{ flex: 1 }}>
+        <Text numberOfLines={1} className="text-body-0 font-pretendardMedium">{item.title}</Text>
+        <Text numberOfLines={1} className="text-caption-1 font-pretendardLight" style={{ color: '#666' }}>
+          {item.address}
+        </Text>
+      </View>
     </Pressable>
   );
 
-  const renderStoredRow = (listType) => ({ item }) => (
+  const renderStoredRow = (listType) => ({ item }) => {
     <View style={styles.storedRow}>
       <Pressable style={{ flex: 1 }} onPress={() => choose(item)}>
-        <Text numberOfLines={1} className="text-body-0 font-pretendardLight">{item.label}</Text>
+        <Text numberOfLines={1} className="text-body-0 font-pretendardLight">{item.name}</Text>
       </Pressable>
       <Pressable
         onPress={async () => {
@@ -160,7 +182,7 @@ export default function LocationSearchScreen() {
         <Icon name="close" width={20} height={20} color="#AFAFAF" />
       </Pressable>
     </View>
-  );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
@@ -170,6 +192,11 @@ export default function LocationSearchScreen() {
         setQuery={setQuery}
         onSubmit={submitSearch}
         onBack={() => router.back()}
+        rightAction={{
+          icon: 'my-location',
+          onPress: setCurrentLocation,
+          tooltip: '현재 위치로',
+        }}
       />
 
       {/* 헤더 밑 구분 영역 */}
@@ -184,13 +211,7 @@ export default function LocationSearchScreen() {
           colors={["rgba(0,0,0,0.08)", "rgba(0,0,0,0)"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: 1,
-            height: 4,
-          }}
+          style={{ position: "absolute", left: 0, right: 0, top: 1, height: 4 }}
           pointerEvents="none"
         />
       </View>
@@ -203,7 +224,7 @@ export default function LocationSearchScreen() {
       ) : results.length > 0 ? (
         <FlatList
           data={results}
-          keyExtractor={(it, i) => `${it.label}-${i}`}
+          keyExtractor={(it, i) => `${it.id ?? it.label}-${i}`}
           renderItem={renderRow}
           ItemSeparatorComponent={() => <View style={styles.sep} />}
           ListHeaderComponent={() => (
@@ -218,11 +239,7 @@ export default function LocationSearchScreen() {
           <View style={styles.tabWrap}>
             <View style={styles.tabGrayLine} />
 
-            <Pressable
-              onPress={() => setTab('recent')}
-              style={styles.tabBtnLeft}
-              hitSlop={8}
-            >
+            <Pressable onPress={() => setTab('recent')} style={styles.tabBtnLeft} hitSlop={8}>
               <Text
                 onLayout={(e) => setRecentW(e.nativeEvent.layout.width)}
                 className={tab === 'recent'
@@ -232,15 +249,11 @@ export default function LocationSearchScreen() {
                 최근 검색
               </Text>
               {tab === 'recent' && (
-                <View style={[styles.activeUnderline, { width: recentW, left: 25, }]} />
+                <View style={[styles.activeUnderline, { width: recentW, left: 25 }]} />
               )}
             </Pressable>
 
-            <Pressable
-              onPress={() => setTab('saved')}
-              style={styles.tabBtnRight}
-              hitSlop={8}
-            >
+            <Pressable onPress={() => setTab('saved')} style={styles.tabBtnRight} hitSlop={8}>
               <Text
                 onLayout={(e) => setSavedW(e.nativeEvent.layout.width)}
                 className={tab === 'saved'
@@ -311,7 +324,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 24,
   },
-
   tabWrap: {
     position: 'relative',
     flexDirection: 'row',
@@ -327,20 +339,7 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#D4D4D4',
   },
-  tabBtnLeft: {
-    paddingLeft: 25,
-    paddingRight: 10,
-    position: 'relative',
-  },
-  tabBtnRight: {
-    marginLeft: 25,
-    paddingRight: 10,
-    position: 'relative',
-  },
-  activeUnderline: {
-    position: 'absolute',
-    bottom: -10,
-    height: 3,
-    backgroundColor: '#000',
-  },
+  tabBtnLeft: { paddingLeft: 25, paddingRight: 10, position: 'relative' },
+  tabBtnRight: { marginLeft: 25, paddingRight: 10, position: 'relative' },
+  activeUnderline: { position: 'absolute', bottom: -10, height: 3, backgroundColor: '#000' },
 });

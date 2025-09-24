@@ -10,16 +10,21 @@ export default function AddPlaceCard({
   category,
   address,
   rating,
+  thumb,
   onDelete,
   onPress,
   style,
 }) {
-  console.log('[AddPlaceCard] rating prop =', rating, typeof rating);
+  console.log("[AddPlaceCard] rating prop =", rating, typeof rating);
 
-  const numericRating = 
-    typeof rating === 'number'
+  const numericRating =
+    typeof rating === "number"
       ? rating
-      : parseFloat(String(rating).replace(',', '.').replace(/[^\d.]/g, '')); // '4,5' -> 4.5
+      : parseFloat(
+          String(rating)
+            .replace(",", ".")
+            .replace(/[^\d.]/g, "")
+        ); // '4,5' -> 4.5
 
   const showBadge = Number.isFinite(numericRating) && numericRating > 0;
 
@@ -31,9 +36,11 @@ export default function AddPlaceCard({
     >
       {/* 좌측 이미지 */}
       <Image
-        source={image || SAMPLE_IMAGE}
+        source={{ uri: thumb }}
         style={styles.image}
         resizeMode="cover"
+        onLoad={() => console.log("[AddPlaceCard] img loaded")}
+        onError={(e) => console.log("[AddPlaceCard] img error", e?.nativeEvent)}
       />
 
       {/* 우측 정보 */}
@@ -66,10 +73,13 @@ export default function AddPlaceCard({
 
         {/* 삭제 버튼 (맨 오른쪽 위) */}
         <Pressable onPress={onDelete} style={styles.deleteBtn}>
-          <Text className="text-gray500 text-body-2 font-pretendardMedium">
-            장소 삭제하기
-          </Text>
-          <Icon name="close" width={20} height={20} color="#AFAFAF" style={{ marginLeft: 2 }} />
+          <Icon
+            name="close"
+            width={20}
+            height={20}
+            color="#AFAFAF"
+            style={{ marginLeft: 2 }}
+          />
         </Pressable>
 
         {/* 평점 뱃지 (맨 오른쪽 아래) */}
@@ -79,7 +89,14 @@ export default function AddPlaceCard({
             <Text className="mx-[2px] mr-[13px] text-body-2 font-pretendardMedium text-green500">
               {numericRating}
             </Text>
-            <Icon name="left_arrow" width={11} height={11} color="#62974F"flip strokeWidth={4} />
+            <Icon
+              name="left_arrow"
+              width={11}
+              height={11}
+              color="#62974F"
+              flip
+              strokeWidth={4}
+            />
           </View>
         )}
       </View>
@@ -103,7 +120,7 @@ const styles = StyleSheet.create({
   right: {
     flex: 1,
     position: "relative", // 삭제 버튼 / 평점 절대 배치용 기준
-    paddingLeft: 10,       // 이미지와 제목 사이 여백
+    paddingLeft: 10, // 이미지와 제목 사이 여백
     paddingRight: 12,
   },
   title: {
@@ -136,5 +153,5 @@ const styles = StyleSheet.create({
   },
   address: {
     paddingRight: 63, // 평점 뱃지 영역 비워주기
-  }
+  },
 });
