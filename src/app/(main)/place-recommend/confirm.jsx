@@ -194,7 +194,9 @@ export default function RouteBuilderScreen() {
                   {/* 상단: 제목 + 액션 */}
                   <View style={styles.placeHeaderRow}>
                     <View style={styles.titleRatingWrap}>
-                      <Text className="text-heading-2 text-[#244DD3] font-pretendardSemiBold">
+                      <Text 
+                        className="text-heading-2 text-[#244DD3] font-pretendardSemiBold"
+                        numberOfLines={1}>
                         {placeName}
                       </Text>
                       {/* 평점이 넘어오면 표시 (없으면 숨김) */}

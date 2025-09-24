@@ -81,7 +81,10 @@ function PlaceCard({
         <View className="flex-row items-center justify-between">
           <Pressable onPress={onPressTitle} hitSlop={8} className="flex-1">
             <View className="flex-row items-center">
-              <Text className="text-heading-1 font-pretendardSemiBold text-[#244DD3]">
+              <Text
+                className="text-heading-1 font-pretendardSemiBold text-[#244DD3]"
+                numberOfLines={1}
+              >
                 {title}
               </Text>
 

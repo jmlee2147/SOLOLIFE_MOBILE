@@ -1,8 +1,10 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
+  Alert,
   Image,
   Pressable,
   SafeAreaView,
@@ -14,9 +16,41 @@ import {
 import Button from "../../../components/shared/Button";
 import Icon from "../../../components/shared/Icon";
 
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL.trim();
+
+// 개발 편의용 테스트 토큰 (env에 없으면 폴백)
+const ENV_TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN?.trim();
+
+function sanitizeToken(t) {
+  return String(t || "")
+    .trim()
+    .replace(/^Bearer\s+/i, "");
+}
+function decodeJwtPayload(token) {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+function isExpired(token) {
+  const p = decodeJwtPayload(token);
+  if (!p?.exp) return false; // exp 없으면 만료 체크 스킵(서버가 거를 것)
+  const now = Math.floor(Date.now() / 1000);
+  return p.exp <= now;
+}
+
 export default function ReviewWriteScreen() {
   const router = useRouter();
-  const { placeId, placeName, address } = useLocalSearchParams();
+  const { placeId, placeName, address, logbookId } = useLocalSearchParams();
 
   const [rating, setRating] = useState(0);
   const [content, setContent] = useState("");
@@ -71,19 +105,85 @@ export default function ReviewWriteScreen() {
     setImages((prev) => prev.filter((it) => it.uri !== uri));
   }, []);
 
-  const onSubmit = useCallback(() => {
-    const payload = {
-      placeId,
-      placeName,
-      address,
-      rating,
-      content,
-      photos: images, // [{ uri, ... }]
-    };
-    console.log("리뷰 제출:", payload);
-    router.back();
-  }, [placeId, placeName, address, rating, content, images, router]);
+  // 토큰 확보: 저장된 jwt → 만료/없으면 테스트 토큰 폴백
+  const ensureToken = useCallback(async () => {
+    let stored = await AsyncStorage.getItem("jwt");
+    stored = sanitizeToken(stored);
+    if (stored && !isExpired(stored)) return stored;
 
+    const fallback = sanitizeToken(ENV_TEST_TOKEN || FALLBACK_TEST_TOKEN);
+    if (!fallback) throw new Error("로그인이 필요합니다. (테스트 토큰 없음)");
+    // 상세/다른 화면에서도 동일 토큰 쓰게 저장
+    try {
+      await AsyncStorage.setItem("jwt", fallback);
+    } catch {}
+    return fallback;
+  }, []);
+
+  const onSubmit = useCallback(async () => {
+    try {
+      const locationIdNum = Number(placeId);
+      if (!Number.isFinite(locationIdNum)) {
+        Alert.alert("리뷰 작성", "잘못된 장소입니다.");
+        return;
+      }
+      if (!rating) {
+        Alert.alert("리뷰 작성", "별점을 선택해 주세요.");
+        return;
+      }
+      if (!content?.trim()) {
+        Alert.alert("리뷰 작성", "리뷰 내용을 입력해 주세요.");
+        return;
+      }
+
+      const contentArray = content
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const token = await ensureToken();
+
+      const body = {
+        location_id: locationIdNum,
+        rating: Number(rating),
+        content: contentArray.length ? contentArray : [content.trim()],
+        logbook_id: Number.isFinite(Number(logbookId)) ? Number(logbookId) : 0, // ✅ 여기
+      };
+
+      const res = await fetch(`${API_BASE}/reviews`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sanitizeToken(token)}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (
+          res.status === 401 ||
+          String(data?.error).toLowerCase().includes("invalid token")
+        ) {
+          await AsyncStorage.removeItem("jwt");
+          Alert.alert("리뷰 작성 실패", "로그인이 필요합니다. (토큰 무효)");
+          return;
+        }
+        Alert.alert(
+          "리뷰 작성 실패",
+          data?.error || `오류가 발생했습니다. (HTTP ${res.status})`
+        );
+        return;
+      }
+
+      router.back();
+    } catch (e) {
+      Alert.alert(
+        "리뷰 작성 실패",
+        e?.message || "알 수 없는 오류가 발생했습니다."
+      );
+    }
+  }, [placeId, rating, content, logbookId, ensureToken, router]);
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       {/* 커스텀 헤더 영역 (높이 42) */}
@@ -309,6 +409,8 @@ export default function ReviewWriteScreen() {
             </ScrollView>
           </View>
         )}
+
+        {/* NOTE: 현재 리뷰 API에는 사진 필드가 없음. 사진 업로드는 별도 엔드포인트 필요 */}
       </ScrollView>
 
       {/* 하단 바 */}

@@ -17,7 +17,12 @@ import { MOODS } from "../../../config/category.config";
 import { useToast } from "../../../providers/ToastProvider";
 import { setPendingToast } from "../../../utils/toastNext";
 
-const BASE_URL = "http://16.176.24.53:4000";
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN?.trim();
+
+function sanitizeToken(t) {
+  return String(t || "").trim().replace(/^Bearer\s+/i, "");
+}
 
 export default function RouteSaveScreen() {
   const router = useRouter();
@@ -25,15 +30,11 @@ export default function RouteSaveScreen() {
   const { showToast } = useToast();
 
   /** ---------- 파라미터 파싱 ---------- */
-  const routeNameDefault = params?.defaultName
-    ? String(params.defaultName)
-    : "";
+  const routeNameDefault = params?.defaultName ? String(params.defaultName) : "";
 
   const defaultThumbs = useMemo(() => {
-    // summary에서 넘겨주면(JSON string of URIs) 저장할 때 함께 보관
     try {
       const arr = JSON.parse(params?.thumbs || "[]");
-      // 문자열 URI면 {uri} 형태로 맞춰줌
       return Array.isArray(arr)
         ? arr.slice(0, 3).map((t) => (typeof t === "string" ? { uri: t } : t))
         : [];
@@ -43,14 +44,9 @@ export default function RouteSaveScreen() {
   }, [params?.thumbs]);
 
   const placeSummaryFromParams = useMemo(() => {
-    // summary에서 placeSummary를 넘겨줄 수도 있음
-    if (
-      typeof params?.placeSummary === "string" &&
-      params.placeSummary.trim()
-    ) {
+    if (typeof params?.placeSummary === "string" && params.placeSummary.trim()) {
       return params.placeSummary.trim();
     }
-    // 또는 placeNames(JSON array)로 넘어오면 3개까지 합쳐서 생성
     try {
       const names = JSON.parse(params?.placeNames || "[]");
       if (Array.isArray(names) && names.length) {
@@ -69,24 +65,19 @@ export default function RouteSaveScreen() {
   const suggestions = useMemo(() => MOODS ?? [], []);
 
   /** ---------- 유틸 ---------- */
-  // builder에서 전달된 장소 ID들 파싱 (array / JSON string / comma string 모두 허용)
   function getSelectedLocationIds() {
     const raw = params?.locationIds ?? params?.locations ?? null;
     if (!raw) return [];
     if (Array.isArray(raw)) {
       return raw
-        .map((x) =>
-          typeof x === "object" ? Number(x.location_id ?? x.id) : Number(x)
-        )
+        .map((x) => (typeof x === "object" ? Number(x.location_id ?? x.id) : Number(x)))
         .filter((n) => Number.isFinite(n));
     }
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         return parsed
-          .map((x) =>
-            typeof x === "object" ? Number(x.location_id ?? x.id) : Number(x)
-          )
+          .map((x) => (typeof x === "object" ? Number(x.location_id ?? x.id) : Number(x)))
           .filter((n) => Number.isFinite(n));
       }
     } catch {}
@@ -97,38 +88,22 @@ export default function RouteSaveScreen() {
   }
 
   async function ensureToken() {
-    let token = await AsyncStorage.getItem("jwt");
-    if (token) return token;
-
-    // dev fallback 로그인
-    const r = await fetch(`${BASE_URL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "test@test.com", password: "test" }),
-    });
-    const data = await r.json().catch(() => ({}));
-
-    if (r.ok && data?.token) {
-      await AsyncStorage.setItem("jwt", data.token); // << 통일
-      return data.token;
-    }
-
-    throw new Error(data?.error || "로그인 실패");
+    const t = sanitizeToken(TEST_TOKEN);
+    try {
+      await AsyncStorage.setItem("jwt", t); // 상세 화면에서도 동일 토큰 사용
+    } catch {}
+    return t;
   }
 
   /** ---------- 태그 제어 ---------- */
   const toggleTag = (t) => {
-    setSelectedTags((prev) =>
-      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
-    );
+    setSelectedTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
   };
 
   const addTag = () => {
     const v = inputTag.trim();
     if (!v) return;
-    if (!selectedTags.includes(v)) {
-      setSelectedTags((p) => [...p, v]);
-    }
+    if (!selectedTags.includes(v)) setSelectedTags((p) => [...p, v]);
     setInputTag("");
     Keyboard.dismiss();
   };
@@ -152,43 +127,45 @@ export default function RouteSaveScreen() {
     try {
       setSaving(true);
 
-      // 1) 토큰 확보
+      // 1) 토큰
       const token = await ensureToken();
 
-      // 2) /journeys 요청 바디 구성
+      // 2) 바디
       const body = {
         journey_title: title,
         locations: ids.map((id, idx) => ({
           location_id: Number(id),
-          sequence_number: idx + 1, // 전달 순서대로 보존
+          sequence_number: idx + 1,
         })),
-        // NOTE: selectedTags는 명세에 없으므로 전송 생략
+        // selectedTags는 현재 명세에 없으므로 미전송
       };
 
-      // 3) 여정 생성
+      // 3) 요청
       const res = await fetch(`${BASE_URL}/journeys`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${sanitizeToken(token)}`,
         },
         body: JSON.stringify(body),
       });
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 401 || String(data?.error).toLowerCase().includes("invalid token")) {
+          await AsyncStorage.removeItem("jwt");
+          throw new Error("로그인이 필요합니다. (토큰 무효)");
+        }
         const msg =
           data?.error ||
-          (res.status === 401
-            ? "로그인이 필요합니다."
-            : `저장에 실패했어요. (HTTP ${res.status})`);
+          (res.status === 401 ? "로그인이 필요합니다." : `저장에 실패했어요. (HTTP ${res.status})`);
         throw new Error(msg);
       }
 
       const journeyId = String(data?.journey_id);
       if (!journeyId) throw new Error("서버 응답에 journey_id가 없습니다.");
 
-      // ----- 여기서 저장소 카드용 메타를 로컬에 기록 -----
+      // 4) 메타 저장 (상세 화면 카드용)
       const thumbsParam = (() => {
         try {
           return JSON.parse(params?.thumbs ?? "[]");
@@ -200,34 +177,38 @@ export default function RouteSaveScreen() {
         typeof params?.placeSummary === "string" ? params.placeSummary : "";
       const meta = {
         thumbs: Array.isArray(thumbsParam) ? thumbsParam : [],
-        placeSummary: placeSummaryParam,
+        placeSummary: placeSummaryParam || placeSummaryFromParams || "",
+        title,
       };
       try {
-        await AsyncStorage.setItem(
-          `journey_meta_${journeyId}`,
-          JSON.stringify(meta)
-        );
+        await AsyncStorage.setItem(`journey_meta_${journeyId}`, JSON.stringify(meta));
       } catch (e) {
         console.warn("[save] set journey_meta failed:", e?.message);
       }
 
-      // 5) 성공 → 저장소/루트 상세로 이동
-      // 토스트 예약
+      // 5) 토스트 예약 + 라우팅
       await setPendingToast({
         type: "success",
         message: "루트 저장 완료!",
         subText: "저장소에 추가됨",
-        duration: 3000, 
+        duration: 3000,
         targetRoute: "/home",
       });
 
-      // 라우팅 (홈으로)
       router.replace("/home");
+
+      // 바로 상세로 가고 싶으면 아래 주석 해제
+      // router.replace({
+      //   pathname: "/(main)/routes/[id]",
+      //   params: {
+      //     id: journeyId,
+      //     title,
+      //     placeSummary: meta.placeSummary,
+      //     thumbs: JSON.stringify(meta.thumbs),
+      //   },
+      // });
     } catch (e) {
-      Alert.alert(
-        "루트 저장 실패",
-        e?.message || "알 수 없는 오류가 발생했어요."
-      );
+      Alert.alert("루트 저장 실패", e?.message || "알 수 없는 오류가 발생했어요.");
     } finally {
       setSaving(false);
     }
@@ -246,10 +227,8 @@ export default function RouteSaveScreen() {
 
       <View>
         {/* 루트 이름 */}
-        <View style={styles.section}>
-          <Text className="text-heading-1 font-pretendardSemiBold">
-            루트 이름을 작성해주세요.
-          </Text>
+        <View className="px-[25px] pt-[20px]">
+          <Text className="text-heading-1 font-pretendardSemiBold">루트 이름을 작성해주세요.</Text>
 
           <TextInput
             value={routeName}
@@ -263,12 +242,9 @@ export default function RouteSaveScreen() {
         </View>
 
         {/* 태그 선택 */}
-        <View style={styles.section}>
-          <Text className="text-heading-1 font-pretendardSemiBold">
-            루트 태그 선택
-          </Text>
+        <View className="px-[25px] pt-[20px]">
+          <Text className="text-heading-1 font-pretendardSemiBold">루트 태그 선택</Text>
 
-          {/* 직접 입력 */}
           <TextInput
             value={inputTag}
             onChangeText={setInputTag}
@@ -279,20 +255,14 @@ export default function RouteSaveScreen() {
             onSubmitEditing={addTag}
           />
 
-          {/* 선택된 태그 */}
           {selectedTags.length > 0 && (
-            <View
-              style={{ marginTop: 10, flexDirection: "row", flexWrap: "wrap" }}
-            >
+            <View style={{ marginTop: 10, flexDirection: "row", flexWrap: "wrap" }}>
               {selectedTags.map((t) => (
                 <Pressable
                   key={`sel-${t}`}
                   onPress={() => toggleTag(t)}
                   style={[styles.pill, styles.pillActive]}
-                  android_ripple={{
-                    color: "rgba(0,0,0,0.06)",
-                    borderless: true,
-                  }}
+                  android_ripple={{ color: "rgba(0,0,0,0.06)", borderless: true }}
                 >
                   <Text style={[styles.pillText, { color: "#fff" }]}>{t}</Text>
                 </Pressable>
@@ -320,15 +290,6 @@ export default function RouteSaveScreen() {
 
 /** ---------- styles ---------- */
 const styles = StyleSheet.create({
-  section: {
-    paddingHorizontal: 25,
-    paddingTop: 20,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "800",
-    marginBottom: 12,
-  },
   input: {
     marginTop: 12,
     borderRadius: 999,

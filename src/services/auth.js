@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const BASE_URL = "http://16.176.24.53:4000";
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
 
 async function debugLogin() {
   const url = `${BASE_URL}/auth/login`;

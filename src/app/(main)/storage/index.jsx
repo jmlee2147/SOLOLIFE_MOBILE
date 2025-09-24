@@ -1,22 +1,22 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    ActivityIndicator,
-    Dimensions,
-    FlatList,
-    Image,
-    Pressable,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Image,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SortDropdown from "../../../components/journey/SortDropdown";
@@ -28,7 +28,7 @@ const GAP = 14;
 const H_PADDING = 25;
 const ITEM_W = (SCREEN_W - H_PADDING * 2 - GAP * (COLS - 1)) / COLS;
 
-const BASE_URL = "http://16.176.24.53:4000";
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
 const SAMPLE = require("../../../assets/images/sample.png");
 
 export default function StorageScreen() {
