@@ -1,14 +1,17 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Image, SafeAreaView, Text, View } from "react-native";
+import { SafeAreaView, Text, View } from "react-native";
+import MonkeyLoadingVideo from "../../../components/animation/MonkeyLoading"; // ⬅️ 추가
 import Header from "../../../components/shared/Header";
 import { postRouteNext } from "../../../services/api";
 
-const CHARACTER = require("../../../assets/images/monkey-run.png");
-
 const parseJsonArray = (v) => {
-  try { const a = JSON.parse(String(v ?? "[]")); return Array.isArray(a) ? a : []; }
-  catch { return []; }
+  try {
+    const a = JSON.parse(String(v ?? "[]"));
+    return Array.isArray(a) ? a : [];
+  } catch {
+    return [];
+  }
 };
 
 export default function LoadingRouteScreen() {
@@ -16,7 +19,10 @@ export default function LoadingRouteScreen() {
   const params = useLocalSearchParams();
 
   // confirm/index에서 넘어온 값 복구
-  const moods = useMemo(() => parseJsonArray(params.moodsKo || params.moods), [params]);
+  const moods = useMemo(
+    () => parseJsonArray(params.moodsKo || params.moods),
+    [params]
+  );
   const region = useMemo(() => String(params.region ?? ""), [params]);
 
   // 필수: first (URI-encoded JSON)
@@ -32,9 +38,12 @@ export default function LoadingRouteScreen() {
         location_name: String(o.location_name ?? ""),
         category: o.category ? String(o.category) : undefined,
         address: String(o.address ?? ""),
-        lat, lng,
+        lat,
+        lng,
       };
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }, [params.first]);
 
   const [err, setErr] = useState("");
@@ -43,16 +52,15 @@ export default function LoadingRouteScreen() {
     let canceled = false;
 
     async function run() {
-      // first가 없으면 여기서 멈춤 (자동 이동 X)
       if (!first) {
-        setErr("처음 선택한 장소 정보가 유효하지 않아요. 뒤로 가서 다시 시도해 주세요.");
+        setErr(
+          "처음 선택한 장소 정보가 유효하지 않아요. 뒤로 가서 다시 시도해 주세요."
+        );
         return;
       }
 
-      // 최소 체류 시간(시각적 안정)
       const minDelay = new Promise((r) => setTimeout(r, 600));
 
-      // 단계적 조건 완화
       const base = {
         moods,
         exclude_location_ids: first.location_id ? [first.location_id] : [],
@@ -77,7 +85,6 @@ export default function LoadingRouteScreen() {
         } catch {}
       }
 
-      // 유니크 상위 2개만
       const seen = new Set();
       const uniq = [];
       for (const it of merged) {
@@ -91,22 +98,22 @@ export default function LoadingRouteScreen() {
       await minDelay;
       if (canceled) return;
 
-      // summary로 이동 (summary가 fallback 처리함)
       router.replace({
         pathname: "/route-builder/summary",
         params: {
           first: String(params.first || ""),
           region,
           moodsKo: JSON.stringify(moods),
-          prefetched: JSON.stringify(uniq), // 옵션
+          prefetched: JSON.stringify(uniq),
         },
       });
     }
 
     run();
-    return () => { canceled = true; };
+    return () => {
+      canceled = true;
+    };
   }, [first, moods, region, router, params.first]);
-  
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -118,7 +125,9 @@ export default function LoadingRouteScreen() {
         onRightPress={() => router.push("/home")}
       />
       <View style={{ flex: 1, alignItems: "center", paddingTop: 143 }}>
-        <Text className="text-title-1 font-pretendardExtraBold">루트 생성 중이에요.</Text>
+        <Text className="text-title-1 font-pretendardExtraBold">
+          루트 생성 중이에요.
+        </Text>
         <Text className="mt-2 text-heading-3 text-gray700 font-pretendardMedium">
           딱 맞는 루트를 추천해드릴게요!
         </Text>
@@ -126,12 +135,22 @@ export default function LoadingRouteScreen() {
           잠시만 기다려 주세요.
         </Text>
 
-        {/* 3D 캐릭터 이미지 */}
-        <Image source={CHARACTER} style={{ width: 240, height: 240, resizeMode: "contain", marginTop: 24 }} />
-        <ActivityIndicator size="large" style={{ marginTop: 28 }} />
+        {/* 이미지 → mp4 비디오로 교체 */}
+        <MonkeyLoadingVideo
+          // 필요 시 커스텀 경로: source={require("../../../assets/videos/monkey-walk.mp4")}
+          height={300}
+          mirror
+        />
 
         {!!err && (
-          <Text style={{ marginTop: 16, color: "#EF4444", paddingHorizontal: 24, textAlign: "center" }}>
+          <Text
+            style={{
+              marginTop: 16,
+              color: "#EF4444",
+              paddingHorizontal: 24,
+              textAlign: "center",
+            }}
+          >
             {err}
           </Text>
         )}
