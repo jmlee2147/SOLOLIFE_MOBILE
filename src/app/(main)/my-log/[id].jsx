@@ -2,15 +2,16 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import Button from "../../../components/shared/Button";
 import Icon from "../../../components/shared/Icon";
@@ -18,7 +19,7 @@ import Icon from "../../../components/shared/Icon";
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL;
 const TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN;
 
-/* ---------- UI helpers ---------- */
+/* ---------- small ui ---------- */
 function StarRow({ value }) {
   if (value == null) return null;
   const stars = Array.from({ length: 5 }).map((_, i) => {
@@ -47,7 +48,18 @@ function fmtDate(iso) {
   return `${y}.${m}.${day}`;
 }
 
-/* ---------- API calls ---------- */
+/* ---------- caches & utils ---------- */
+const USER_CACHE = new Map(); // userId -> { name }
+const LOC_CACHE = new Map(); // locationId -> { name, address, thumb }
+
+function raceTimeout(promise, ms = 1500) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
+/* ---------- API ---------- */
 async function getLogbook(logbookId, { signal } = {}) {
   if (!API_BASE) throw new Error("API base missing");
   const url = `${API_BASE.replace(/\/+$/, "")}/logbooks/${logbookId}`;
@@ -67,6 +79,8 @@ async function getLogbook(logbookId, { signal } = {}) {
 
 async function getUser(userId, { signal } = {}) {
   if (!API_BASE || !userId) return null;
+  if (USER_CACHE.has(userId)) return USER_CACHE.get(userId);
+
   const url = `${API_BASE.replace(/\/+$/, "")}/users/${userId}`;
   try {
     const res = await fetch(url, {
@@ -77,7 +91,12 @@ async function getUser(userId, { signal } = {}) {
       },
     });
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    const name =
+      data?.nickname || data?.display_name || data?.name || `작성자 #${userId}`;
+    const packed = { name };
+    USER_CACHE.set(userId, packed);
+    return packed;
   } catch {
     return null;
   }
@@ -85,6 +104,8 @@ async function getUser(userId, { signal } = {}) {
 
 async function getLocation(locationId, { signal } = {}) {
   if (!API_BASE || !locationId) return null;
+  if (LOC_CACHE.has(locationId)) return LOC_CACHE.get(locationId);
+
   const url = `${API_BASE.replace(/\/+$/, "")}/locations/${locationId}`;
   try {
     const res = await fetch(url, {
@@ -96,62 +117,105 @@ async function getLocation(locationId, { signal } = {}) {
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return {
-      name: data.location_name || data.title || data.name || "",
-      address: data.address || data.formatted_address || data.addr || "",
+    const root = data?.location || data || {};
+    const packed = {
+      name: root.location_name || root.title || root.name || "",
+      address: root.address || root.formatted_address || root.addr || "",
+      thumb:
+        root.thumbnail_url ||
+        root.cover?.thumbnail_url ||
+        root.images?.[0]?.thumbnail_url ||
+        root.cover?.url ||
+        "",
     };
+    LOC_CACHE.set(locationId, packed);
+    return packed;
   } catch {
     return null;
   }
 }
 
-/**
- * (선택) 리뷰 엔드포인트가 있을 때 사용.
- * 없으면 404일 수 있으니 try/catch로 무시.
- * 기대 형태(예시):
- * [
- *   { review_id: 1, location_id: 101, rating: 4 },
- *   { review_id: 2, location_id: 205, rating: 5 },
- * ]
+/** detail에 들어있는 장소 배열(places)이 있으면 그걸 우선 사용.
+ * 각 원소: { locationId, rating } 가정. (스펙 2) POST 참고)
+ * 없으면 fallback으로 location_id 단일 사용.
  */
-async function getReviewsByLogbook(logbookId, { signal } = {}) {
-  if (!API_BASE || !logbookId) return [];
-  const url = `${API_BASE.replace(/\/+$/, "")}/reviews?logbookId=${logbookId}`;
-  try {
-    const res = await fetch(url, {
-      signal,
-      headers: {
-        Accept: "application/json",
-        ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
-      },
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data)
-      ? data
-      : Array.isArray(data?.items)
-      ? data.items
-      : [];
-  } catch {
-    return [];
+async function resolvePlaces(detail, { signal } = {}) {
+  // 1) 배열 우선
+  if (Array.isArray(detail?.places) && detail.places.length > 0) {
+    // 중복 locationId 제거
+    const uniq = [];
+    const seen = new Set();
+    for (const p of detail.places) {
+      const id = Number(p?.locationId);
+      if (!Number.isFinite(id) || seen.has(id)) continue;
+      seen.add(id);
+      uniq.push({ locationId: id, rating: Number(p?.rating) || null });
+    }
+    if (uniq.length === 0) return [];
+
+    // 메타 병렬 fetch (타임아웃 내에서)
+    const metas = await Promise.all(
+      uniq.map(async (p, idx) => {
+        const loader = idx === 0
+            ? getLocation(p.locationId, { signal })
+            : reaceTimeout(getLocation(p.locationId, { signal }), 8000);
+        const meta = await loader;
+        return { ...p, meta };
+      })
+    );
+
+    // 출력 형태로 변환
+    return metas.map((it) => ({
+      id: String(it.locationId),
+      name: it.meta?.name || "",
+      address: it.meta?.address || "",
+      rating: it.rating ?? null,
+      thumb: it.meta?.thumb || "",
+    }));
   }
+
+  // 2) 단일 location_id fallback
+  if (detail?.location_id) {
+    const locationId = Number(detail.location_id);
+    const meta = await raceTimeout(getLocation(locationId, { signal }), 1500);
+    return [
+      {
+        id: String(locationId),
+        name: meta?.name || "",
+        address: meta?.address || "",
+        rating: null,
+        thumb: meta?.thumb || "",
+      },
+    ];
+  }
+
+  return [];
 }
 
 /* ---------- Page ---------- */
-export default function ExplorerPostDetail() {
+export default function MyLogDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams();
 
+  // 라우트 파라미터 정규화 (+ 리스트에서 넘어온 낙관값)
+  const id = String(params?.id ?? "").replace(/[^0-9]/g, "");
+  const optimisticTitle = typeof params?.t === "string" ? params.t : "";
+  const optimisticDate = typeof params?.d === "string" ? params.d : "";
+  const optimisticThumb = typeof params?.thumb === "string" ? params.thumb : "";
+
+  // 상태
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
 
-  // 서버 데이터
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(optimisticTitle);
   const [createdAt, setCreatedAt] = useState("");
   const [body, setBody] = useState("");
-  const [authorName, setAuthorName] = useState("");
-  const [places, setPlaces] = useState([]); // [{id, name, address, rating?}]
-  const [tags, setTags] = useState([]); // 스펙에 없으니 일단 빈배열
+  const [authorName, setAuthorName] = useState("탐험가");
+  const [places, setPlaces] = useState([]); // [{id, name, address, rating?, thumb?}]
+  const [images, setImages] = useState(
+    optimisticThumb ? [optimisticThumb] : []
+  );
+  const [tags, setTags] = useState([]);
 
   // 입력창
   const [quickText, setQuickText] = useState("");
@@ -165,117 +229,69 @@ export default function ExplorerPostDetail() {
         setLoading(true);
         setErr(null);
 
-        // 1) 로그북 상세
+        // 1) 로그북 상세 — 도착 즉시 기본 정보 렌더
         const detail = await getLogbook(id, { signal: ac.signal });
 
-        setTitle(detail?.entry_title || "");
+        setTitle(detail?.entry_title || optimisticTitle || "(제목 없음)");
         setCreatedAt(detail?.created_at || detail?.updated_at || "");
         setBody(detail?.entry_content || "");
+        const imgs = Array.isArray(detail?.image_urls) ? detail.image_urls : [];
+        if (imgs.length > 0) setImages(imgs);
+        else if (optimisticThumb) setImages([optimisticThumb]);
 
-        // 2) 작성자
-        if (detail?.user_id) {
-          const user = await getUser(detail.user_id, { signal: ac.signal });
-          const name =
-            user?.nickname ||
-            user?.display_name ||
-            user?.name ||
-            `작성자 #${detail.user_id}`;
-          setAuthorName(name);
-        } else {
-          setAuthorName("탐험가");
-        }
-
-        // 3) 여러 장소 처리
-        // 3-1) 서버가 detail.places 배열을 줄 경우 (가장 이상적)
-        let locationIds = [];
-        let ratingMap = new Map(); // locId -> ratings[]
-
-        if (Array.isArray(detail?.places) && detail.places.length > 0) {
-          locationIds = detail.places
-            .map((p) => Number(p.locationId ?? p.location_id ?? p.id))
-            .filter((n) => Number.isFinite(n));
-          // 평점이 있다면 모아두기
-          detail.places.forEach((p) => {
-            const locId = Number(p.locationId ?? p.location_id ?? p.id);
-            const r = Number(p.rating);
-            if (Number.isFinite(locId) && Number.isFinite(r)) {
-              if (!ratingMap.has(locId)) ratingMap.set(locId, []);
-              ratingMap.get(locId).push(r);
-            }
-          });
-        } else {
-          // 3-2) 리뷰로부터 장소 추론 (엔드포인트 있을 때만)
-          const reviews = await getReviewsByLogbook(id, { signal: ac.signal });
-          if (Array.isArray(reviews) && reviews.length > 0) {
-            for (const rv of reviews) {
-              const locId = Number(rv.location_id ?? rv.locationId);
-              if (Number.isFinite(locId)) {
-                locationIds.push(locId);
-                const r = Number(rv.rating);
-                if (Number.isFinite(r)) {
-                  if (!ratingMap.has(locId)) ratingMap.set(locId, []);
-                  ratingMap.get(locId).push(r);
-                }
-              }
-            }
-          }
-          // 3-3) 그래도 비어 있으면 단일 location_id라도
-          if (locationIds.length === 0 && detail?.location_id) {
-            const solo = Number(detail.location_id);
-            if (Number.isFinite(solo)) locationIds = [solo];
-          }
-        }
-
-        // 중복 제거
-        locationIds = Array.from(new Set(locationIds));
-
-        if (locationIds.length === 0) {
-          setPlaces([]);
-        } else {
-          // 각 장소 메타 병렬 조회
-          const metas = await Promise.all(
-            locationIds.map(async (locId) => {
-              const meta = await getLocation(locId, { signal: ac.signal });
-              // 평점 평균(있을 때만)
-              const ratings = ratingMap.get(locId) || [];
-              const rating =
-                ratings.length > 0
-                  ? Math.round(
-                      (ratings.reduce((a, b) => a + b, 0) / ratings.length) * 2
-                    ) / 2
-                  : null;
-
-              return meta
-                ? {
-                    id: String(locId),
-                    name: meta.name,
-                    address: meta.address,
-                    rating,
-                  }
-                : { id: String(locId), name: "", address: "", rating };
-            })
+        // 화면은 먼저 보여주기 위해 loading 끄기 전에 부가데이터 병렬로 시작
+        // 2) 작성자 + 3) 장소 배열/단일 동시 처리
+        const userPromise = (async () => {
+          const userId = detail?.user_id;
+          if (!userId) return null;
+          const u = await raceTimeout(
+            getUser(userId, { signal: ac.signal }),
+            1500
           );
+          return u; // { name }
+        })();
 
-          setPlaces(metas);
+        const placesPromise = resolvePlaces(detail, { signal: ac.signal });
+
+        const [userMeta, placesArr] = await Promise.all([
+          userPromise,
+          placesPromise,
+        ]);
+
+        if (userMeta?.name) setAuthorName(userMeta.name);
+        else setAuthorName((v) => v || "탐험가");
+
+        setPlaces(placesArr);
+
+        // 장소 썸네일로 대표 이미지 보강(이미 이미지가 없고, 장소 thumb가 있으면)
+        if ((!imgs || imgs.length === 0) && !optimisticThumb) {
+          const firstThumb = placesArr.find((p) => p.thumb)?.thumb;
+          if (firstThumb) setImages([firstThumb]);
         }
 
-        // 4) 태그 (서버가 주면 사용)
+        // 태그(서버 제공 시 매핑)
         setTags(Array.isArray(detail?.keywords) ? detail.keywords : []);
+
+        setLoading(false);
       } catch (e) {
-        if (!ac.signal.aborted) setErr("기록을 불러오지 못했어요.");
-      } finally {
-        if (!ac.signal.aborted) setLoading(false);
+        if (!ac.signal.aborted) {
+          setErr("기록을 불러오지 못했어요.");
+          setLoading(false);
+        }
       }
     })();
 
     return () => ac.abort();
-  }, [id]);
+  }, [id, optimisticTitle, optimisticThumb]);
 
-  const dateStr = useMemo(() => fmtDate(createdAt), [createdAt]);
+  const dateStr = useMemo(() => {
+    if (createdAt) return fmtDate(createdAt);
+    return optimisticDate || "";
+  }, [createdAt, optimisticDate]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
-      {/* 상단바: 뒤로가기 / 작성자 / 옵션 */}
+      {/* 상단바 */}
       <View
         style={{
           height: 42,
@@ -327,11 +343,74 @@ export default function ExplorerPostDetail() {
       </View>
 
       {loading ? (
-        <View
-          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-        >
-          <ActivityIndicator />
-        </View>
+        images.length === 0 && !title ? (
+          <View
+            style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+          >
+            <ActivityIndicator />
+          </View>
+        ) : (
+          <KeyboardAvoidingView
+            behavior={Platform.select({ ios: "padding", android: undefined })}
+            style={{ flex: 1 }}
+          >
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 110 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {images[0] ? (
+                <Image
+                  source={{ uri: images[0] }}
+                  style={{
+                    width: "100%",
+                    height: 220,
+                    backgroundColor: "#eee",
+                  }}
+                  resizeMode="cover"
+                />
+              ) : null}
+
+              <View
+                style={{
+                  paddingHorizontal: 25,
+                  paddingVertical: 20,
+                  backgroundColor: "#fff",
+                  borderBottomWidth: 1,
+                  borderBottomColor: "#D4D4D4",
+                }}
+              >
+                <Text className="text-body-1 font-pretendardMedium">
+                  {title || "(제목 없음)"}
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  paddingHorizontal: 25,
+                  paddingVertical: 16,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "#D4D4D4",
+                  backgroundColor: "#fff",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Icon name="time" width={24} height={24} />
+                  <Text
+                    className="text-body-1 font-pretendardMedium text-gray700"
+                    style={{ marginLeft: 7 }}
+                  >
+                    {dateStr}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ paddingVertical: 24 }}>
+                <ActivityIndicator />
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        )
       ) : err ? (
         <View
           style={{
@@ -353,6 +432,15 @@ export default function ExplorerPostDetail() {
             contentContainerStyle={{ paddingBottom: 110 }}
             showsVerticalScrollIndicator={false}
           >
+            {/* 대표 이미지 */}
+            {images[0] ? (
+              <Image
+                source={{ uri: images[0] }}
+                style={{ width: "100%", height: 220, backgroundColor: "#eee" }}
+                resizeMode="cover"
+              />
+            ) : null}
+
             {/* 제목 */}
             <View
               style={{
@@ -420,7 +508,7 @@ export default function ExplorerPostDetail() {
               )}
             </View>
 
-            {/* 방문 장소 리스트 (여러 개) */}
+            {/* 방문 장소 — 여러 개 지원 */}
             {places.length > 0 && (
               <View
                 style={{
@@ -474,7 +562,6 @@ export default function ExplorerPostDetail() {
                   paddingHorizontal: 16,
                   paddingVertical: 16,
                   minHeight: 220,
-                  justifyContent: "flex-start",
                 }}
               >
                 <Text
@@ -509,7 +596,7 @@ export default function ExplorerPostDetail() {
               />
             </View>
 
-            {/* 반응 바 (UI만) */}
+            {/* 반응 바 (placeholder) */}
             <View
               style={{
                 paddingTop: 10,
@@ -573,7 +660,7 @@ export default function ExplorerPostDetail() {
                   placeholderTextColor="#6B6B6B"
                   multiline
                   style={{
-                    minHeight: 44,
+                    minHeight: 20,
                     fontFamily: "Pretendard-Regular",
                     fontSize: 14,
                     lineHeight: 20,

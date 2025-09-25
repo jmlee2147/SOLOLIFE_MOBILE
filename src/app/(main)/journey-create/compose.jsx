@@ -26,6 +26,15 @@ const DRAFT_KEY = "journey_draft_places_v1";
 const POST_DRAFT_KEY = "journey_post_draft_v1";
 const POSTS_KEY = "journey_posts_v1";
 
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL; // e.g. https://api.example.com
+const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN; // Bearer 토큰 (.env)
+
+function toHttpImageUrls(images = []) {
+  return images
+    .map((it) => String(it?.uri || ""))
+    .filter((u) => /^https?:\/\//i.test(u)); // 업로드 API 없으니 http(s)만 전송
+}
+
 async function loadDraftPlaces() {
   try {
     const raw = await AsyncStorage.getItem(DRAFT_KEY);
@@ -63,6 +72,63 @@ async function savePost(finalPost) {
   } catch {}
 }
 
+async function postLogbook({ title, body, isPrivate, places, images }) {
+  if (!API_BASE) throw new Error("API base is empty");
+  if (!TEST_TOKEN)
+    throw new Error("Unauthorized: EXPO_PUBLIC_TEST_TOKEN missing");
+
+  // places -> [{ locationId, rating }]
+  const placePayload = (Array.isArray(places) ? places : [])
+    .map((p) => {
+      const locId = Number(p.locationId ?? p.id);
+      if (!Number.isFinite(locId)) return null;
+
+      // 1~5로 클램프 (소수 허용하면 Math.round/Math.floor 조정)
+      const ratingNum = Number(p.rating);
+      const rating = Number.isFinite(ratingNum)
+        ? Math.max(1, Math.min(5, ratingNum))
+        : 5; // 기본값 5 등 원하는 기본값
+
+      return { locationId: locId, rating };
+    })
+    .filter(Boolean);
+
+  const image_urls = toHttpImageUrls(images);
+
+  const bodyJson = {
+    entry_title: String(title || "").trim(), // 필수
+    entry_content: String(body || "").trim(), // 본문이 있을 때만 서버가 리뷰 자동생성 시도
+    is_public: !isPrivate,
+    image_urls,
+    ...(placePayload.length ? { places: placePayload } : {}),
+    ...(placePayload.length ? { location_id: placePayload[0].locationId } : {}),
+  };
+
+  if (!bodyJson.entry_title) throw new Error("Title is required");
+
+  const url = `${API_BASE.replace(/\/+$/, "")}/logbooks`;
+  // console.log("[compose] POST", url, bodyJson); // 디버깅용
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${TEST_TOKEN}`,
+    },
+    body: JSON.stringify(bodyJson),
+  });
+
+  if (!res.ok) {
+    const errTxt = await res.text().catch(() => "");
+    // console.log("[compose] POST /logbooks error", res.status, errTxt?.slice(0, 300));
+    throw new Error(`POST /logbooks ${res.status}`);
+  }
+
+  const data = await res.json();
+  // console.log("[compose] POST /logbooks ok", data?.logbook_id);
+  return data;
+}
+
 function formatDate(date = new Date()) {
   const y = date.getFullYear();
   const m = (date.getMonth() + 1).toString().padStart(2, "0");
@@ -93,7 +159,10 @@ export default function ComposeScreen() {
   // 초기 로드: 장소 드래프트 + 포스트 드래프트
   useEffect(() => {
     (async () => {
-      const [pl, draft] = await Promise.all([loadDraftPlaces(), loadPostDraft()]);
+      const [pl, draft] = await Promise.all([
+        loadDraftPlaces(),
+        loadPostDraft(),
+      ]);
       setPlaces(pl);
 
       if (draft) {
@@ -109,7 +178,14 @@ export default function ComposeScreen() {
 
   // 변경 시 글쓰기 드래프트 자동 저장(간단)
   useEffect(() => {
-    const draft = { title, body, tags, isPrivate, date: date.toISOString(), images };
+    const draft = {
+      title,
+      body,
+      tags,
+      isPrivate,
+      date: date.toISOString(),
+      images,
+    };
     savePostDraft(draft);
   }, [title, body, tags, isPrivate, date, images]);
 
@@ -125,21 +201,21 @@ export default function ComposeScreen() {
   }, []);
 
   const onPressSave = useCallback(async () => {
-    const post = {
-      id: `${Date.now()}`,
-      date: date.toISOString(),
-      title: title.trim(),
-      body: body.trim(),
-      tags,
-      isPrivate,
-      places,
-      images,
-    };
-
-    await savePost(post);
-    await clearPostDraft();
-    router.replace("/journey-create");
-  }, [date, title, body, tags, isPrivate, places, images, router]);
+    try {
+      await postLogbook({
+        title,
+        body,
+        isPrivate,
+        places, // { locationId(정수), rating } 포함
+        images, // http(s)만 전송
+      });
+      await clearPostDraft();
+      router.replace("/journey-create");
+    } catch (e) {
+      // console.log("[compose] save error", String(e?.message || e));
+      // TODO: 토스트/알럿 연결 가능
+    }
+  }, [title, body, isPrivate, places, images, router]);
 
   // 카메라/갤러리 구현
 
@@ -179,7 +255,7 @@ export default function ComposeScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true, // iOS 14+/Web에서 동시 선택 가능
-      selectionLimit: 10,            // 플랫폼에 따라 1로 fallback 될 수 있음
+      selectionLimit: 10, // 플랫폼에 따라 1로 fallback 될 수 있음
       quality: 0.9,
       exif: false,
     });
@@ -209,17 +285,30 @@ export default function ComposeScreen() {
             paddingHorizontal: 25,
           }}
         >
-          <Pressable onPress={() => router.back()} hitSlop={8} style={{ padding: 4 }}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={8}
+            style={{ padding: 4 }}
+          >
             <Icon name="previous" width={24} height={24} />
           </Pressable>
 
           <Pressable
             onPress={() => {}}
-            style={{ flexDirection: "row", alignItems: "center", marginLeft: 16 }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginLeft: 16,
+            }}
             hitSlop={8}
           >
             <Text className="text-body-1 font-pretendardMedium">{dateStr}</Text>
-            <Icon name="down_arrow" width={14} height={14} style={{ marginLeft: 5 }} />
+            <Icon
+              name="down_arrow"
+              width={14}
+              height={14}
+              style={{ marginLeft: 5 }}
+            />
           </Pressable>
 
           <View style={{ flex: 1 }} />
@@ -284,11 +373,17 @@ export default function ComposeScreen() {
             >
               <Icon name="location" width={24} height={24} />
               <View style={{ flex: 1, marginLeft: 5 }}>
-                <Text className="text-body-1 font-pretendardMedium" numberOfLines={1}>
+                <Text
+                  className="text-body-1 font-pretendardMedium"
+                  numberOfLines={1}
+                >
                   {p.name}
                 </Text>
                 {!!p.address && (
-                  <Text className="text-gray700 text-body-3 font-pretendardRegular" numberOfLines={1}>
+                  <Text
+                    className="text-gray700 text-body-3 font-pretendardRegular"
+                    numberOfLines={1}
+                  >
                     {p.address}
                   </Text>
                 )}
@@ -311,13 +406,22 @@ export default function ComposeScreen() {
                 <Text className="text-body-2 font-pretendardMedium text-green500 ml-[2px] mr-[12px]">
                   {p.rating}
                 </Text>
-                <Icon name="left_arrow" width={11} height={11} color="#62974F" flip strokeWidth={4} />
+                <Icon
+                  name="left_arrow"
+                  width={11}
+                  height={11}
+                  color="#62974F"
+                  flip
+                  strokeWidth={4}
+                />
               </View>
             </View>
           ))}
         </View>
 
-        <View style={{ height: 1, backgroundColor: "#D4D4D4", marginTop: 21 }} />
+        <View
+          style={{ height: 1, backgroundColor: "#D4D4D4", marginTop: 21 }}
+        />
 
         {/* 본문 + 태그 + 이미지 미리보기 */}
         <KeyboardAvoidingView
@@ -339,10 +443,17 @@ export default function ComposeScreen() {
               <View style={{ marginBottom: 16 }}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {images.map((img) => (
-                    <View key={img.uri} style={{ marginRight: 10, position: "relative" }}>
+                    <View
+                      key={img.uri}
+                      style={{ marginRight: 10, position: "relative" }}
+                    >
                       <Image
                         source={{ uri: img.uri }}
-                        style={{ width: 96, height: 96, backgroundColor: "#F2F2F2" }}
+                        style={{
+                          width: 96,
+                          height: 96,
+                          backgroundColor: "#F2F2F2",
+                        }}
                       />
                       <Pressable
                         onPress={() => removeImage(img.uri)}
@@ -359,7 +470,12 @@ export default function ComposeScreen() {
                           justifyContent: "center",
                         }}
                       >
-                        <Icon name="close" width={14} height={14} color="#fff" />
+                        <Icon
+                          name="close"
+                          width={14}
+                          height={14}
+                          color="#fff"
+                        />
                       </Pressable>
                     </View>
                   ))}
@@ -413,7 +529,13 @@ export default function ComposeScreen() {
                 }}
               />
               {/* 태그 칩 */}
-              <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 10 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  marginTop: 10,
+                }}
+              >
                 {tags.map((t) => (
                   <View
                     key={t}
@@ -428,9 +550,20 @@ export default function ComposeScreen() {
                       marginBottom: 8,
                     }}
                   >
-                    <Text className="text-body-2 font-pretendardMedium">{t}</Text>
-                    <Pressable onPress={() => removeTag(t)} hitSlop={8} style={{ marginLeft: 6 }}>
-                      <Icon name="close" width={14} height={14} color="#9A9A9A" />
+                    <Text className="text-body-2 font-pretendardMedium">
+                      {t}
+                    </Text>
+                    <Pressable
+                      onPress={() => removeTag(t)}
+                      hitSlop={8}
+                      style={{ marginLeft: 6 }}
+                    >
+                      <Icon
+                        name="close"
+                        width={14}
+                        height={14}
+                        color="#9A9A9A"
+                      />
                     </Pressable>
                   </View>
                 ))}
@@ -456,11 +589,19 @@ export default function ComposeScreen() {
           }}
         >
           {/* 아이콘 3개 */}
-          <Pressable onPress={onPressCamera} hitSlop={10} style={{ paddingLeft: 9 }}>
+          <Pressable
+            onPress={onPressCamera}
+            hitSlop={10}
+            style={{ paddingLeft: 9 }}
+          >
             <Icon name="camera_outline" width={24} height={24} />
           </Pressable>
 
-          <Pressable onPress={onPressGallery} hitSlop={10} style={{ marginLeft: 39 }}>
+          <Pressable
+            onPress={onPressGallery}
+            hitSlop={10}
+            style={{ marginLeft: 39 }}
+          >
             <Icon name="gallery_outline" width={24} height={24} />
           </Pressable>
 
@@ -468,7 +609,11 @@ export default function ComposeScreen() {
           <Pressable
             onPress={() => setIsPrivate((v) => !v)}
             hitSlop={8}
-            style={{ flexDirection: "row", alignItems: "center", marginLeft: 39 }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginLeft: 39,
+            }}
           >
             <Icon name="lock" width={24} height={24} />
             <Text className="text-body-2 font-pretendardMedium ml-[5px]">
@@ -479,7 +624,12 @@ export default function ComposeScreen() {
           <View style={{ flex: 1 }} />
 
           {/* 저장하기 버튼 (공통 Button) */}
-          <Button title="저장하기" variant="primary" size="small" onPress={onPressSave} />
+          <Button
+            title="저장하기"
+            variant="primary"
+            size="small"
+            onPress={onPressSave}
+          />
         </View>
       </SafeAreaView>
     </TouchableWithoutFeedback>
