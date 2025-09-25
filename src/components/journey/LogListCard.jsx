@@ -19,78 +19,117 @@ export default function LogListCard({
   onToggleLike,
   onToggleBookmark,
   style,
+  placeholderImage,
+  placeholderBg = "#D9D9D9",
 }) {
+  // console.log('[LogListCard] title=', title, 'placeText=', placeText);
   return (
-    <Pressable onPress={onPress} style={[styles.card, style]} accessibilityRole="button">
+    <Pressable
+      onPress={onPress}
+      style={[styles.card, style]}
+      accessibilityRole="button"
+    >
       <View style={styles.thumbWrap}>
-            <Image source={thumbnail} resizeMode="cover" style={styles.thumb} />
+        {thumbnail ? (
+          <Image source={thumbnail} resizeMode="cover" style={styles.thumb} />
+        ) : (
+          <View
+            style={[
+              styles.thumb,
+              {
+                backgroundColor: placeholderBg,
+                alignItems: "center",
+                justifyContent: "center",
+              },
+            ]}
+          >
+            {placeholderImage && (
+              <Image
+                source={placeholderImage}
+                style={{ width: 70, height: 70 }}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        )}
       </View>
 
       <View style={styles.content}>
         {/* 제목 + 액션 */}
         <View style={styles.titleRow}>
-            <Text
+          <Text
             className="flex-1 text-heading-2 font-pretendardSemiBold"
             numberOfLines={1}
-            >
+          >
             {title}
-            </Text>
+          </Text>
 
-            {isMine ? (
+          {isMine ? (
             // 내 기록 → 옵션 아이콘
             <Pressable onPress={onPressMore} hitSlop={8}>
-                <Icon name="options" width={24} height={24}/>
+              <Icon name="options" width={24} height={24} />
             </Pressable>
-            ) : (
+          ) : (
             // 다른 사람 기록 → 북마크 아이콘
             <Pressable onPress={onToggleBookmark} hitSlop={8}>
-                <Icon
+              <Icon
                 name="bookmark"
                 width={24}
                 height={24}
                 strokeColor="#AFAFAF"
-                />
+              />
             </Pressable>
-            )}
+          )}
         </View>
 
-
         {/* 위치 */}
-        {!!placeText && (
-            <View style={styles.placeRow}>
-            <Icon name="location" width={16} height={16} />
-            <Text className="ml-1 text-body-2 text-gray700 font-pretendardMedium" numberOfLines={1}>
-                {placeText}
-            </Text>
-            </View>
-        )}
+
+        <View style={styles.placeRow}>
+          <Icon name="location" width={16} height={16} />
+          <Text
+            className="ml-1 text-body-2 text-gray700 font-pretendardMedium"
+            numberOfLines={1}
+          >
+            { (placeText ?? "").trim() || "알 수 없는 탐험지" }
+          </Text>
+        </View>
 
         {/* 하단 행 */}
         <View style={styles.footer}>
-            {/* 왼쪽: 비공개/공개 or 작성자 | 날짜 */}
-            {isMine ? (
-                <Text className="text-body-3 font-pretendardRegular text-gray700" numberOfLines={1}>
-                {visibility === "public" ? "공개" : "비공개"} | {dateText}
-                </Text>
-            ) : (
-                <Text className="text-body-3 font-pretendardRegular text-gray700" numberOfLines={1}>
-                {authorName} | {dateText}
-                </Text>
-            )}
+          {/* 왼쪽: 비공개/공개 or 작성자 | 날짜 */}
+          {isMine ? (
+            <Text
+              className="text-body-3 font-pretendardRegular text-gray700"
+              numberOfLines={1}
+            >
+              {visibility === "public" ? "공개" : "비공개"} | {dateText}
+            </Text>
+          ) : (
+            <Text
+              className="text-body-3 font-pretendardRegular text-gray700"
+              numberOfLines={1}
+            >
+              {authorName} | {dateText}
+            </Text>
+          )}
 
-            {/* 오른쪽: 댓글 + 스마일 */}
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {/* 오른쪽: 댓글 + 스마일 */}
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
             <View style={styles.actionItem}>
-                <Icon name="comment_fill" width={16} height={16} />
-                <Text className="ml-1 text-body-2 text-gray500 font-pretendardMedium">{commentsCount}</Text>
+              <Icon name="comment_fill" width={16} height={16} />
+              <Text className="ml-1 text-body-2 text-gray500 font-pretendardMedium">
+                {commentsCount}
+              </Text>
             </View>
             <View style={styles.actionItem}>
-                <Icon name="smile" width={16} height={16} />
-                <Text className="ml-1 text-body-2 text-gray500 font-pretendardMedium">{reactionsCount}</Text>
+              <Icon name="smile" width={16} height={16} />
+              <Text className="ml-1 text-body-2 text-gray500 font-pretendardMedium">
+                {reactionsCount}
+              </Text>
             </View>
-            </View>
+          </View>
         </View>
-        </View>
+      </View>
     </Pressable>
   );
 }
@@ -104,27 +143,27 @@ const styles = StyleSheet.create({
     minHeight: 108,
   },
   thumbWrap: {
-    width: TH,              
+    width: TH,
     marginRight: 11,
-    position: "relative",      
-    alignSelf: "stretch",      
+    position: "relative",
+    alignSelf: "stretch",
   },
   thumb: {
     ...StyleSheet.absoluteFillObject,
     width: undefined,
     height: undefined,
   },
-  content: { 
-    flex: 1, 
-},
-    placeRow: { 
-        flexDirection: "row",
-        alignItems: "center",
-        marginTop: 5,
-},
-  titleRow: { 
-    flexDirection: "row", 
-    alignItems: "center", 
+  content: {
+    flex: 1,
+  },
+  placeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 5,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
 
   footer: {
@@ -135,11 +174,11 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: "row",
-    alignItems: "center", 
-},
-  actionItem: { 
+    alignItems: "center",
+  },
+  actionItem: {
     flexDirection: "row",
     alignItems: "center",
     marginLeft: 10,
-},
+  },
 });

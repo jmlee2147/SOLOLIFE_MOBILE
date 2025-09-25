@@ -1,11 +1,18 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Dimensions,
   FlatList,
   Image,
   ImageBackground,
+  InteractionManager,
   Pressable,
   SafeAreaView,
   Text,
@@ -18,25 +25,20 @@ import SortDropdown from "../../../../components/journey/SortDropdown";
 import Icon from "../../../../components/shared/Icon";
 
 const CHARACTER = require("../../../../assets/images/explorer.png");
+const FALLBACK_THUMB = require("../../../../assets/images/sample.png");
+const MONKEY_PLACEHOLDER = require("../../../../assets/images/monkey-placeholder.png");
 
-// 데모 목업
-const MOCK_MY = Array.from({ length: 6 }).map((_, i) => ({
-  id: `my-${i}`,
-  thumbnail: require("../../../../assets/images/sample.png"),
-  title: "기록 제목",
-  placeText: "칸나, 칸나, 칸나",
-  dateText: "2025.07.28",
-  visibility: i % 2 ? "public" : "private",
-  commentsCount: 0,
-  reactionsCount: 0,
-  liked: i === 1,
-}));
+// ===== ENV =====
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL;
+const TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN;
+const USER_ID = Number(process.env.EXPO_PUBLIC_TEST_USER_ID || 1);
 
+// ===== 데모 목업(탐험가 탭/보드용만 유지) =====
 const MOCK_OTHERS = Array.from({ length: 10 }).map((_, i) => ({
   id: `oth-${i}`,
   profileImage: require("../../../../assets/images/explorer.png"),
   authorName: i % 2 ? "배고픈여우" : "배고픈판다",
-  thumbnail: require("../../../../assets/images/sample.png"),
+  thumbnail: null,
   title: "주말 기록",
   placeText: i % 2 ? "55데시벨, 부타센세" : "55데시벨, 맥도날드",
   dateText: "2025.08.31",
@@ -45,101 +47,304 @@ const MOCK_OTHERS = Array.from({ length: 10 }).map((_, i) => ({
 }));
 
 const MOCK_REELS = [
-  {
-    id: "reel-1",
-    thumbnail: require("../../../../assets/images/sample.png"),
-    title: "기록 제목",
-  },
-  {
-    id: "reel-2",
-    thumbnail: require("../../../../assets/images/sample.png"),
-    title: "기록 제목",
-  },
-  {
-    id: "reel-3",
-    thumbnail: require("../../../../assets/images/sample.png"),
-    title: "기록 제목",
-  },
-  {
-    id: "reel-4",
-    thumbnail: require("../../../../assets/images/sample.png"),
-    title: "기록 제목",
-  },
+  { id: "reel-1", thumbnail: FALLBACK_THUMB, title: "기록 제목" },
+  { id: "reel-2", thumbnail: FALLBACK_THUMB, title: "기록 제목" },
+  { id: "reel-3", thumbnail: FALLBACK_THUMB, title: "기록 제목" },
+  { id: "reel-4", thumbnail: FALLBACK_THUMB, title: "기록 제목" },
 ];
 
+// ===== 유틸 =====
 function formatYM(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   return `${y}.${m}`;
 }
+function fmtDateISOToYmd(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}.${m}.${day}`;
+}
+
+// ===== API 헬퍼 =====
+async function fetchLogbookDetail(logbookId) {
+  if (!API_BASE || !logbookId) return null;
+  const url = `${API_BASE.replace(/\/+$/, "")}/logbooks/${logbookId}`;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+      },
+    });
+    console.warn("[logbook] HTTP status", res.status, url);
+    if (!res.ok) return null;
+    return await res.json(); // { location_id, image_urls, ... }
+  } catch (e) {
+    console.warn("[logbook] fetch error", String(e));
+    return null;
+  }
+}
+
+async function fetchLocationMeta(id) {
+  if (!API_BASE || !id) return null;
+  const url = `${API_BASE.replace(/\/+$/, "")}/locations/${id}`;
+  try {
+    console.warn("[locations] fetchLocationMeta called with id=", id);
+    const res = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+      },
+    });
+    console.warn("[locations] HTTP status", res.status, url);
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    console.warn("[locations] raw data for", id, data);
+
+    const name =
+      data.location_name || data.title || data.name || data.locationTitle || ""; // 안전 매핑
+
+    const thumb =
+      data.thumbnail_url ||
+      data.cover?.thumbnail_url ||
+      data.images?.[0]?.thumbnail_url ||
+      data.cover?.url ||
+      "";
+
+    return { name, thumb };
+  } catch (e) {
+    console.warn("[locations] fetch error", String(e));
+    return null;
+  }
+}
 
 export default function JourneyScreen() {
-  const [tab, setTab] = useState("explorers");
+  const [tab, setTab] = useState("mine"); // 기본 mine로 시작
   const [view, setView] = useState("list");
 
-  // 드롭다운 상태 (탐험가 탭용)
+  // 탐험가 탭용 정렬/필터
   const [sort, setSort] = useState("latest");
   const [region, setRegion] = useState(null);
   const [category, setCategory] = useState(null);
 
-  // 내 탭에서만 쓰는 월 네비 (탐험가 탭엔 숨김)
+  // 내 탭 월 네비
   const [month, setMonth] = useState(new Date());
 
   const [mineW, setMineW] = useState(0);
   const [expW, setExpW] = useState(0);
   const router = useRouter();
 
-  // 옵션들
-  const latestOptions = useMemo(
-    () => [
-      { label: "최신순", value: "latest" },
-      { label: "인기순", value: "popular" },
-    ],
-    []
+  // ===== 내 로그북 상태/로딩/페이징 =====
+  const [myLogs, setMyLogs] = useState([]); // [{ id, locationId, thumbnailUri, title, placeText, dateText, ... }]
+  const [myPage, setMyPage] = useState(1);
+  const [myHasMore, setMyHasMore] = useState(true);
+  const [myLoading, setMyLoading] = useState(false);
+  const [myRefreshing, setMyRefreshing] = useState(false);
+
+  // 이미 조회한 locationId(중복 호출 방지)
+  const fetchedLocIdsRef = useRef(new Set());
+
+  const fetchMyLogs = useCallback(
+    async ({ page = 1, append = false } = {}) => {
+      if (!API_BASE || !USER_ID) {
+        setMyLogs([]);
+        setMyHasMore(false);
+        return;
+      }
+      if (myLoading) return;
+      setMyLoading(true);
+      try {
+        const url =
+          `${API_BASE.replace(/\/+$/, "")}/logbooks` +
+          `?userId=${USER_ID}&page=${page}&limit=20&order=created_at.desc`;
+        const res = await fetch(url, {
+          headers: {
+            Accept: "application/json",
+            ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+          },
+        });
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          console.warn("[mine] GET /logbooks error", res.status, body);
+          if (!append) setMyLogs([]);
+          setMyHasMore(false);
+          return;
+        }
+        const data = await res.json();
+
+        const mapped = (data.items || []).map((it) => ({
+          id: String(it.logbook_id),
+          locationId: it.location_id ?? null, // 목록에 없으면 null
+          thumbnailUri: it.image_urls?.[0] || "",
+          title: it.entry_title || "",
+          placeText: "", // ⚠️ 초기에 비워두기: 깜빡임/루프 방지
+          dateText: fmtDateISOToYmd(it.created_at),
+          visibility: "public",
+          commentsCount: it?.commentsCount ?? 0,
+          reactionsCount: it?.likes?.length || 0,
+          liked: false,
+        }));
+
+        setMyLogs((prev) => (append ? [...prev, ...mapped] : mapped));
+        setMyHasMore((mapped.length || 0) >= (data.limit || 20));
+        setMyPage(page);
+      } catch (e) {
+        console.warn("[mine] fetch error", String(e));
+        if (!append) setMyLogs([]);
+        setMyHasMore(false);
+      } finally {
+        setMyLoading(false);
+        setMyRefreshing(false);
+      }
+    },
+    [myLoading]
   );
 
-  const regionOptions = useMemo(
-    () => [
-      { label: "지역별", value: null },
-      { label: "전국", value: "all" },
-      { label: "서울", value: "seoul" },
-      { label: "경기", value: "gyeonggi" },
-      { label: "인천", value: "incheon" },
-      { label: "부산", value: "busan" },
-    ],
-    []
-  );
+  // 탭이 mine일 때 최초 로드
+  useEffect(() => {
+    if (tab === "mine") fetchMyLogs({ page: 1, append: false });
+  }, [tab, fetchMyLogs]);
 
-  const categoryOptions = useMemo(
-    () => [
-      { label: "카테고리", value: null },
-      { label: "카페", value: "cafe" },
-      { label: "쇼핑", value: "shopping" },
-      { label: "먹거리", value: "food" },
-      { label: "체험", value: "activity" },
-      { label: "전시", value: "exhibit" },
-      { label: "독서/공부", value: "study" },
-      { label: "산책", value: "walk" },
-    ],
-    []
-  );
+  // ① 상세 조회로 locationId/thumbnail 보강
+  useEffect(() => {
+    const needDetailIds = myLogs
+      .filter((it) => !it.locationId || !it.thumbnailUri)
+      .map((it) => it.id);
 
+    if (needDetailIds.length === 0) return;
+
+    let alive = true;
+    (async () => {
+      const pairs = await Promise.all(
+        needDetailIds.map(async (logbookId) => {
+          const detail = await fetchLogbookDetail(logbookId);
+          const locId = detail?.location_id ?? detail?.locationId ?? null;
+          const firstImage = Array.isArray(detail?.image_urls)
+            ? detail.image_urls[0]
+            : "";
+          return [logbookId, locId, firstImage];
+        })
+      );
+
+      if (!alive) return;
+
+      setMyLogs((prev) =>
+        prev.map((it) => {
+          const hit = pairs.find(([logId]) => String(logId) === String(it.id));
+          if (!hit) return it;
+          const [, locId, firstImg] = hit;
+          return {
+            ...it,
+            locationId: it.locationId || (locId ?? null),
+            thumbnailUri: it.thumbnailUri || firstImg || it.thumbnailUri,
+          };
+        })
+      );
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [myLogs]);
+
+  // ② 장소 메타(이름/썸네일) 통합 보강 — 단일 이펙트
+  useEffect(() => {
+    // 아직 조회 안 한 locationId 수집
+    const need = [
+      ...new Set(
+        myLogs
+          .filter(
+            (it) =>
+              it.locationId &&
+              !fetchedLocIdsRef.current.has(Number(it.locationId))
+          )
+          .map((it) => Number(it.locationId))
+      ),
+    ];
+    if (need.length === 0) return;
+
+    // 중복 호출 방지 마킹
+    need.forEach((id) => fetchedLocIdsRef.current.add(id));
+
+    let alive = true;
+    (async () => {
+      const pairs = await Promise.all(
+        need.map(async (id) => [id, await fetchLocationMeta(id)])
+      );
+
+      if (!alive) return;
+
+      const byId = new Map(pairs); // id -> {name, thumb} | null
+
+      setMyLogs((prev) =>
+        prev.map((it) => {
+          if (!it.locationId) return it;
+          const meta = byId.get(Number(it.locationId));
+          if (meta === undefined) return it; // 이번 배치 대상 아님
+
+          // 실패 시엔 마지막에만 “알 수 없는 탐험지”로 채움(깜빡임 방지)
+          if (!meta) {
+            if (!it.placeText) return { ...it, placeText: "알 수 없는 탐험지" };
+            return it;
+          }
+
+          // 성공: 이름/썸네일 보강
+          return {
+            ...it,
+            placeText: meta.name || it.placeText || `장소 #${it.locationId}`,
+            thumbnailUri: it.thumbnailUri || meta.thumb || it.thumbnailUri,
+          };
+        })
+      );
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [myLogs]);
+
+  const onRefreshMine = useCallback(() => {
+    setMyRefreshing(true);
+    // 새로고침 시, 중복 방지 캐시 초기화해서 이름도 다시 시도하게 할 수 있음(선택)
+    fetchedLocIdsRef.current = new Set();
+    fetchMyLogs({ page: 1, append: false });
+  }, [fetchMyLogs]);
+
+  const onEndReachedMine = useCallback(() => {
+    if (tab !== "mine") return;
+    if (myLoading || !myHasMore) return;
+    fetchMyLogs({ page: myPage + 1, append: true });
+  }, [tab, myLoading, myHasMore, myPage, fetchMyLogs]);
+
+  // ===== 리스트 데이터 소스 =====
   const listData = useMemo(() => {
-    const base = tab === "mine" ? MOCK_MY : MOCK_OTHERS;
+    const base = tab === "mine" ? myLogs : MOCK_OTHERS;
     if (tab === "explorers") {
-      const sorted = sort === "popular" ? [...base].reverse() : base; // 데모용 로직
-      // region / category 필터도 여기에서 적용 가능
+      const sorted = sort === "popular" ? [...base].reverse() : base; // 데모용
       return sorted;
     }
     return base;
-  }, [tab, sort]);
+  }, [tab, sort, myLogs]);
 
-  const goExplorerDetail = (item) => {
-    router.push({
-      pathname: "/explorer/[id]", // (tabs) 바깥으로 만든 상세 경로
-      params: { id: String(item.id) }, // 문자열이어야 함
-    });
-  };
+  const goMyDetail = useCallback(
+    (item) => {
+      router.push({
+        pathname: "/my-log/[id]",
+        params: {
+          id: String(item.id),
+          t: item.title || "",
+          d: item.dateText || "",
+          thumb: item.thumbnailUri || "",
+        },
+      });
+      InteractionManager.runAfterInteractions(() => {});
+    },
+    [router]
+  );
 
   // 릴스 카드 레이아웃
   const { width: SCREEN_W } = Dimensions.get("window");
@@ -251,9 +456,9 @@ export default function JourneyScreen() {
 
           <View style={{ flexDirection: "row", marginTop: 13 }}>
             {[
-              { label: "작성한 기록", value: 10 },
-              { label: "받은 감정", value: 5 },
-              { label: "표시한 감정", value: 7 },
+              { label: "작성한 기록", value: myLogs.length },
+              { label: "받은 감정", value: 0 },
+              { label: "표시한 감정", value: 0 },
             ].map((s, i) => (
               <View key={i} style={{ flex: 1, alignItems: "center" }}>
                 <Text className="text-heading-2 text-yellow900 font-pretendardSemiBold">
@@ -382,9 +587,8 @@ export default function JourneyScreen() {
         </View>
       )}
 
-      {/* 상단 컨트롤 줄 */}
+      {/* 상단 컨트롤 줄 (mine) */}
       {tab === "mine" ? (
-        // 내 여정 기록: 월 네비 + 보기 전환 + (기존) 캘린더 아이콘
         <View
           style={{
             paddingHorizontal: 15,
@@ -453,15 +657,16 @@ export default function JourneyScreen() {
         <View
           style={{ paddingHorizontal: 15, paddingTop: 8, paddingBottom: 25 }}
         >
-          {/* 기존 1개짜리 정렬 */}
           <SortDropdown
             value={sort}
             onChange={(v) => setSort(v)}
-            options={latestOptions}
+            options={[
+              { label: "최신순", value: "latest" },
+              { label: "인기순", value: "popular" },
+            ]}
           />
         </View>
       ) : (
-        // 탐험가 탭: 최신순/지역별/카테고리 3개 나란히
         <View
           style={{
             paddingHorizontal: 15,
@@ -475,17 +680,36 @@ export default function JourneyScreen() {
           <SortDropdown
             value={sort}
             onChange={(v) => setSort(v)}
-            options={latestOptions}
+            options={[
+              { label: "최신순", value: "latest" },
+              { label: "인기순", value: "popular" },
+            ]}
           />
           <SortDropdown
             value={region}
             onChange={(v) => setRegion(v)}
-            options={regionOptions}
+            options={[
+              { label: "지역별", value: null },
+              { label: "전국", value: "all" },
+              { label: "서울", value: "seoul" },
+              { label: "경기", value: "gyeonggi" },
+              { label: "인천", value: "incheon" },
+              { label: "부산", value: "busan" },
+            ]}
           />
           <SortDropdown
             value={category}
             onChange={(v) => setCategory(v)}
-            options={categoryOptions}
+            options={[
+              { label: "카테고리", value: null },
+              { label: "카페", value: "cafe" },
+              { label: "쇼핑", value: "shopping" },
+              { label: "먹거리", value: "food" },
+              { label: "체험", value: "activity" },
+              { label: "전시", value: "exhibit" },
+              { label: "독서/공부", value: "study" },
+              { label: "산책", value: "walk" },
+            ]}
           />
 
           <Pressable
@@ -502,7 +726,7 @@ export default function JourneyScreen() {
         </View>
       )}
 
-      {/* 리스트/보드 */}
+      {/* 리스트 / 보드 */}
       {view === "list" ? (
         <FlatList
           key="list"
@@ -510,11 +734,19 @@ export default function JourneyScreen() {
           contentContainerStyle={{ paddingHorizontal: 15, paddingBottom: 110 }}
           ItemSeparatorComponent={() => <View style={{ height: 29 }} />}
           showsVerticalScrollIndicator={false}
+          onRefresh={tab === "mine" ? onRefreshMine : undefined}
+          refreshing={tab === "mine" ? myRefreshing : false}
+          onEndReached={tab === "mine" ? onEndReachedMine : undefined}
+          onEndReachedThreshold={0.4}
           renderItem={({ item }) =>
             tab === "mine" ? (
               <LogListCard
                 isMine
-                thumbnail={item.thumbnail}
+                thumbnail={
+                  item.thumbnailUri ? { uri: item.thumbnailUri } : null
+                }
+                placeholderImage={MONKEY_PLACEHOLDER}
+                placeholderBg="#D9D9D9" // ✅ 오타 수정(plaeholderBg → placeholderBg)
                 title={item.title}
                 placeText={item.placeText}
                 dateText={item.dateText}
@@ -522,11 +754,23 @@ export default function JourneyScreen() {
                 commentsCount={item.commentsCount}
                 reactionsCount={item.reactionsCount}
                 liked={item.liked}
-                onPress={() => {}}
+                onPress={() => {
+                  router.push({
+                    pathname: "/my-log/[id]",
+                    params: {
+                      id: String(item.id),
+                      t: item.title || "",
+                      d: item.dateText || "",
+                      thumb: item.thumbnailUri || "",
+                    },
+                  });
+                }}
               />
             ) : (
               <LogListCard
-                thumbnail={item.thumbnail}
+                thumbnail={item.thumbnail ? item.thumbnail : null}
+                placeholderImage={MONKEY_PLACEHOLDER}
+                placeholderBg="#F4F4F4"
                 title={item.title}
                 placeText={item.placeText}
                 dateText={item.dateText}
@@ -534,7 +778,12 @@ export default function JourneyScreen() {
                 commentsCount={3}
                 reactionsCount={5}
                 bookmarked={item.liked}
-                onPress={() => goExplorerDetail(item)}
+                onPress={() => {
+                  router.push({
+                    pathname: "/explorer/[id]",
+                    params: { id: String(item.id) },
+                  });
+                }}
               />
             )
           }
@@ -553,13 +802,20 @@ export default function JourneyScreen() {
             <LogBoardCard
               profileImage={item.profileImage}
               authorName={item.authorName}
+              placeholderImage={MONKEY_PLACEHOLDER}
+              placeholderBg="#F4F4F4"
               thumbnail={item.thumbnail}
               title={item.title}
               placeText={item.placeText}
               dateText={item.dateText}
               excerpt={item.excerpt}
               liked={item.liked}
-              onPress={() => goExplorerDetail(item)}
+              onPress={() => {
+                router.push({
+                  pathname: "/explorer/[id]",
+                  params: { id: String(item.id) },
+                });
+              }}
               style={{ width: "100%" }}
             />
           )}
