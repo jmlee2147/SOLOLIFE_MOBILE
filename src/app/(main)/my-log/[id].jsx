@@ -1,5 +1,3 @@
-// app/(main)/my-log/[id].jsx
-
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -24,22 +22,24 @@ const TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN;
 /* ---------- small ui ---------- */
 function StarRow({ value }) {
   if (value == null || Number.isNaN(Number(value))) return null;
-  const v = Math.max(0, Math.min(5, Number(value)));
-  const stars = Array.from({ length: 5 }).map((_, i) => {
-    const diff = v - i;
-    const type = diff >= 1 ? "full" : diff >= 0.5 ? "half" : "empty";
-    return (
-      <Icon
-        key={i}
-        name="star"
-        width={15}
-        height={15}
-        color={type === "empty" ? "#E0A4A4" : "#EE7A13"}
-        style={{ marginLeft: i === 0 ? 0 : 3 }}
-      />
-    );
-  });
-  return <View style={{ flexDirection: "row" }}>{stars}</View>;
+  const v = Math.max(0, Math.min(5, Math.round(Number(value))));
+  return (
+    <View style={{ flexDirection: "row" }}>
+      {Array.from({ length: 5 }).map((_, i) => {
+        const filled = i < v;
+        return (
+          <Icon
+            key={i}
+            name={filled ? "star" : "star_outline"}
+            width={16}
+            height={16}
+            color="#EE7A13"
+            style={{ marginLeft: i === 0 ? 0 : 3 }}
+          />
+        );
+      })}
+    </View>
+  );
 }
 
 function fmtDate(iso) {
@@ -53,7 +53,7 @@ function fmtDate(iso) {
 
 /* ---------- caches & utils ---------- */
 const USER_CACHE = new Map(); // userId(Number) -> { name }
-const LOC_CACHE = new Map(); // locationId(Number) -> { name, thumb, ratingAvg }
+const LOC_CACHE = new Map(); // locationId(Number) -> { name, thumb }
 
 function raceTimeout(promise, ms = 1500) {
   return Promise.race([
@@ -126,25 +126,14 @@ async function getLocation(locationId, { signal } = {}) {
     if (!res.ok) return null;
 
     const text = await res.text();
-    if (__DEV__) {
-      const oneLine = String(text || "").replace(/\s+/g, " ");
-      console.log(
-        `[locations:${lid}] status=`,
-        res.status,
-        "body=",
-        oneLine.slice(0, 800)
-      );
-    }
-    if (!res.ok || !text) return null;
     let data;
     try {
-      data = JSON.parse(text);
+      data = text ? JSON.parse(text) : {};
     } catch {
       data = {};
     }
 
     const root = data?.location || data?.data || data?.result || data || {};
-
     const packed = {
       name: root.location_name || root.title || root.name || "",
       // 주소는 쓰지 않음
@@ -154,16 +143,7 @@ async function getLocation(locationId, { signal } = {}) {
         root.images?.[0]?.thumbnail_url ||
         root.cover?.url ||
         "",
-      ratingAvg: Number.isFinite(Number(root.rating_avg))
-        ? Number(root.rating_avg)
-        : null,
     };
-    if (__DEV__)
-      console.log(`[locations:${lid}] parsed=`, {
-        name: packed.name,
-        hasThumb: !!packed.thumb,
-        ratingAvg: packed.ratingAvg,
-      });
 
     LOC_CACHE.set(lid, packed);
     return packed;
@@ -172,20 +152,100 @@ async function getLocation(locationId, { signal } = {}) {
   }
 }
 
-/** 단일 장소만: logbook.location_id 기반으로 /locations/{id} 조회 */
+/** 이 기록에 대한 '내 리뷰 별점' 단일 조회 */
+async function getReviewForLogbook({
+  logbookId,
+  userId,
+  locationId,
+  signal,
+} = {}) {
+  if (!API_BASE || !Number.isFinite(Number(logbookId))) return null;
+  const base = API_BASE.replace(/\/+$/, "");
+  const headers = {
+    Accept: "application/json",
+    ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+  };
+  try {
+    // 1) logbook_id로 직접 조회 (최신 1건)
+    {
+      const url = `${base}/reviews?logbook_id=${Number(
+        logbookId
+      )}&limit=1&order=created_at.desc`;
+      const res = await fetch(url, { headers, signal });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const item = Array.isArray(data?.items)
+          ? data.items[0]
+          : data?.items ?? null;
+        const rating = Number(item?.rating);
+        if (Number.isFinite(rating)) return { rating };
+      }
+    }
+    // 2) 폴백: 같은 사용자·같은 장소의 최신 리뷰 1건
+    if (
+      Number.isFinite(Number(userId)) &&
+      Number.isFinite(Number(locationId))
+    ) {
+      const url = `${base}/reviews?user_id=${Number(
+        userId
+      )}&location_id=${Number(locationId)}&limit=1&order=created_at.desc`;
+      const res = await fetch(url, { headers, signal });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const item = Array.isArray(data?.items)
+          ? data.items[0]
+          : data?.items ?? null;
+        const rating = Number(item?.rating);
+        if (Number.isFinite(rating)) return { rating };
+      }
+    }
+  } catch {}
+  return null;
+}
+
+/** 단일 장소만: logbook.location_id 기반으로 /locations/{id} 조회
+ *  별점은 '내가 이 기록에서 준 별점'만 사용한다.
+ */
 async function resolveSinglePlace(detail, { signal } = {}) {
   const fallbackId = Number(detail?.location_id);
   if (!Number.isFinite(fallbackId)) return [];
 
   const meta = await getLocation(fallbackId, { signal });
-  if (__DEV__) console.log("[resolveSinglePlace]", { fallbackId, meta });
-  if (!meta || !meta.name) return []; // ← 이름 없으면 섹션 자체 숨김
+  if (!meta || !meta.name) return []; // 이름 없으면 섹션 숨김
+
+  // 1) detail.places[0].rating 우선
+  const placeRatingRaw =
+    detail?.places && Array.isArray(detail.places) && detail.places.length > 0
+      ? detail.places[0]?.rating
+      : undefined;
+  const placeRating = Number(placeRatingRaw);
+
+  // 2) 없으면 리뷰 API에서 이 기록의 내 리뷰 별점 조회
+  let reviewRating = null;
+  if (!Number.isFinite(placeRating)) {
+    const r = await getReviewForLogbook({
+      logbookId: Number(detail?.logbook_id ?? detail?.id),
+      userId: Number(detail?.user_id),
+      locationId: fallbackId,
+      signal,
+    });
+    const rr = Number(r?.rating);
+    reviewRating = Number.isFinite(rr) ? rr : null;
+  }
+
+  // 최종: 내가 남긴 별점만(1~5로 클램프). 없으면 null → 별 표시 안 함
+  const clamp15 = (n) => Math.max(1, Math.min(5, n));
+  const finalRating = Number.isFinite(placeRating)
+    ? clamp15(placeRating)
+    : Number.isFinite(reviewRating)
+    ? clamp15(reviewRating)
+    : null;
 
   return [
     {
       id: String(fallbackId),
       name: meta.name,
-      rating: meta.ratingAvg ?? null,
+      rating: finalRating,
       thumb: meta.thumb || "",
     },
   ];
@@ -249,9 +309,6 @@ export default function MyLogDetailScreen() {
         const imgs = Array.isArray(detail?.image_urls) ? detail.image_urls : [];
         if (imgs.length > 0) setImages(imgs);
         else if (optimisticThumb) setImages([optimisticThumb]);
-        // detail 바로 받은 직후
-        if (__DEV__)
-          console.log("[detail] id=", id, "location_id=", detail?.location_id);
 
         // 2) 작성자
         const userPromise = (async () => {
@@ -264,7 +321,7 @@ export default function MyLogDetailScreen() {
           return u; // { name }
         })();
 
-        // 3) 단일 장소 메타
+        // 3) 단일 장소 메타 + 내가 준 별점
         const placesPromise = resolveSinglePlace(detail, { signal: ac.signal });
 
         const [userMeta, placeArr] = await Promise.all([
@@ -528,7 +585,7 @@ export default function MyLogDetailScreen() {
               )}
             </View>
 
-            {/* 방문 장소 — 단일 */}
+            {/* 방문 장소 — 단일 (내가 준 별점만) */}
             {places.length > 0 && !placesLoading && !!places[0]?.name && (
               <View
                 style={{

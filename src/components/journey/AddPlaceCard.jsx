@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     paddingRight: 2.6,
     paddingVertical: 2.5,
     borderRadius: 3,
-    backgroundColor: "#dbdcc1",
+    backgroundColor: "#C9DCC1",
   },
   address: {
     paddingRight: 63, // 평점 뱃지 영역 비워주기
