@@ -27,31 +27,12 @@ import Icon from "../../../../components/shared/Icon";
 const CHARACTER = require("../../../../assets/images/explorer.png");
 const FALLBACK_THUMB = require("../../../../assets/images/sample.png");
 const MONKEY_PLACEHOLDER = require("../../../../assets/images/monkey-placeholder.png");
+const MONKEY_PLACEHOLDER_BOARD = require("../../../../assets/images/monkey-placeholder-board.png");
 
 // ===== ENV =====
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL;
 const TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN;
 const USER_ID = Number(process.env.EXPO_PUBLIC_TEST_USER_ID || 1);
-
-// ===== 데모 목업(탐험가 탭/보드용만 유지) =====
-const MOCK_OTHERS = Array.from({ length: 10 }).map((_, i) => ({
-  id: `oth-${i}`,
-  profileImage: require("../../../../assets/images/explorer.png"),
-  authorName: i % 2 ? "배고픈여우" : "배고픈판다",
-  thumbnail: null,
-  title: "주말 기록",
-  placeText: i % 2 ? "55데시벨, 부타센세" : "55데시벨, 맥도날드",
-  dateText: "2025.08.31",
-  excerpt: "오늘은 카페에서 하루 종일 공부하고, 저녁엔 햄버거를 먹었다...",
-  liked: i === 2,
-}));
-
-const MOCK_REELS = [
-  { id: "reel-1", thumbnail: FALLBACK_THUMB, title: "기록 제목" },
-  { id: "reel-2", thumbnail: FALLBACK_THUMB, title: "기록 제목" },
-  { id: "reel-3", thumbnail: FALLBACK_THUMB, title: "기록 제목" },
-  { id: "reel-4", thumbnail: FALLBACK_THUMB, title: "기록 제목" },
-];
 
 // ===== 유틸 =====
 function formatYM(d) {
@@ -68,6 +49,9 @@ function fmtDateISOToYmd(iso) {
   return `${y}.${m}.${day}`;
 }
 
+// ===== 세션 캐시(선택) =====
+const LOCATION_NAME_CACHE = new Map(); // id:number -> name
+
 // ===== API 헬퍼 =====
 async function fetchLogbookDetail(logbookId) {
   if (!API_BASE || !logbookId) return null;
@@ -79,51 +63,67 @@ async function fetchLogbookDetail(logbookId) {
         ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
       },
     });
-    console.warn("[logbook] HTTP status", res.status, url);
-    if (!res.ok) return null;
-    return await res.json(); // { location_id, image_urls, ... }
+    if (!res.ok) {
+      // console.warn("[logbookDetail] !ok", res.status, url);
+      return null;
+    }
+    const data = await res.json();
+
+    // console.warn("[logbookDetail]", logbookId, { entry_content_len: data?.entry_content?.length });
+
+    const raw = typeof data?.entry_content === "string" ? data.entry_content : "";
+    const compact = raw.replace(/\s+/g, " ").trim();
+    const excerpt = compact ? compact.slice(0, 160) + (compact.length > 160 ? "…" : "") : "";
+
+    return { ...data, excerpt };
   } catch (e) {
-    console.warn("[logbook] fetch error", String(e));
+    // console.warn("[logbookDetail] fetch error", String(e));
     return null;
   }
 }
 
 async function fetchLocationMeta(id) {
-  if (!API_BASE || !id) return null;
-  const url = `${API_BASE.replace(/\/+$/, "")}/locations/${id}`;
+  if (!API_BASE || id === null || id === undefined) return null;
+  const url = `${API_BASE.replace(/\/+$/, "")}/locations/${Number(id)}`;
   try {
-    console.warn("[locations] fetchLocationMeta called with id=", id);
     const res = await fetch(url, {
       headers: {
         Accept: "application/json",
         ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
       },
     });
-    console.warn("[locations] HTTP status", res.status, url);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // console.warn("[locations] !ok", res.status, url);
+      return null;
+    }
 
     const data = await res.json();
-    console.warn("[locations] raw data for", id, data);
-
+    const root = data?.location || data;
     const name =
-      data.location_name || data.title || data.name || data.locationTitle || ""; // 안전 매핑
-
-    const thumb =
-      data.thumbnail_url ||
-      data.cover?.thumbnail_url ||
-      data.images?.[0]?.thumbnail_url ||
-      data.cover?.url ||
+      root.location_name ??
+      root.locationName ??
+      root.title ??
+      root.name ??
+      root.locationTitle ??
       "";
+    const thumb =
+      root.thumbnail_url ??
+      root.cover?.thumbnail_url ??
+      root.images?.[0]?.thumbnail_url ??
+      root.cover?.url ??
+      "";
+
+    if (name) LOCATION_NAME_CACHE.set(Number(id), name); // 세션 캐시에 저장
 
     return { name, thumb };
   } catch (e) {
-    console.warn("[locations] fetch error", String(e));
+    // console.warn("[locations] fetch error", String(e));
     return null;
   }
 }
 
 export default function JourneyScreen() {
-  const [tab, setTab] = useState("mine"); // 기본 mine로 시작
+  const [tab, setTab] = useState("mine");
   const [view, setView] = useState("list");
 
   // 탐험가 탭용 정렬/필터
@@ -138,16 +138,42 @@ export default function JourneyScreen() {
   const [expW, setExpW] = useState(0);
   const router = useRouter();
 
-  // ===== 내 로그북 상태/로딩/페이징 =====
-  const [myLogs, setMyLogs] = useState([]); // [{ id, locationId, thumbnailUri, title, placeText, dateText, ... }]
+  // ===== 내 로그북 =====
+  const [myLogs, setMyLogs] = useState([]);
   const [myPage, setMyPage] = useState(1);
   const [myHasMore, setMyHasMore] = useState(true);
   const [myLoading, setMyLoading] = useState(false);
   const [myRefreshing, setMyRefreshing] = useState(false);
+  const fetchedMyLocIdsRef = useRef(new Set());
 
-  // 이미 조회한 locationId(중복 호출 방지)
-  const fetchedLocIdsRef = useRef(new Set());
+  // ===== 다른 탐험가 로그북 =====
+  const [othersLogs, setOthersLogs] = useState([]);
+  const [othersPage, setOthersPage] = useState(1);
+  const [othersHasMore, setOthersHasMore] = useState(true);
+  const [othersLoading, setOthersLoading] = useState(false);
+  const [othersRefreshing, setOthersRefreshing] = useState(false);
+  const fetchedOthersLocIdsRef = useRef(new Set());
 
+  // ===== 목록 mapper =====
+  function mapApiLogToItem(it) {
+    const locId = Number.isFinite(Number(it.location_id)) ? Number(it.location_id) : null;
+    return {
+      id: String(it.logbook_id),
+      locationId: locId,
+      thumbnailUri: it.image_urls?.[0] || "",
+      title: it.entry_title || "",
+      placeText: locId != null ? (LOCATION_NAME_CACHE.get(locId) || "") : "",
+      excerpt: "",
+      dateText: fmtDateISOToYmd(it.created_at),
+      visibility: "public",
+      commentsCount: it?.commentsCount ?? 0,
+      reactionsCount: it?.likes?.length || 0,
+      liked: false,
+      authorName: it?.user?.nickname || it?.user_name || "탐험가",
+    };
+  }
+
+  // ===== 내 로그 불러오기 =====
   const fetchMyLogs = useCallback(
     async ({ page = 1, append = false } = {}) => {
       if (!API_BASE || !USER_ID) {
@@ -168,32 +194,17 @@ export default function JourneyScreen() {
           },
         });
         if (!res.ok) {
-          const body = await res.text().catch(() => "");
-          console.warn("[mine] GET /logbooks error", res.status, body);
           if (!append) setMyLogs([]);
           setMyHasMore(false);
           return;
         }
         const data = await res.json();
-
-        const mapped = (data.items || []).map((it) => ({
-          id: String(it.logbook_id),
-          locationId: it.location_id ?? null, // 목록에 없으면 null
-          thumbnailUri: it.image_urls?.[0] || "",
-          title: it.entry_title || "",
-          placeText: "", // ⚠️ 초기에 비워두기: 깜빡임/루프 방지
-          dateText: fmtDateISOToYmd(it.created_at),
-          visibility: "public",
-          commentsCount: it?.commentsCount ?? 0,
-          reactionsCount: it?.likes?.length || 0,
-          liked: false,
-        }));
+        const mapped = (data.items || []).map(mapApiLogToItem);
 
         setMyLogs((prev) => (append ? [...prev, ...mapped] : mapped));
         setMyHasMore((mapped.length || 0) >= (data.limit || 20));
         setMyPage(page);
-      } catch (e) {
-        console.warn("[mine] fetch error", String(e));
+      } catch {
         if (!append) setMyLogs([]);
         setMyHasMore(false);
       } finally {
@@ -204,113 +215,182 @@ export default function JourneyScreen() {
     [myLoading]
   );
 
-  // 탭이 mine일 때 최초 로드
+  // ===== 다른 탐험가 로그 불러오기 =====
+  const fetchOthers = useCallback(
+    async ({ page = 1, append = false } = {}) => {
+      if (!API_BASE) {
+        setOthersLogs([]);
+        setOthersHasMore(false);
+        return;
+      }
+      if (othersLoading) return;
+      setOthersLoading(true);
+      try {
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: "20",
+          order: sort === "popular" ? "likes.desc,created_at.desc" : "created_at.desc",
+          isPublic: "true",
+          ...(USER_ID ? { excludeUserId: String(USER_ID) } : {}),
+          ...(region && region !== "all" ? { region } : {}),
+          ...(category ? { category } : {}),
+        });
+        const url = `${API_BASE.replace(/\/+$/, "")}/logbooks?${params.toString()}`;
+
+        const res = await fetch(url, {
+          headers: {
+            Accept: "application/json",
+            ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+          },
+        });
+        if (!res.ok) {
+          if (!append) setOthersLogs([]);
+          setOthersHasMore(false);
+          return;
+        }
+        const data = await res.json();
+        const mapped = (data.items || []).map(mapApiLogToItem);
+
+        setOthersLogs((prev) => (append ? [...prev, ...mapped] : mapped));
+        setOthersHasMore((mapped.length || 0) >= (data.limit || 20));
+        setOthersPage(page);
+      } catch {
+        if (!append) setOthersLogs([]);
+        setOthersHasMore(false);
+      } finally {
+        setOthersLoading(false);
+        setOthersRefreshing(false);
+      }
+    },
+    [othersLoading, sort, region, category]
+  );
+
+  // ===== 탭 최초 로드 =====
   useEffect(() => {
     if (tab === "mine") fetchMyLogs({ page: 1, append: false });
-  }, [tab, fetchMyLogs]);
+    if (tab === "explorers") fetchOthers({ page: 1, append: false });
+  }, [tab, fetchMyLogs, fetchOthers]);
 
-  // ① 상세 조회로 locationId/thumbnail 보강
-  useEffect(() => {
-    const needDetailIds = myLogs
-      .filter((it) => !it.locationId || !it.thumbnailUri)
-      .map((it) => it.id);
+  // ===== 상세 조회로 locationId/thumbnail/excerpt 보강 =====
+  function useDetailEnrichment(logs, setLogs) {
+    useEffect(() => {
+      const needDetailIds = logs
+        .filter((it) => !it.locationId || !it.thumbnailUri || !it.excerpt)
+        .map((it) => it.id);
 
-    if (needDetailIds.length === 0) return;
+      if (needDetailIds.length === 0) return;
 
-    let alive = true;
-    (async () => {
-      const pairs = await Promise.all(
-        needDetailIds.map(async (logbookId) => {
-          const detail = await fetchLogbookDetail(logbookId);
-          const locId = detail?.location_id ?? detail?.locationId ?? null;
-          const firstImage = Array.isArray(detail?.image_urls)
-            ? detail.image_urls[0]
-            : "";
-          return [logbookId, locId, firstImage];
-        })
-      );
+      let alive = true;
+      (async () => {
+        const pairs = await Promise.all(
+          needDetailIds.map(async (logbookId) => {
+            const detail = await fetchLogbookDetail(logbookId);
+            if (!detail)
+              return [logbookId, { locId: null, firstImage: "", excerpt: "" }];
 
-      if (!alive) return;
+            const locId = detail?.location_id ?? detail?.locationId ?? null;
+            const firstImage = Array.isArray(detail?.image_urls) ? detail.image_urls[0] : "";
 
-      setMyLogs((prev) =>
-        prev.map((it) => {
-          const hit = pairs.find(([logId]) => String(logId) === String(it.id));
-          if (!hit) return it;
-          const [, locId, firstImg] = hit;
-          return {
-            ...it,
-            locationId: it.locationId || (locId ?? null),
-            thumbnailUri: it.thumbnailUri || firstImg || it.thumbnailUri,
-          };
-        })
-      );
-    })();
+            let ex =
+              (typeof detail?.entry_content_head === "string" && detail.entry_content_head.trim()) || "";
 
-    return () => {
-      alive = false;
-    };
-  }, [myLogs]);
+            if (!ex && typeof detail?.entry_content === "string") {
+              const compact = detail.entry_content.replace(/\s+/g, " ").trim();
+              ex = compact ? compact.slice(0, 160) + (compact.length > 160 ? "…" : "") : "";
+            }
 
-  // ② 장소 메타(이름/썸네일) 통합 보강 — 단일 이펙트
-  useEffect(() => {
-    // 아직 조회 안 한 locationId 수집
-    const need = [
-      ...new Set(
-        myLogs
-          .filter(
-            (it) =>
-              it.locationId &&
-              !fetchedLocIdsRef.current.has(Number(it.locationId))
-          )
-          .map((it) => Number(it.locationId))
-      ),
-    ];
-    if (need.length === 0) return;
+            return [logbookId, { locId, firstImage, excerpt: ex }];
+          })
+        );
 
-    // 중복 호출 방지 마킹
-    need.forEach((id) => fetchedLocIdsRef.current.add(id));
+        if (!alive) return;
 
-    let alive = true;
-    (async () => {
-      const pairs = await Promise.all(
-        need.map(async (id) => [id, await fetchLocationMeta(id)])
-      );
+        setLogs((prev) =>
+          prev.map((it) => {
+            const hit = pairs.find(([logId]) => String(logId) === String(it.id));
+            if (!hit) return it;
 
-      if (!alive) return;
+            const [, payload] = hit;
+            const { locId, firstImage, excerpt } = payload || {};
 
-      const byId = new Map(pairs); // id -> {name, thumb} | null
+            return {
+              ...it,
+              locationId: Number.isFinite(Number(it.locationId))
+                ? Number(it.locationId)
+                : Number.isFinite(Number(locId))
+                ? Number(locId)
+                : null,
+              thumbnailUri: it.thumbnailUri || firstImage || it.thumbnailUri,
+              excerpt: it.excerpt || excerpt || "",
+            };
+          })
+        );
+      })();
 
-      setMyLogs((prev) =>
-        prev.map((it) => {
-          if (!it.locationId) return it;
-          const meta = byId.get(Number(it.locationId));
-          if (meta === undefined) return it; // 이번 배치 대상 아님
+      return () => {
+        alive = false;
+      };
+    }, [logs, setLogs]);
+  }
 
-          // 실패 시엔 마지막에만 “알 수 없는 탐험지”로 채움(깜빡임 방지)
-          if (!meta) {
-            if (!it.placeText) return { ...it, placeText: "알 수 없는 탐험지" };
-            return it;
+  useDetailEnrichment(myLogs, setMyLogs);
+  useDetailEnrichment(othersLogs, setOthersLogs);
+
+  // ===== 장소 메타(이름/썸네일) 보강 =====
+  function useLocationMetaEnrichment(logs, setLogs, fetchedLocIdsRef) {
+    useEffect(() => {
+      const ids = logs
+        .map((it) => Number(it.locationId))
+        .filter((n) => Number.isFinite(n));
+      const unique = [...new Set(ids)];
+      const need = unique.filter((id) => !fetchedLocIdsRef.current.has(id));
+      if (need.length === 0) return;
+
+      let alive = true;
+      (async () => {
+        const pairs = [];
+        for (const id of need) {
+          const meta = await fetchLocationMeta(id);
+          if (meta?.name) {
+            fetchedLocIdsRef.current.add(id); // 성공한 것만 캐시
           }
+          pairs.push([id, meta]);
+        }
 
-          // 성공: 이름/썸네일 보강
-          return {
-            ...it,
-            placeText: meta.name || it.placeText || `장소 #${it.locationId}`,
-            thumbnailUri: it.thumbnailUri || meta.thumb || it.thumbnailUri,
-          };
-        })
-      );
-    })();
+        if (!alive) return;
 
-    return () => {
-      alive = false;
-    };
-  }, [myLogs]);
+        const byId = new Map(pairs);
 
+        setLogs((prev) =>
+          prev.map((it) => {
+            const locNum = Number(it.locationId);
+            if (!Number.isFinite(locNum)) return it;
+            const meta = byId.get(locNum);
+            if (meta === undefined) return it; // 이번 배치 아님
+            if (!meta) return it; // 실패: 다음 렌더에서 재시도
+
+            return {
+              ...it,
+              placeText: it.placeText || meta.name || "",
+              thumbnailUri: it.thumbnailUri || meta.thumb || it.thumbnailUri,
+            };
+          })
+        );
+      })();
+
+      return () => {
+        alive = false;
+      };
+    }, [logs, setLogs, fetchedLocIdsRef]);
+  }
+
+  useLocationMetaEnrichment(myLogs, setMyLogs, fetchedMyLocIdsRef);
+  useLocationMetaEnrichment(othersLogs, setOthersLogs, fetchedOthersLocIdsRef);
+
+  // ===== 새로고침 / 페이징 =====
   const onRefreshMine = useCallback(() => {
     setMyRefreshing(true);
-    // 새로고침 시, 중복 방지 캐시 초기화해서 이름도 다시 시도하게 할 수 있음(선택)
-    fetchedLocIdsRef.current = new Set();
+    fetchedMyLocIdsRef.current = new Set();
     fetchMyLogs({ page: 1, append: false });
   }, [fetchMyLogs]);
 
@@ -320,15 +400,23 @@ export default function JourneyScreen() {
     fetchMyLogs({ page: myPage + 1, append: true });
   }, [tab, myLoading, myHasMore, myPage, fetchMyLogs]);
 
-  // ===== 리스트 데이터 소스 =====
+  const onRefreshOthers = useCallback(() => {
+    setOthersRefreshing(true);
+    fetchedOthersLocIdsRef.current = new Set();
+    fetchOthers({ page: 1, append: false });
+  }, [fetchOthers]);
+
+  const onEndReachedOthers = useCallback(() => {
+    if (tab !== "explorers") return;
+    if (othersLoading || !othersHasMore) return;
+    fetchOthers({ page: othersPage + 1, append: true });
+  }, [tab, othersLoading, othersHasMore, othersPage, fetchOthers]);
+
+  // ===== 렌더 데이터 =====
   const listData = useMemo(() => {
-    const base = tab === "mine" ? myLogs : MOCK_OTHERS;
-    if (tab === "explorers") {
-      const sorted = sort === "popular" ? [...base].reverse() : base; // 데모용
-      return sorted;
-    }
-    return base;
-  }, [tab, sort, myLogs]);
+    if (tab === "mine") return myLogs;
+    return othersLogs;
+  }, [tab, myLogs, othersLogs]);
 
   const goMyDetail = useCallback(
     (item) => {
@@ -346,7 +434,6 @@ export default function JourneyScreen() {
     [router]
   );
 
-  // 릴스 카드 레이아웃
   const { width: SCREEN_W } = Dimensions.get("window");
   const CARD_W = 129;
   const CARD_H = 194;
@@ -356,9 +443,7 @@ export default function JourneyScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       {/* 탭 + 하단 라인 */}
-      <View
-        style={{ position: "relative", paddingHorizontal: 25, paddingTop: 8 }}
-      >
+      <View style={{ position: "relative", paddingHorizontal: 25, paddingTop: 8 }}>
         <View
           style={{
             position: "absolute",
@@ -372,65 +457,33 @@ export default function JourneyScreen() {
         <View style={{ flexDirection: "row" }}>
           <Pressable
             onPress={() => setTab("mine")}
-            style={{
-              flex: 1,
-              alignItems: "center",
-              position: "relative",
-              paddingBottom: 8,
-            }}
+            style={{ flex: 1, alignItems: "center", position: "relative", paddingBottom: 8 }}
             hitSlop={8}
           >
             <Text
               onLayout={(e) => setMineW(e.nativeEvent.layout.width)}
-              className={[
-                "text-heading-2 font-pretendardSemiBold",
-                tab === "mine" ? "text-black" : "text-gray500",
-              ].join(" ")}
+              className={["text-heading-2 font-pretendardSemiBold", tab === "mine" ? "text-black" : "text-gray500"].join(" ")}
             >
               내 여정 기록
             </Text>
             {tab === "mine" && (
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: -1,
-                  height: 3,
-                  width: mineW,
-                  backgroundColor: "#000",
-                }}
-              />
+              <View style={{ position: "absolute", bottom: -1, height: 3, width: mineW, backgroundColor: "#000" }} />
             )}
           </Pressable>
 
           <Pressable
             onPress={() => setTab("explorers")}
-            style={{
-              flex: 1,
-              alignItems: "center",
-              position: "relative",
-              paddingBottom: 8,
-            }}
+            style={{ flex: 1, alignItems: "center", position: "relative", paddingBottom: 8 }}
             hitSlop={8}
           >
             <Text
               onLayout={(e) => setExpW(e.nativeEvent.layout.width)}
-              className={[
-                "text-heading-2 font-pretendardSemiBold",
-                tab === "explorers" ? "text-black" : "text-gray500",
-              ].join(" ")}
+              className={["text-heading-2 font-pretendardSemiBold", tab === "explorers" ? "text-black" : "text-gray500"].join(" ")}
             >
               탐험가들의 기록
             </Text>
             {tab === "explorers" && (
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: -1,
-                  height: 3,
-                  width: expW,
-                  backgroundColor: "#000",
-                }}
-              />
+              <View style={{ position: "absolute", bottom: -1, height: 3, width: expW, backgroundColor: "#000" }} />
             )}
           </Pressable>
         </View>
@@ -440,17 +493,10 @@ export default function JourneyScreen() {
       {tab === "mine" ? (
         <View style={{ paddingHorizontal: 20, paddingTop: 12 }}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Image
-              source={CHARACTER}
-              style={{ width: 46, height: 46, resizeMode: "contain" }}
-            />
+            <Image source={CHARACTER} style={{ width: 46, height: 46, resizeMode: "contain" }} />
             <View style={{ marginLeft: 6 }}>
-              <Text className="text-gray700 text-body-2 font-pretendardMedium">
-                포슬감자님,
-              </Text>
-              <Text className="text-gray700 text-body-2 font-pretendardMedium">
-                오늘은 어떤 곳을 탐험하셨나요?
-              </Text>
+              <Text className="text-gray700 text-body-2 font-pretendardMedium">포슬감자님,</Text>
+              <Text className="text-gray700 text-body-2 font-pretendardMedium">오늘은 어떤 곳을 탐험하셨나요?</Text>
             </View>
           </View>
 
@@ -461,12 +507,8 @@ export default function JourneyScreen() {
               { label: "표시한 감정", value: 0 },
             ].map((s, i) => (
               <View key={i} style={{ flex: 1, alignItems: "center" }}>
-                <Text className="text-heading-2 text-yellow900 font-pretendardSemiBold">
-                  {s.value}
-                </Text>
-                <Text className="text-gray700 text-body-2  font-pretendardMedium mt-[5px]">
-                  {s.label}
-                </Text>
+                <Text className="text-heading-2 text-yellow900 font-pretendardSemiBold">{s.value}</Text>
+                <Text className="text-gray700 text-body-2  font-pretendardMedium mt-[5px]">{s.label}</Text>
               </View>
             ))}
           </View>
@@ -484,13 +526,7 @@ export default function JourneyScreen() {
               colors={["rgba(0,0,0,0.08)", "rgba(0,0,0,0)"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                top: 1,
-                height: 4,
-              }}
+              style={{ position: "absolute", left: 0, right: 0, top: 1, height: 4 }}
             />
           </View>
         </View>
@@ -506,21 +542,15 @@ export default function JourneyScreen() {
               borderBottomColor: "#D4D4D4",
             }}
           >
-            <Image
-              source={CHARACTER}
-              style={{ width: 46, height: 46, resizeMode: "contain" }}
-            />
-            <Text
-              className="text-gray700 text-body-2 font-pretendardMedium"
-              style={{ marginLeft: 6 }}
-            >
+            <Image source={CHARACTER} style={{ width: 46, height: 46, resizeMode: "contain" }} />
+            <Text className="text-gray700 text-body-2 font-pretendardMedium" style={{ marginLeft: 6 }}>
               다른 탐험가들의 여정 기록을 살펴보세요!
             </Text>
           </View>
 
-          {/* 릴스 캐러셀 */}
+          {/* 릴스 캐러셀 (임시) */}
           <FlatList
-            data={MOCK_REELS}
+            data={[{ id: "r1", thumbnail: FALLBACK_THUMB, title: "기록 제목" }]}
             keyExtractor={(it) => it.id}
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -549,11 +579,7 @@ export default function JourneyScreen() {
                   <ImageBackground
                     source={item.thumbnail}
                     style={{ flex: 1 }}
-                    imageStyle={{
-                      width: CARD_W,
-                      height: CARD_H,
-                      resizeMode: "cover",
-                    }}
+                    imageStyle={{ width: CARD_W, height: CARD_H, resizeMode: "cover" }}
                   >
                     <LinearGradient
                       colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.5)"]}
@@ -568,14 +594,7 @@ export default function JourneyScreen() {
                         paddingBottom: 8,
                       }}
                     >
-                      <Text
-                        numberOfLines={1}
-                        style={{
-                          color: "#fff",
-                          fontFamily: "Pretendard-SemiBold",
-                          fontSize: 14,
-                        }}
-                      >
+                      <Text numberOfLines={1} style={{ color: "#fff", fontFamily: "Pretendard-SemiBold", fontSize: 14 }}>
                         {item.title}
                       </Text>
                     </LinearGradient>
@@ -600,153 +619,117 @@ export default function JourneyScreen() {
         >
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Pressable
-              onPress={() =>
-                setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))
-              }
+              onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
               hitSlop={10}
             >
               <Icon name="triangle" width={8} height={9} />
             </Pressable>
-            <Text
-              className="text-title-1 font-pretendardExtraBold"
-              style={{ marginHorizontal: 10 }}
-            >
+            <Text className="text-title-1 font-pretendardExtraBold" style={{ marginHorizontal: 10 }}>
               {formatYM(month)}
             </Text>
             <Pressable
-              onPress={() =>
-                setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))
-              }
+              onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
               hitSlop={10}
             >
-              <Icon
-                name="triangle"
-                width={8}
-                height={9}
-                style={{ transform: [{ scaleX: -1 }] }}
-              />
+              <Icon name="triangle" width={8} height={9} style={{ transform: [{ scaleX: -1 }] }} />
             </Pressable>
           </View>
 
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Pressable
-              onPress={() => setView(view === "list" ? "board" : "list")}
-              style={{ marginRight: 12 }}
-              hitSlop={10}
-            >
-              <Icon
-                name={view === "list" ? "grid" : "list"}
-                width={22}
-                height={22}
-              />
+            <Pressable onPress={() => setView(view === "list" ? "board" : "list")} style={{ marginRight: 12 }} hitSlop={10}>
+              <Icon name={view === "list" ? "grid" : "list"} width={22} height={22} />
             </Pressable>
             <Pressable onPress={() => {}} hitSlop={10}>
-              <Icon
-                name="calendar"
-                width={34}
-                height={34}
-                strokeColor="#AFAFAF"
-              />
+              <Icon name="calendar" width={34} height={34} strokeColor="#AFAFAF" />
             </Pressable>
           </View>
         </View>
       ) : null}
 
       {/* 드롭다운 줄 */}
-      {tab === "mine" ? (
-        <View
-          style={{ paddingHorizontal: 15, paddingTop: 8, paddingBottom: 25 }}
-        >
-          <SortDropdown
-            value={sort}
-            onChange={(v) => setSort(v)}
-            options={[
-              { label: "최신순", value: "latest" },
-              { label: "인기순", value: "popular" },
-            ]}
-          />
-        </View>
-      ) : (
-        <View
-          style={{
-            paddingHorizontal: 15,
-            paddingTop: 23,
-            paddingBottom: 28,
-            flexDirection: "row",
-            alignItems: "center",
-            columnGap: 8,
+      <View
+        style={{
+          paddingHorizontal: 15,
+          paddingTop: tab === "mine" ? 8 : 23,
+          paddingBottom: tab === "mine" ? 25 : 28,
+          flexDirection: tab === "mine" ? "column" : "row",
+          alignItems: tab === "mine" ? "stretch" : "center",
+          columnGap: 8,
+        }}
+      >
+        <SortDropdown
+          value={sort}
+          onChange={(v) => {
+            setSort(v);
+            if (tab === "explorers") fetchOthers({ page: 1, append: false });
           }}
-        >
-          <SortDropdown
-            value={sort}
-            onChange={(v) => setSort(v)}
-            options={[
-              { label: "최신순", value: "latest" },
-              { label: "인기순", value: "popular" },
-            ]}
-          />
-          <SortDropdown
-            value={region}
-            onChange={(v) => setRegion(v)}
-            options={[
-              { label: "지역별", value: null },
-              { label: "전국", value: "all" },
-              { label: "서울", value: "seoul" },
-              { label: "경기", value: "gyeonggi" },
-              { label: "인천", value: "incheon" },
-              { label: "부산", value: "busan" },
-            ]}
-          />
-          <SortDropdown
-            value={category}
-            onChange={(v) => setCategory(v)}
-            options={[
-              { label: "카테고리", value: null },
-              { label: "카페", value: "cafe" },
-              { label: "쇼핑", value: "shopping" },
-              { label: "먹거리", value: "food" },
-              { label: "체험", value: "activity" },
-              { label: "전시", value: "exhibit" },
-              { label: "독서/공부", value: "study" },
-              { label: "산책", value: "walk" },
-            ]}
-          />
-
-          <Pressable
-            onPress={() => setView(view === "list" ? "board" : "list")}
-            hitSlop={10}
-            style={{ marginLeft: "auto" }}
-          >
-            <Icon
-              name={view === "list" ? "grid" : "list"}
-              width={22}
-              height={22}
+          options={[
+            { label: "최신순", value: "latest" },
+            { label: "인기순", value: "popular" },
+          ]}
+        />
+        {tab === "explorers" && (
+          <>
+            <SortDropdown
+              value={region}
+              onChange={(v) => {
+                setRegion(v);
+                fetchOthers({ page: 1, append: false });
+              }}
+              options={[
+                { label: "지역별", value: null },
+                { label: "전국", value: "all" },
+                { label: "서울", value: "seoul" },
+                { label: "경기", value: "gyeonggi" },
+                { label: "인천", value: "incheon" },
+                { label: "부산", value: "busan" },
+              ]}
             />
-          </Pressable>
-        </View>
-      )}
+            <SortDropdown
+              value={category}
+              onChange={(v) => {
+                setCategory(v);
+                fetchOthers({ page: 1, append: false });
+              }}
+              options={[
+                { label: "카테고리", value: null },
+                { label: "카페", value: "cafe" },
+                { label: "쇼핑", value: "shopping" },
+                { label: "먹거리", value: "food" },
+                { label: "체험", value: "activity" },
+                { label: "전시", value: "exhibit" },
+                { label: "독서/공부", value: "study" },
+                { label: "산책", value: "walk" },
+              ]}
+            />
+
+            <Pressable onPress={() => setView(view === "list" ? "board" : "list")} hitSlop={10} style={{ marginLeft: "auto" }}>
+              <Icon name={view === "list" ? "grid" : "list"} width={22} height={22} />
+            </Pressable>
+          </>
+        )}
+      </View>
 
       {/* 리스트 / 보드 */}
       {view === "list" ? (
         <FlatList
           key="list"
           data={listData}
+          keyExtractor={(it) => String(it.id)}
           contentContainerStyle={{ paddingHorizontal: 15, paddingBottom: 110 }}
           ItemSeparatorComponent={() => <View style={{ height: 29 }} />}
           showsVerticalScrollIndicator={false}
-          onRefresh={tab === "mine" ? onRefreshMine : undefined}
-          refreshing={tab === "mine" ? myRefreshing : false}
-          onEndReached={tab === "mine" ? onEndReachedMine : undefined}
+          onRefresh={tab === "mine" ? onRefreshMine : onRefreshOthers}
+          refreshing={tab === "mine" ? myRefreshing : othersRefreshing}
+          onEndReached={tab === "mine" ? onEndReachedMine : onEndReachedOthers}
           onEndReachedThreshold={0.4}
           renderItem={({ item }) =>
             tab === "mine" ? (
               <LogListCard
                 isMine
-                thumbnail={
-                  item.thumbnailUri ? { uri: item.thumbnailUri } : null
-                }
+                thumbnail={item.thumbnailUri ? { uri: item.thumbnailUri } : null}
                 placeholderImage={MONKEY_PLACEHOLDER}
-                placeholderBg="#D9D9D9" // ✅ 오타 수정(plaeholderBg → placeholderBg)
+                placeholderBg="#D9D9D9"
                 title={item.title}
                 placeText={item.placeText}
                 dateText={item.dateText}
@@ -754,35 +737,22 @@ export default function JourneyScreen() {
                 commentsCount={item.commentsCount}
                 reactionsCount={item.reactionsCount}
                 liked={item.liked}
-                onPress={() => {
-                  router.push({
-                    pathname: "/my-log/[id]",
-                    params: {
-                      id: String(item.id),
-                      t: item.title || "",
-                      d: item.dateText || "",
-                      thumb: item.thumbnailUri || "",
-                    },
-                  });
-                }}
+                onPress={() => goMyDetail(item)}
               />
             ) : (
               <LogListCard
-                thumbnail={item.thumbnail ? item.thumbnail : null}
+                thumbnail={item.thumbnailUri ? { uri: item.thumbnailUri } : null}
                 placeholderImage={MONKEY_PLACEHOLDER}
-                placeholderBg="#F4F4F4"
+                placeholderBg="#D9D9D9"
                 title={item.title}
                 placeText={item.placeText}
                 dateText={item.dateText}
                 authorName={item.authorName}
-                commentsCount={3}
-                reactionsCount={5}
+                commentsCount={item.commentsCount}
+                reactionsCount={item.reactionsCount}
                 bookmarked={item.liked}
                 onPress={() => {
-                  router.push({
-                    pathname: "/explorer/[id]",
-                    params: { id: String(item.id) },
-                  });
+                  router.push({ pathname: "/explorer/[id]", params: { id: String(item.id) } });
                 }}
               />
             )
@@ -791,7 +761,8 @@ export default function JourneyScreen() {
       ) : (
         <FlatList
           key="board"
-          data={MOCK_OTHERS}
+          data={tab === "mine" ? myLogs : othersLogs}
+          keyExtractor={(it) => String(it.id)}
           contentContainerStyle={{
             paddingHorizontal: tab === "explorers" ? 25 : 15,
             paddingBottom: 110,
@@ -800,21 +771,20 @@ export default function JourneyScreen() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <LogBoardCard
-              profileImage={item.profileImage}
-              authorName={item.authorName}
-              placeholderImage={MONKEY_PLACEHOLDER}
-              placeholderBg="#F4F4F4"
-              thumbnail={item.thumbnail}
+              isMine={tab === "mine"} // 내 탭이면 상단 프로필/날짜/북마크 숨김
+              profileImage={CHARACTER}
+              authorName={tab === "mine" ? "나" : item.authorName}
+              placeholderImage={MONKEY_PLACEHOLDER_BOARD}
+              placeholderBg="#D9D9D9"
+              thumbnail={item.thumbnailUri ? { uri: item.thumbnailUri } : null}
               title={item.title}
               placeText={item.placeText}
               dateText={item.dateText}
               excerpt={item.excerpt}
               liked={item.liked}
               onPress={() => {
-                router.push({
-                  pathname: "/explorer/[id]",
-                  params: { id: String(item.id) },
-                });
+                const pathname = tab === "mine" ? "/my-log/[id]" : "/explorer/[id]";
+                router.push({ pathname, params: { id: String(item.id) } });
               }}
               style={{ width: "100%" }}
             />

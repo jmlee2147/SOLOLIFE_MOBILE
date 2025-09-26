@@ -1,17 +1,17 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import Button from "../../../components/shared/Button";
 import Icon from "../../../components/shared/Icon";
@@ -21,22 +21,25 @@ const TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN;
 
 /* ---------- small ui ---------- */
 function StarRow({ value }) {
-  if (value == null) return null;
-  const stars = Array.from({ length: 5 }).map((_, i) => {
-    const diff = value - i;
-    const type = diff >= 1 ? "full" : diff >= 0.5 ? "half" : "empty";
-    return (
-      <Icon
-        key={i}
-        name="star"
-        width={15}
-        height={15}
-        color={type === "empty" ? "#E0A4A4" : "#EE7A13"}
-        style={{ marginLeft: i === 0 ? 0 : 3 }}
-      />
-    );
-  });
-  return <View style={{ flexDirection: "row" }}>{stars}</View>;
+  if (value == null || Number.isNaN(Number(value))) return null;
+  const v = Math.max(0, Math.min(5, Math.round(Number(value))));
+  return (
+    <View style={{ flexDirection: "row" }}>
+      {Array.from({ length: 5 }).map((_, i) => {
+        const filled = i < v;
+        return (
+          <Icon
+            key={i}
+            name={filled ? "star" : "star_outline"}
+            width={16}
+            height={16}
+            color="#EE7A13"
+            style={{ marginLeft: i === 0 ? 0 : 3 }}
+          />
+        );
+      })}
+    </View>
+  );
 }
 
 function fmtDate(iso) {
@@ -49,8 +52,8 @@ function fmtDate(iso) {
 }
 
 /* ---------- caches & utils ---------- */
-const USER_CACHE = new Map(); // userId -> { name }
-const LOC_CACHE = new Map(); // locationId -> { name, address, thumb }
+const USER_CACHE = new Map(); // userId(Number) -> { name }
+const LOC_CACHE = new Map(); // locationId(Number) -> { name, thumb }
 
 function raceTimeout(promise, ms = 1500) {
   return Promise.race([
@@ -78,10 +81,11 @@ async function getLogbook(logbookId, { signal } = {}) {
 }
 
 async function getUser(userId, { signal } = {}) {
-  if (!API_BASE || !userId) return null;
-  if (USER_CACHE.has(userId)) return USER_CACHE.get(userId);
+  const uid = Number(userId);
+  if (!API_BASE || !Number.isFinite(uid)) return null;
+  if (USER_CACHE.has(uid)) return USER_CACHE.get(uid);
 
-  const url = `${API_BASE.replace(/\/+$/, "")}/users/${userId}`;
+  const url = `${API_BASE.replace(/\/+$/, "")}/users/${uid}`;
   try {
     const res = await fetch(url, {
       signal,
@@ -93,9 +97,9 @@ async function getUser(userId, { signal } = {}) {
     if (!res.ok) return null;
     const data = await res.json();
     const name =
-      data?.nickname || data?.display_name || data?.name || `작성자 #${userId}`;
+      data?.nickname || data?.display_name || data?.name || `작성자 #${uid}`;
     const packed = { name };
-    USER_CACHE.set(userId, packed);
+    USER_CACHE.set(uid, packed);
     return packed;
   } catch {
     return null;
@@ -103,10 +107,14 @@ async function getUser(userId, { signal } = {}) {
 }
 
 async function getLocation(locationId, { signal } = {}) {
-  if (!API_BASE || !locationId) return null;
-  if (LOC_CACHE.has(locationId)) return LOC_CACHE.get(locationId);
+  const lid = Number(locationId);
+  if (!API_BASE || !Number.isFinite(lid)) return null;
+  if (LOC_CACHE.has(lid)) {
+    const cached = LOC_CACHE.get(lid);
+    if (cached && cached.name) return cached;
+  }
 
-  const url = `${API_BASE.replace(/\/+$/, "")}/locations/${locationId}`;
+  const url = `${API_BASE.replace(/\/+$/, "")}/locations/${lid}`;
   try {
     const res = await fetch(url, {
       signal,
@@ -116,11 +124,19 @@ async function getLocation(locationId, { signal } = {}) {
       },
     });
     if (!res.ok) return null;
-    const data = await res.json();
-    const root = data?.location || data || {};
+
+    const text = await res.text();
+    let data;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = {};
+    }
+
+    const root = data?.location || data?.data || data?.result || data || {};
     const packed = {
       name: root.location_name || root.title || root.name || "",
-      address: root.address || root.formatted_address || root.addr || "",
+      // 주소는 쓰지 않음
       thumb:
         root.thumbnail_url ||
         root.cover?.thumbnail_url ||
@@ -128,74 +144,120 @@ async function getLocation(locationId, { signal } = {}) {
         root.cover?.url ||
         "",
     };
-    LOC_CACHE.set(locationId, packed);
+
+    LOC_CACHE.set(lid, packed);
     return packed;
   } catch {
     return null;
   }
 }
 
-/** detail에 들어있는 장소 배열(places)이 있으면 그걸 우선 사용.
- * 각 원소: { locationId, rating } 가정. (스펙 2) POST 참고)
- * 없으면 fallback으로 location_id 단일 사용.
- */
-async function resolvePlaces(detail, { signal } = {}) {
-  // 1) 배열 우선
-  if (Array.isArray(detail?.places) && detail.places.length > 0) {
-    // 중복 locationId 제거
-    const uniq = [];
-    const seen = new Set();
-    for (const p of detail.places) {
-      const id = Number(p?.locationId);
-      if (!Number.isFinite(id) || seen.has(id)) continue;
-      seen.add(id);
-      uniq.push({ locationId: id, rating: Number(p?.rating) || null });
+/** 이 기록에 대한 '내 리뷰 별점' 단일 조회 */
+async function getReviewForLogbook({
+  logbookId,
+  userId,
+  locationId,
+  signal,
+} = {}) {
+  if (!API_BASE || !Number.isFinite(Number(logbookId))) return null;
+  const base = API_BASE.replace(/\/+$/, "");
+  const headers = {
+    Accept: "application/json",
+    ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+  };
+  try {
+    // 1) logbook_id로 직접 조회 (최신 1건)
+    {
+      const url = `${base}/reviews?logbook_id=${Number(
+        logbookId
+      )}&limit=1&order=created_at.desc`;
+      const res = await fetch(url, { headers, signal });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const item = Array.isArray(data?.items)
+          ? data.items[0]
+          : data?.items ?? null;
+        const rating = Number(item?.rating);
+        if (Number.isFinite(rating)) return { rating };
+      }
     }
-    if (uniq.length === 0) return [];
+    // 2) 폴백: 같은 사용자·같은 장소의 최신 리뷰 1건
+    if (
+      Number.isFinite(Number(userId)) &&
+      Number.isFinite(Number(locationId))
+    ) {
+      const url = `${base}/reviews?user_id=${Number(
+        userId
+      )}&location_id=${Number(locationId)}&limit=1&order=created_at.desc`;
+      const res = await fetch(url, { headers, signal });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const item = Array.isArray(data?.items)
+          ? data.items[0]
+          : data?.items ?? null;
+        const rating = Number(item?.rating);
+        if (Number.isFinite(rating)) return { rating };
+      }
+    }
+  } catch {}
+  return null;
+}
 
-    // 메타 병렬 fetch (타임아웃 내에서)
-    const metas = await Promise.all(
-      uniq.map(async (p, idx) => {
-        const loader = idx === 0
-            ? getLocation(p.locationId, { signal })
-            : reaceTimeout(getLocation(p.locationId, { signal }), 8000);
-        const meta = await loader;
-        return { ...p, meta };
-      })
-    );
+/** 단일 장소만: logbook.location_id 기반으로 /locations/{id} 조회
+ *  별점은 '내가 이 기록에서 준 별점'만 사용한다.
+ */
+async function resolveSinglePlace(detail, { signal } = {}) {
+  const fallbackId = Number(detail?.location_id);
+  if (!Number.isFinite(fallbackId)) return [];
 
-    // 출력 형태로 변환
-    return metas.map((it) => ({
-      id: String(it.locationId),
-      name: it.meta?.name || "",
-      address: it.meta?.address || "",
-      rating: it.rating ?? null,
-      thumb: it.meta?.thumb || "",
-    }));
+  const meta = await getLocation(fallbackId, { signal });
+  if (!meta || !meta.name) return []; // 이름 없으면 섹션 숨김
+
+  // 1) detail.places[0].rating 우선
+  const placeRatingRaw =
+    detail?.places && Array.isArray(detail.places) && detail.places.length > 0
+      ? detail.places[0]?.rating
+      : undefined;
+  const placeRating = Number(placeRatingRaw);
+
+  // 2) 없으면 리뷰 API에서 이 기록의 내 리뷰 별점 조회
+  let reviewRating = null;
+  if (!Number.isFinite(placeRating)) {
+    const r = await getReviewForLogbook({
+      logbookId: Number(detail?.logbook_id ?? detail?.id),
+      userId: Number(detail?.user_id),
+      locationId: fallbackId,
+      signal,
+    });
+    const rr = Number(r?.rating);
+    reviewRating = Number.isFinite(rr) ? rr : null;
   }
 
-  // 2) 단일 location_id fallback
-  if (detail?.location_id) {
-    const locationId = Number(detail.location_id);
-    const meta = await raceTimeout(getLocation(locationId, { signal }), 1500);
-    return [
-      {
-        id: String(locationId),
-        name: meta?.name || "",
-        address: meta?.address || "",
-        rating: null,
-        thumb: meta?.thumb || "",
-      },
-    ];
-  }
+  // 최종: 내가 남긴 별점만(1~5로 클램프). 없으면 null → 별 표시 안 함
+  const clamp15 = (n) => Math.max(1, Math.min(5, n));
+  const finalRating = Number.isFinite(placeRating)
+    ? clamp15(placeRating)
+    : Number.isFinite(reviewRating)
+    ? clamp15(reviewRating)
+    : null;
 
-  return [];
+  return [
+    {
+      id: String(fallbackId),
+      name: meta.name,
+      rating: finalRating,
+      thumb: meta.thumb || "",
+    },
+  ];
 }
 
 /* ---------- Page ---------- */
 export default function MyLogDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+
+  // StrictMode 더블 런 방지
+  const didRunRef = useRef(false);
 
   // 라우트 파라미터 정규화 (+ 리스트에서 넘어온 낙관값)
   const id = String(params?.id ?? "").replace(/[^0-9]/g, "");
@@ -211,7 +273,11 @@ export default function MyLogDetailScreen() {
   const [createdAt, setCreatedAt] = useState("");
   const [body, setBody] = useState("");
   const [authorName, setAuthorName] = useState("탐험가");
-  const [places, setPlaces] = useState([]); // [{id, name, address, rating?, thumb?}]
+
+  // 단일 장소만 담지만, 기존 렌더 구조 유지 위해 배열 형태 사용
+  const [places, setPlaces] = useState([]); // [{id, name, rating?, thumb?}]
+  const [placesLoading, setPlacesLoading] = useState(true);
+
   const [images, setImages] = useState(
     optimisticThumb ? [optimisticThumb] : []
   );
@@ -222,14 +288,19 @@ export default function MyLogDetailScreen() {
 
   useEffect(() => {
     if (!id) return;
+
+    if (didRunRef.current) return;
+    didRunRef.current = true;
+
     const ac = new AbortController();
 
     (async () => {
       try {
         setLoading(true);
         setErr(null);
+        setPlacesLoading(true);
 
-        // 1) 로그북 상세 — 도착 즉시 기본 정보 렌더
+        // 1) 로그북 상세
         const detail = await getLogbook(id, { signal: ac.signal });
 
         setTitle(detail?.entry_title || optimisticTitle || "(제목 없음)");
@@ -239,11 +310,10 @@ export default function MyLogDetailScreen() {
         if (imgs.length > 0) setImages(imgs);
         else if (optimisticThumb) setImages([optimisticThumb]);
 
-        // 화면은 먼저 보여주기 위해 loading 끄기 전에 부가데이터 병렬로 시작
-        // 2) 작성자 + 3) 장소 배열/단일 동시 처리
+        // 2) 작성자
         const userPromise = (async () => {
-          const userId = detail?.user_id;
-          if (!userId) return null;
+          const userId = Number(detail?.user_id);
+          if (!Number.isFinite(userId)) return null;
           const u = await raceTimeout(
             getUser(userId, { signal: ac.signal }),
             1500
@@ -251,9 +321,10 @@ export default function MyLogDetailScreen() {
           return u; // { name }
         })();
 
-        const placesPromise = resolvePlaces(detail, { signal: ac.signal });
+        // 3) 단일 장소 메타 + 내가 준 별점
+        const placesPromise = resolveSinglePlace(detail, { signal: ac.signal });
 
-        const [userMeta, placesArr] = await Promise.all([
+        const [userMeta, placeArr] = await Promise.all([
           userPromise,
           placesPromise,
         ]);
@@ -261,11 +332,12 @@ export default function MyLogDetailScreen() {
         if (userMeta?.name) setAuthorName(userMeta.name);
         else setAuthorName((v) => v || "탐험가");
 
-        setPlaces(placesArr);
+        setPlaces(placeArr);
+        setPlacesLoading(false);
 
-        // 장소 썸네일로 대표 이미지 보강(이미 이미지가 없고, 장소 thumb가 있으면)
+        // 장소 썸네일이 있고 대표 이미지 없음 → 보강
         if ((!imgs || imgs.length === 0) && !optimisticThumb) {
-          const firstThumb = placesArr.find((p) => p.thumb)?.thumb;
+          const firstThumb = placeArr.find((p) => p.thumb)?.thumb;
           if (firstThumb) setImages([firstThumb]);
         }
 
@@ -276,6 +348,7 @@ export default function MyLogDetailScreen() {
       } catch (e) {
         if (!ac.signal.aborted) {
           setErr("기록을 불러오지 못했어요.");
+          setPlacesLoading(false);
           setLoading(false);
         }
       }
@@ -405,9 +478,12 @@ export default function MyLogDetailScreen() {
                 </View>
               </View>
 
-              <View style={{ paddingVertical: 24 }}>
-                <ActivityIndicator />
-              </View>
+              {/* 로딩 중엔 장소 섹션 자체를 안 그림 → 깜빡임 최소화 */}
+              {placesLoading ? (
+                <View style={{ paddingVertical: 24 }}>
+                  <ActivityIndicator />
+                </View>
+              ) : null}
             </ScrollView>
           </KeyboardAvoidingView>
         )
@@ -477,6 +553,7 @@ export default function MyLogDetailScreen() {
                 </Text>
               </View>
 
+              {/* tags */}
               {tags.length > 0 && (
                 <View
                   style={{
@@ -508,8 +585,8 @@ export default function MyLogDetailScreen() {
               )}
             </View>
 
-            {/* 방문 장소 — 여러 개 지원 */}
-            {places.length > 0 && (
+            {/* 방문 장소 — 단일 (내가 준 별점만) */}
+            {places.length > 0 && !placesLoading && !!places[0]?.name && (
               <View
                 style={{
                   paddingHorizontal: 16,
@@ -518,40 +595,36 @@ export default function MyLogDetailScreen() {
                   paddingBottom: 16,
                 }}
               >
-                {places.map((p) => (
-                  <View
-                    key={p.id}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      paddingVertical: 7.5,
-                    }}
-                  >
-                    <Icon
-                      name="location"
-                      width={20}
-                      height={20}
-                      color="#93B56C"
-                    />
-                    <View style={{ flex: 1, marginLeft: 5 }}>
-                      <Text
-                        className="text-body-1 font-pretendardMedium"
-                        numberOfLines={1}
-                      >
-                        {p.name || "(장소)"}
-                      </Text>
-                      {!!p.address && (
+                {(() => {
+                  const p = places[0];
+                  return (
+                    <View
+                      key={p.id}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        paddingVertical: 7.5,
+                      }}
+                    >
+                      <Icon
+                        name="location"
+                        width={20}
+                        height={20}
+                        color="#93B56C"
+                      />
+                      <View style={{ flex: 1, marginLeft: 5 }}>
                         <Text
-                          className="text-gray700 text-body-3 font-pretendardRegular"
+                          className="text-body-1 font-pretendardMedium"
                           numberOfLines={1}
                         >
-                          {p.address}
+                          {p.name || "알 수 없는 탐험지"}
                         </Text>
-                      )}
+                        {/* 주소는 표시하지 않음 */}
+                      </View>
+                      <StarRow value={p.rating} />
                     </View>
-                    <StarRow value={p.rating} />
-                  </View>
-                ))}
+                  );
+                })()}
               </View>
             )}
 

@@ -85,11 +85,10 @@ async function postLogbook({ title, body, isPrivate, places, images }) {
 
       // 1~5로 클램프 (소수 허용하면 Math.round/Math.floor 조정)
       const ratingNum = Number(p.rating);
-      const rating = Number.isFinite(ratingNum)
-        ? Math.max(1, Math.min(5, ratingNum))
-        : 5; // 기본값 5 등 원하는 기본값
-
-      return { locationId: locId, rating };
+      const hasRating = Number.isFinite(ratingNum);
+      const rating = hasRating ? Math.max(1, Math.min(5, ratingNum)) : null;
+      // 별점 안 고르면 rating 키 자체를 빼서 보냄
+      return hasRating ? { locationId: locId, rating } : { locationId: locId };
     })
     .filter(Boolean);
 
@@ -396,7 +395,7 @@ export default function ComposeScreen() {
                   paddingLeft: 5,
                   paddingRight: 4,
                   borderRadius: 3,
-                  backgroundColor: "#DBDCC1",
+                  backgroundColor: "#C9DCC1",
                   flexDirection: "row",
                   alignItems: "center",
                   marginLeft: 70,

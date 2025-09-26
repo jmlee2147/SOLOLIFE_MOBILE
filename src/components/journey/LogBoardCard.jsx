@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import Icon from "../shared/Icon";
 
 export default function LogBoardCard({
+  isMine = false,              // 🔥 추가: 내 탭 여부
   profileImage,
   authorName,
   dateText,
@@ -18,40 +19,55 @@ export default function LogBoardCard({
   onPressComment,
   onPressReaction,
   style,
+  placeholderImage,
+  placeholderBg = "#D9D9D9",
 }) {
   return (
     <Pressable style={[styles.card, style]} onPress={onPress}>
-      {/* 상단 프로필 영역 */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
+      {/* 상단 프로필 영역 (내 탭이면 숨김) */}
+      {!isMine && (
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
             <View style={styles.avatarWrapper}>
-                <Image source={profileImage} style={styles.profileImage} resizeMode="cover" />
+              <Image source={profileImage} style={styles.profileImage} resizeMode="cover" />
             </View>
-          <Text className="text-black text-body-2 font-pretendardMedium" numberOfLines={1}>
-            {authorName}
-          </Text>
-          <Text className="text-black text-body-2 font-pretendardMedium"> | {dateText}</Text>
+            <Text className="text-black text-body-2 font-pretendardMedium" numberOfLines={1}>
+              {authorName}
+            </Text>
+            <Text className="text-black text-body-2 font-pretendardMedium"> | {dateText}</Text>
+          </View>
+          <Pressable onPress={onToggleBookmark} hitSlop={8}>
+            <Icon name="bookmark" width={24} height={24} strokeColor="#AFAFAF" />
+          </Pressable>
         </View>
-        <Pressable onPress={onToggleBookmark} hitSlop={8}>
-          <Icon
-            name="bookmark"
-            width={24}
-            height={24}
-            strokeColor="#AFAFAF"
-          />
-        </Pressable>
-      </View>
+      )}
 
       {/* 제목 */}
-      <Text
-        className="mb-3 text-black text-heading-1 font-pretendardSemiBold"
-        numberOfLines={1}
-      >
+      <Text className="mb-3 text-black text-heading-1 font-pretendardSemiBold" numberOfLines={1}>
         {title}
       </Text>
 
       {/* 대표 이미지 */}
-      <Image source={thumbnail} style={styles.thumbnail} resizeMode="cover" />
+      <View style={styles.thumbnail}>
+        {thumbnail ? (
+          <Image source={thumbnail} resizeMode="cover" style={styles.thumb} />
+        ) : (
+          <View
+            style={[
+              styles.thumb,
+              {
+                backgroundColor: placeholderBg,
+                alignItems: "center",
+                justifyContent: "center",
+              },
+            ]}
+          >
+            {placeholderImage && (
+              <Image source={placeholderImage} style={{ width: 344, height: 218 }} resizeMode="contain" />
+            )}
+          </View>
+        )}
+      </View>
 
       {/* 장소 */}
       {!!placeText && (
@@ -63,12 +79,9 @@ export default function LogBoardCard({
         </View>
       )}
 
-      {/* 내용 요약 */}
+      {/* 내용 요약 (3줄 고정) */}
       {!!excerpt && (
-        <Text
-          className="mb-3 text-gray700 text-body-3"
-          numberOfLines={3}
-        >
+        <Text className="mb-3 text-gray700 text-body-3" numberOfLines={3}>
           {excerpt}
         </Text>
       )}
@@ -108,16 +121,16 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 7,
   },
-  headerLeft: { 
+  headerLeft: {
     flexDirection: "row",
     alignItems: "center",
     //backgroundColor: "#ee1414", // 빨간색 구역
-    },
+  },
   avatarWrapper: {
-    width: 28,           // 원하는 사이즈
+    width: 28, // 원하는 사이즈
     height: 28,
-    borderRadius: 14,    // width/2
-    overflow: "hidden",  // 동그라미 바깥은 안 보이게
+    borderRadius: 14, // width/2
+    overflow: "hidden", // 동그라미 바깥은 안 보이게
     marginRight: 6,
     borderWidth: 1,
     borderColor: "#ffffff",
@@ -127,7 +140,8 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  thumbnail: { width: "100%", height: 180 },
+  thumbnail: { width: "100%", height: 218 },
+  thumb: { width: "100%", height: "100%" },
   placeRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -142,10 +156,16 @@ const styles = StyleSheet.create({
     gap: 10,
     marginLeft: "auto",
   },
-  action: { 
-    flexDirection: "row", 
+  action: {
+    flexDirection: "row",
     alignItems: "center",
     // backgroundColor: "#e7e7e7",
     marginBottom: 9,
- },
+  },
+  placeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+    marginBottom: 11,
+  },
 });
