@@ -1,4 +1,3 @@
-// app/(main)/journey/index.jsx
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, {
