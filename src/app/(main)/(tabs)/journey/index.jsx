@@ -1,7 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Animated,
   Dimensions,
@@ -19,6 +25,7 @@ import LogBoardCard from "../../../../components/journey/LogBoardCard";
 import LogListCard from "../../../../components/journey/LogListCard";
 import SortDropdown from "../../../../components/journey/SortDropdown";
 import Icon from "../../../../components/shared/Icon";
+import { useToast } from "../../../../providers/ToastProvider";
 
 const CHARACTER = require("../../../../assets/images/explorer.png");
 const FALLBACK_THUMB = require("../../../../assets/images/sample.png");
@@ -46,7 +53,10 @@ function fmtDateISOToYmd(iso) {
   return `${y}.${m}.${day}`;
 }
 
-const sanitizeToken = (t) => String(t || "").trim().replace(/^Bearer\s+/i, "");
+const sanitizeToken = (t) =>
+  String(t || "")
+    .trim()
+    .replace(/^Bearer\s+/i, "");
 async function ensureToken() {
   const stored = sanitizeToken(await AsyncStorage.getItem("jwt"));
   if (stored) return stored;
@@ -66,7 +76,10 @@ async function apiPatchLogbook(logbookId, payload) {
   const jwt = await ensureToken();
   const res = await fetch(`${apiBase}/logbooks/${Number(logbookId)}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${jwt}`,
+    },
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(`PATCH /logbooks/${logbookId} ${res.status}`);
@@ -82,13 +95,19 @@ async function fetchLogbookDetail(logbookId) {
   const url = `${API_BASE.replace(/\/+$/, "")}/logbooks/${logbookId}`;
   try {
     const res = await fetch(url, {
-      headers: { Accept: "application/json", ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}) },
+      headers: {
+        Accept: "application/json",
+        ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+      },
     });
     if (!res.ok) return null;
     const data = await res.json();
-    const raw = typeof data?.entry_content === "string" ? data.entry_content : "";
+    const raw =
+      typeof data?.entry_content === "string" ? data.entry_content : "";
     const compact = raw.replace(/\s+/g, " ").trim();
-    const excerpt = compact ? compact.slice(0, 160) + (compact.length > 160 ? "…" : "") : "";
+    const excerpt = compact
+      ? compact.slice(0, 160) + (compact.length > 160 ? "…" : "")
+      : "";
     return { ...data, excerpt };
   } catch {
     return null;
@@ -99,15 +118,27 @@ async function fetchLocationMeta(id) {
   const url = `${API_BASE.replace(/\/+$/, "")}/locations/${Number(id)}`;
   try {
     const res = await fetch(url, {
-      headers: { Accept: "application/json", ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}) },
+      headers: {
+        Accept: "application/json",
+        ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+      },
     });
     if (!res.ok) return null;
     const data = await res.json();
     const root = data?.location || data;
     const name =
-      root.location_name ?? root.locationName ?? root.title ?? root.name ?? root.locationTitle ?? "";
+      root.location_name ??
+      root.locationName ??
+      root.title ??
+      root.name ??
+      root.locationTitle ??
+      "";
     const thumb =
-      root.thumbnail_url ?? root.cover?.thumbnail_url ?? root.images?.[0]?.thumbnail_url ?? root.cover?.url ?? "";
+      root.thumbnail_url ??
+      root.cover?.thumbnail_url ??
+      root.images?.[0]?.thumbnail_url ??
+      root.cover?.url ??
+      "";
     if (name) LOCATION_NAME_CACHE.set(Number(id), name);
     return { name, thumb };
   } catch {
@@ -143,7 +174,11 @@ export default function JourneyScreen() {
       opacityAnim.setValue(0);
       Animated.parallel([
         Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }),
-        Animated.timing(opacityAnim, { toValue: 1, duration: 140, useNativeDriver: true }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 140,
+          useNativeDriver: true,
+        }),
       ]).start();
     },
     [tab, scaleAnim, opacityAnim]
@@ -151,8 +186,16 @@ export default function JourneyScreen() {
 
   const closeMenu = useCallback(() => {
     Animated.parallel([
-      Animated.timing(scaleAnim, { toValue: 0, duration: 100, useNativeDriver: true }),
-      Animated.timing(opacityAnim, { toValue: 0, duration: 100, useNativeDriver: true }),
+      Animated.timing(scaleAnim, {
+        toValue: 0,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 100,
+        useNativeDriver: true,
+      }),
     ]).start(() => {
       setMenuOpen(false);
       setMenuTarget(null);
@@ -188,7 +231,9 @@ export default function JourneyScreen() {
 
   // 목록 mapper
   function mapApiLogToItem(it) {
-    const locId = Number.isFinite(Number(it.location_id)) ? Number(it.location_id) : null;
+    const locId = Number.isFinite(Number(it.location_id))
+      ? Number(it.location_id)
+      : null;
     return {
       id: String(it.logbook_id),
       locationId: locId,
@@ -217,9 +262,13 @@ export default function JourneyScreen() {
       setMyLoading(true);
       try {
         const url =
-          `${API_BASE.replace(/\/+$/, "")}/logbooks` + `?userId=${USER_ID}&page=${page}&limit=20&order=created_at.desc`;
+          `${API_BASE.replace(/\/+$/, "")}/logbooks` +
+          `?userId=${USER_ID}&page=${page}&limit=20&order=created_at.desc`;
         const res = await fetch(url, {
-          headers: { Accept: "application/json", ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}) },
+          headers: {
+            Accept: "application/json",
+            ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+          },
         });
         if (!res.ok) {
           if (!append) setMyLogs([]);
@@ -257,15 +306,24 @@ export default function JourneyScreen() {
         const params = new URLSearchParams({
           page: String(page),
           limit: "20",
-          order: sort === "popular" ? "likes.desc,created_at.desc" : "created_at.desc",
+          order:
+            sort === "popular"
+              ? "likes.desc,created_at.desc"
+              : "created_at.desc",
           isPublic: "true",
           ...(USER_ID ? { excludeUserId: String(USER_ID) } : {}),
           ...(region && region !== "all" ? { region } : {}),
           ...(category ? { category } : {}),
         });
-        const url = `${API_BASE.replace(/\/+$/, "")}/logbooks?${params.toString()}`;
+        const url = `${API_BASE.replace(
+          /\/+$/,
+          ""
+        )}/logbooks?${params.toString()}`;
         const res = await fetch(url, {
-          headers: { Accept: "application/json", ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}) },
+          headers: {
+            Accept: "application/json",
+            ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+          },
         });
         if (!res.ok) {
           if (!append) setOthersLogs([]);
@@ -298,7 +356,9 @@ export default function JourneyScreen() {
   // 상세 보강
   function useDetailEnrichment(logs, setLogs) {
     useEffect(() => {
-      const needDetailIds = logs.filter((it) => !it.locationId || !it.thumbnailUri || !it.excerpt).map((it) => it.id);
+      const needDetailIds = logs
+        .filter((it) => !it.locationId || !it.thumbnailUri || !it.excerpt)
+        .map((it) => it.id);
       if (needDetailIds.length === 0) return;
 
       let alive = true;
@@ -306,16 +366,23 @@ export default function JourneyScreen() {
         const pairs = await Promise.all(
           needDetailIds.map(async (logbookId) => {
             const detail = await fetchLogbookDetail(logbookId);
-            if (!detail) return [logbookId, { locId: null, firstImage: "", excerpt: "" }];
+            if (!detail)
+              return [logbookId, { locId: null, firstImage: "", excerpt: "" }];
 
             const locId = detail?.location_id ?? detail?.locationId ?? null;
-            const firstImage = Array.isArray(detail?.image_urls) ? detail.image_urls[0] : "";
+            const firstImage = Array.isArray(detail?.image_urls)
+              ? detail.image_urls[0]
+              : "";
 
             let ex =
-              (typeof detail?.entry_content_head === "string" && detail.entry_content_head.trim()) || "";
+              (typeof detail?.entry_content_head === "string" &&
+                detail.entry_content_head.trim()) ||
+              "";
             if (!ex && typeof detail?.entry_content === "string") {
               const compact = detail.entry_content.replace(/\s+/g, " ").trim();
-              ex = compact ? compact.slice(0, 160) + (compact.length > 160 ? "…" : "") : "";
+              ex = compact
+                ? compact.slice(0, 160) + (compact.length > 160 ? "…" : "")
+                : "";
             }
             return [logbookId, { locId, firstImage, excerpt: ex }];
           })
@@ -325,7 +392,9 @@ export default function JourneyScreen() {
 
         setLogs((prev) =>
           prev.map((it) => {
-            const hit = pairs.find(([logId]) => String(logId) === String(it.id));
+            const hit = pairs.find(
+              ([logId]) => String(logId) === String(it.id)
+            );
             if (!hit) return it;
             const [, payload] = hit;
             const { locId, firstImage, excerpt } = payload || {};
@@ -354,7 +423,9 @@ export default function JourneyScreen() {
   // 장소 메타 보강
   function useLocationMetaEnrichment(logs, setLogs, fetchedLocIdsRef) {
     useEffect(() => {
-      const ids = logs.map((it) => Number(it.locationId)).filter((n) => Number.isFinite(n));
+      const ids = logs
+        .map((it) => Number(it.locationId))
+        .filter((n) => Number.isFinite(n));
       const unique = [...new Set(ids)];
       const need = unique.filter((id) => !fetchedLocIdsRef.current.has(id));
       if (need.length === 0) return;
@@ -416,13 +487,21 @@ export default function JourneyScreen() {
   }, [tab, othersLoading, othersHasMore, othersPage, fetchOthers]);
 
   // 렌더 데이터
-  const listData = useMemo(() => (tab === "mine" ? myLogs : othersLogs), [tab, myLogs, othersLogs]);
+  const listData = useMemo(
+    () => (tab === "mine" ? myLogs : othersLogs),
+    [tab, myLogs, othersLogs]
+  );
 
   const goMyDetail = useCallback(
     (item) => {
       router.push({
         pathname: "/my-log/[id]",
-        params: { id: String(item.id), t: item.title || "", d: item.dateText || "", thumb: item.thumbnailUri || "" },
+        params: {
+          id: String(item.id),
+          t: item.title || "",
+          d: item.dateText || "",
+          thumb: item.thumbnailUri || "",
+        },
       });
       InteractionManager.runAfterInteractions(() => {});
     },
@@ -439,45 +518,104 @@ export default function JourneyScreen() {
   const onPressEdit = useCallback(() => {
     if (!menuTarget) return;
     closeMenu();
-    router.push({ pathname: "/journey-create", params: { editId: String(menuTarget.id) } });
+    router.push({
+      pathname: "/journey-create",
+      params: { editId: String(menuTarget.id) },
+    });
   }, [menuTarget, closeMenu, router]);
 
+  const { showToast } = useToast();
   const onPressDelete = useCallback(async () => {
     if (!menuTarget) return;
-    const targetId = menuTarget.id;
+    const targetId = String(menuTarget.id);
     closeMenu();
     try {
-      setMyLogs((prev) => prev.filter((it) => String(it.id) !== String(targetId))); // 낙관적 업데이트
+      // 서버 성공 후에만 제거
       await apiDeleteLogbook(targetId);
-    } catch {
-      fetchMyLogs({ page: 1, append: false }); // 실패 시 리로드
+      setMyLogs((prev) => prev.filter((it) => String(it.id) !== targetId));
+    } catch (e) {
     }
-  }, [menuTarget, closeMenu, fetchMyLogs]);
+  }, [menuTarget, closeMenu, setMyLogs]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       {/* 탭 + 하단 라인 */}
-      <View style={{ position: "relative", paddingHorizontal: 25, paddingTop: 8 }}>
-        <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 1, backgroundColor: "#D4D4D4" }} />
+      <View
+        style={{ position: "relative", paddingHorizontal: 25, paddingTop: 8 }}
+      >
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 1,
+            backgroundColor: "#D4D4D4",
+          }}
+        />
         <View style={{ flexDirection: "row" }}>
-          <Pressable onPress={() => setTab("mine")} style={{ flex: 1, alignItems: "center", position: "relative", paddingBottom: 8 }} hitSlop={8}>
+          <Pressable
+            onPress={() => setTab("mine")}
+            style={{
+              flex: 1,
+              alignItems: "center",
+              position: "relative",
+              paddingBottom: 8,
+            }}
+            hitSlop={8}
+          >
             <Text
               onLayout={(e) => setMineW(e.nativeEvent.layout.width)}
-              className={["text-heading-2 font-pretendardSemiBold", tab === "mine" ? "text-black" : "text-gray500"].join(" ")}
+              className={[
+                "text-heading-2 font-pretendardSemiBold",
+                tab === "mine" ? "text-black" : "text-gray500",
+              ].join(" ")}
             >
               내 여정 기록
             </Text>
-            {tab === "mine" && <View style={{ position: "absolute", bottom: -1, height: 3, width: mineW, backgroundColor: "#000" }} />}
+            {tab === "mine" && (
+              <View
+                style={{
+                  position: "absolute",
+                  bottom: -1,
+                  height: 3,
+                  width: mineW,
+                  backgroundColor: "#000",
+                }}
+              />
+            )}
           </Pressable>
 
-          <Pressable onPress={() => setTab("explorers")} style={{ flex: 1, alignItems: "center", position: "relative", paddingBottom: 8 }} hitSlop={8}>
+          <Pressable
+            onPress={() => setTab("explorers")}
+            style={{
+              flex: 1,
+              alignItems: "center",
+              position: "relative",
+              paddingBottom: 8,
+            }}
+            hitSlop={8}
+          >
             <Text
               onLayout={(e) => setExpW(e.nativeEvent.layout.width)}
-              className={["text-heading-2 font-pretendardSemiBold", tab === "explorers" ? "text-black" : "text-gray500"].join(" ")}
+              className={[
+                "text-heading-2 font-pretendardSemiBold",
+                tab === "explorers" ? "text-black" : "text-gray500",
+              ].join(" ")}
             >
               탐험가들의 기록
             </Text>
-            {tab === "explorers" && <View style={{ position: "absolute", bottom: -1, height: 3, width: expW, backgroundColor: "#000" }} />}
+            {tab === "explorers" && (
+              <View
+                style={{
+                  position: "absolute",
+                  bottom: -1,
+                  height: 3,
+                  width: expW,
+                  backgroundColor: "#000",
+                }}
+              />
+            )}
           </Pressable>
         </View>
       </View>
@@ -486,31 +624,80 @@ export default function JourneyScreen() {
       {tab === "mine" ? (
         <View style={{ paddingHorizontal: 20, paddingTop: 12 }}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Image source={CHARACTER} style={{ width: 46, height: 46, resizeMode: "contain" }} />
+            <Image
+              source={CHARACTER}
+              style={{ width: 46, height: 46, resizeMode: "contain" }}
+            />
             <View style={{ marginLeft: 6 }}>
-              <Text className="text-gray700 text-body-2 font-pretendardMedium">포슬감자님,</Text>
-              <Text className="text-gray700 text-body-2 font-pretendardMedium">오늘은 어떤 곳을 탐험하셨나요?</Text>
+              <Text className="text-gray700 text-body-2 font-pretendardMedium">
+                포슬감자님,
+              </Text>
+              <Text className="text-gray700 text-body-2 font-pretendardMedium">
+                오늘은 어떤 곳을 탐험하셨나요?
+              </Text>
             </View>
           </View>
 
           <View style={{ flexDirection: "row", marginTop: 13 }}>
-            {[{ label: "작성한 기록", value: myLogs.length }, { label: "받은 감정", value: 0 }, { label: "표시한 감정", value: 0 }].map((s, i) => (
+            {[
+              { label: "작성한 기록", value: myLogs.length },
+              { label: "받은 감정", value: 0 },
+              { label: "표시한 감정", value: 0 },
+            ].map((s, i) => (
               <View key={i} style={{ flex: 1, alignItems: "center" }}>
-                <Text className="text-heading-2 text-yellow900 font-pretendardSemiBold">{s.value}</Text>
-                <Text className="text-gray700 text-body-2  font-pretendardMedium mt-[5px]">{s.label}</Text>
+                <Text className="text-heading-2 text-yellow900 font-pretendardSemiBold">
+                  {s.value}
+                </Text>
+                <Text className="text-gray700 text-body-2  font-pretendardMedium mt-[5px]">
+                  {s.label}
+                </Text>
               </View>
             ))}
           </View>
 
-          <View style={{ height: 10, backgroundColor: "#F4F4F4", marginTop: 12, marginHorizontal: -20, overflow: "hidden" }}>
-            <LinearGradient colors={["rgba(0,0,0,0.08)", "rgba(0,0,0,0)"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ position: "absolute", left: 0, right: 0, top: 1, height: 4 }} />
+          <View
+            style={{
+              height: 10,
+              backgroundColor: "#F4F4F4",
+              marginTop: 12,
+              marginHorizontal: -20,
+              overflow: "hidden",
+            }}
+          >
+            <LinearGradient
+              colors={["rgba(0,0,0,0.08)", "rgba(0,0,0,0)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: 1,
+                height: 4,
+              }}
+            />
           </View>
         </View>
       ) : (
         <View style={{ paddingTop: 12 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingBottom: 13, borderBottomWidth: 1, borderBottomColor: "#D4D4D4" }}>
-            <Image source={CHARACTER} style={{ width: 46, height: 46, resizeMode: "contain" }} />
-            <Text className="text-gray700 text-body-2 font-pretendardMedium" style={{ marginLeft: 6 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              paddingHorizontal: 20,
+              paddingBottom: 13,
+              borderBottomWidth: 1,
+              borderBottomColor: "#D4D4D4",
+            }}
+          >
+            <Image
+              source={CHARACTER}
+              style={{ width: 46, height: 46, resizeMode: "contain" }}
+            />
+            <Text
+              className="text-gray700 text-body-2 font-pretendardMedium"
+              style={{ marginLeft: 6 }}
+            >
               다른 탐험가들의 여정 기록을 살펴보세요!
             </Text>
           </View>
@@ -521,20 +708,58 @@ export default function JourneyScreen() {
             keyExtractor={(it) => it.id}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: SIDE, paddingVertical: 15, backgroundColor: "#F4F4F4", borderBottomWidth: 1, borderBottomColor: "#D4D4D4" }}
+            contentContainerStyle={{
+              paddingHorizontal: SIDE,
+              paddingVertical: 15,
+              backgroundColor: "#F4F4F4",
+              borderBottomWidth: 1,
+              borderBottomColor: "#D4D4D4",
+            }}
             ItemSeparatorComponent={() => <View style={{ width: GAP }} />}
             snapToAlignment="start"
             decelerationRate="fast"
             snapToInterval={CARD_W + GAP}
             renderItem={({ item }) => (
               <Pressable onPress={() => {}} style={{ width: CARD_W }}>
-                <View style={{ width: CARD_W, height: CARD_H, borderRadius: 5, overflow: "hidden", backgroundColor: "#EDEDED" }}>
-                  <ImageBackground source={item.thumbnail} style={{ flex: 1 }} imageStyle={{ width: CARD_W, height: CARD_H, resizeMode: "cover" }}>
+                <View
+                  style={{
+                    width: CARD_W,
+                    height: CARD_H,
+                    borderRadius: 5,
+                    overflow: "hidden",
+                    backgroundColor: "#EDEDED",
+                  }}
+                >
+                  <ImageBackground
+                    source={item.thumbnail}
+                    style={{ flex: 1 }}
+                    imageStyle={{
+                      width: CARD_W,
+                      height: CARD_H,
+                      resizeMode: "cover",
+                    }}
+                  >
                     <LinearGradient
                       colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.5)"]}
-                      style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 60, paddingHorizontal: 10, justifyContent: "flex-end", paddingBottom: 8 }}
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: 60,
+                        paddingHorizontal: 10,
+                        justifyContent: "flex-end",
+                        paddingBottom: 8,
+                      }}
                     >
-                      <Text numberOfLines={1} style={{ color: "#fff", fontFamily: "Pretendard-SemiBold", fontSize: 14 }}>
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          color: "#fff",
+                          fontFamily: "Pretendard-SemiBold",
+                          fontSize: 14,
+                        }}
+                      >
                         {item.title}
                       </Text>
                     </LinearGradient>
@@ -548,25 +773,64 @@ export default function JourneyScreen() {
 
       {/* 상단 컨트롤 줄 (mine) */}
       {tab === "mine" ? (
-        <View style={{ paddingHorizontal: 15, paddingTop: 25, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <View
+          style={{
+            paddingHorizontal: 15,
+            paddingTop: 25,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Pressable onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} hitSlop={10}>
+            <Pressable
+              onPress={() =>
+                setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))
+              }
+              hitSlop={10}
+            >
               <Icon name="triangle" width={8} height={9} />
             </Pressable>
-            <Text className="text-title-1 font-pretendardExtraBold" style={{ marginHorizontal: 10 }}>
+            <Text
+              className="text-title-1 font-pretendardExtraBold"
+              style={{ marginHorizontal: 10 }}
+            >
               {formatYM(month)}
             </Text>
-            <Pressable onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} hitSlop={10}>
-              <Icon name="triangle" width={8} height={9} style={{ transform: [{ scaleX: -1 }] }} />
+            <Pressable
+              onPress={() =>
+                setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))
+              }
+              hitSlop={10}
+            >
+              <Icon
+                name="triangle"
+                width={8}
+                height={9}
+                style={{ transform: [{ scaleX: -1 }] }}
+              />
             </Pressable>
           </View>
 
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Pressable onPress={() => setView(view === "list" ? "board" : "list")} style={{ marginRight: 12 }} hitSlop={10}>
-              <Icon name={view === "list" ? "grid" : "list"} width={22} height={22} />
+            <Pressable
+              onPress={() => setView(view === "list" ? "board" : "list")}
+              style={{ marginRight: 12 }}
+              hitSlop={10}
+            >
+              <Icon
+                name={view === "list" ? "grid" : "list"}
+                width={22}
+                height={22}
+              />
             </Pressable>
             <Pressable onPress={() => {}} hitSlop={10}>
-              <Icon name="calendar" width={34} height={34} strokeColor="#AFAFAF" />
+              <Icon
+                name="calendar"
+                width={34}
+                height={34}
+                strokeColor="#AFAFAF"
+              />
             </Pressable>
           </View>
         </View>
@@ -628,8 +892,16 @@ export default function JourneyScreen() {
                 { label: "산책", value: "walk" },
               ]}
             />
-            <Pressable onPress={() => setView(view === "list" ? "board" : "list")} hitSlop={10} style={{ marginLeft: "auto" }}>
-              <Icon name={view === "list" ? "grid" : "list"} width={22} height={22} />
+            <Pressable
+              onPress={() => setView(view === "list" ? "board" : "list")}
+              hitSlop={10}
+              style={{ marginLeft: "auto" }}
+            >
+              <Icon
+                name={view === "list" ? "grid" : "list"}
+                width={22}
+                height={22}
+              />
             </Pressable>
           </>
         )}
@@ -652,7 +924,9 @@ export default function JourneyScreen() {
             tab === "mine" ? (
               <LogListCard
                 isMine
-                thumbnail={item.thumbnailUri ? { uri: item.thumbnailUri } : null}
+                thumbnail={
+                  item.thumbnailUri ? { uri: item.thumbnailUri } : null
+                }
                 placeholderImage={MONKEY_PLACEHOLDER}
                 placeholderBg="#D9D9D9"
                 title={item.title}
@@ -667,7 +941,9 @@ export default function JourneyScreen() {
               />
             ) : (
               <LogListCard
-                thumbnail={item.thumbnailUri ? { uri: item.thumbnailUri } : null}
+                thumbnail={
+                  item.thumbnailUri ? { uri: item.thumbnailUri } : null
+                }
                 placeholderImage={MONKEY_PLACEHOLDER}
                 placeholderBg="#D9D9D9"
                 title={item.title}
@@ -678,7 +954,10 @@ export default function JourneyScreen() {
                 reactionsCount={item.reactionsCount}
                 bookmarked={item.liked}
                 onPress={() => {
-                  router.push({ pathname: "/explorer/[id]", params: { id: String(item.id) } });
+                  router.push({
+                    pathname: "/explorer/[id]",
+                    params: { id: String(item.id) },
+                  });
                 }}
               />
             )
@@ -689,7 +968,10 @@ export default function JourneyScreen() {
           key="board"
           data={tab === "mine" ? myLogs : othersLogs}
           keyExtractor={(it) => String(it.id)}
-          contentContainerStyle={{ paddingHorizontal: tab === "explorers" ? 25 : 15, paddingBottom: 110 }}
+          contentContainerStyle={{
+            paddingHorizontal: tab === "explorers" ? 25 : 15,
+            paddingBottom: 110,
+          }}
           ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
@@ -706,7 +988,8 @@ export default function JourneyScreen() {
               excerpt={item.excerpt}
               liked={item.liked}
               onPress={() => {
-                const pathname = tab === "mine" ? "/my-log/[id]" : "/explorer/[id]";
+                const pathname =
+                  tab === "mine" ? "/my-log/[id]" : "/explorer/[id]";
                 router.push({ pathname, params: { id: String(item.id) } });
               }}
               style={{ width: "100%" }}
@@ -733,10 +1016,26 @@ export default function JourneyScreen() {
       {menuOpen && (
         <View
           pointerEvents="auto"
-          style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, zIndex: 50 }}
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            zIndex: 50,
+          }}
         >
           {/* 배경 터치 닫힘 (투명) */}
-          <Pressable style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }} onPress={closeMenu} />
+          <Pressable
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+            }}
+            onPress={closeMenu}
+          />
 
           {(() => {
             const MENU_W = 176;
@@ -767,12 +1066,28 @@ export default function JourneyScreen() {
                 }}
                 onLayout={(e) => setMenuH(e.nativeEvent.layout.height)}
               >
-                <Pressable onPress={onPressDelete} style={{ paddingTop: 27, marginBottom: 31, paddingHorizontal: 21 }} hitSlop={8}>
-                  <Text className="text-body-2 text-gray700 font-pretendardMedium">삭제하기</Text>
+                <Pressable
+                  onPress={onPressDelete}
+                  style={{
+                    paddingTop: 27,
+                    marginBottom: 31,
+                    paddingHorizontal: 21,
+                  }}
+                  hitSlop={8}
+                >
+                  <Text className="text-body-2 text-gray700 font-pretendardMedium">
+                    삭제하기
+                  </Text>
                 </Pressable>
 
-                <Pressable onPress={onPressEdit} style={{ paddingBottom: 27, paddingHorizontal: 21 }} hitSlop={8}>
-                  <Text className="text-body-2 text-gray700 font-pretendardMedium">수정하기</Text>
+                <Pressable
+                  onPress={onPressEdit}
+                  style={{ paddingBottom: 27, paddingHorizontal: 21 }}
+                  hitSlop={8}
+                >
+                  <Text className="text-body-2 text-gray700 font-pretendardMedium">
+                    수정하기
+                  </Text>
                 </Pressable>
               </Animated.View>
             );

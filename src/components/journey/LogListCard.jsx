@@ -96,7 +96,7 @@ export default function LogListCard({
             className="ml-1 text-body-2 text-gray700 font-pretendardMedium"
             numberOfLines={1}
           >
-            {(placeText ?? "").trim() || "알 수 없는 탐험지"}
+            {(placeText ?? "").trim() || "-"}
           </Text>
         </View>
 
