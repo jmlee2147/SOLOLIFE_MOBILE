@@ -1,3 +1,5 @@
+// app/(main)/my-log/[id].jsx
+
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -21,9 +23,10 @@ const TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN;
 
 /* ---------- small ui ---------- */
 function StarRow({ value }) {
-  if (value == null) return null;
+  if (value == null || Number.isNaN(Number(value))) return null;
+  const v = Math.max(0, Math.min(5, Number(value)));
   const stars = Array.from({ length: 5 }).map((_, i) => {
-    const diff = value - i;
+    const diff = v - i;
     const type = diff >= 1 ? "full" : diff >= 0.5 ? "half" : "empty";
     return (
       <Icon
@@ -50,30 +53,13 @@ function fmtDate(iso) {
 
 /* ---------- caches & utils ---------- */
 const USER_CACHE = new Map(); // userId(Number) -> { name }
-const LOC_CACHE = new Map(); // locationId(Number) -> { name, address, thumb }
+const LOC_CACHE = new Map(); // locationId(Number) -> { name, thumb, ratingAvg }
 
 function raceTimeout(promise, ms = 1500) {
   return Promise.race([
     promise,
     new Promise((resolve) => setTimeout(() => resolve(null), ms)),
   ]);
-}
-
-// 새로 받은 places(next)가 비어있는 name을 갖고 오면 기존(prev)의 값을 유지해 flicker 방지
-function mergePlaces(prev, next) {
-  const byId = new Map(prev.map((p) => [String(p.id), p]));
-  return next.map((n) => {
-    const key = String(n.id);
-    const old = byId.get(key);
-    if (!old) return n;
-    return {
-      id: n.id,
-      name: n.name || old.name, // ⬅️ 비면 이전 값 유지
-      address: n.address || old.address, // ⬅️ 비면 이전 값 유지
-      rating: n.rating ?? old.rating,
-      thumb: n.thumb || old.thumb,
-    };
-  });
 }
 
 /* ---------- API ---------- */
@@ -123,7 +109,10 @@ async function getUser(userId, { signal } = {}) {
 async function getLocation(locationId, { signal } = {}) {
   const lid = Number(locationId);
   if (!API_BASE || !Number.isFinite(lid)) return null;
-  if (LOC_CACHE.has(lid)) return LOC_CACHE.get(lid);
+  if (LOC_CACHE.has(lid)) {
+    const cached = LOC_CACHE.get(lid);
+    if (cached && cached.name) return cached;
+  }
 
   const url = `${API_BASE.replace(/\/+$/, "")}/locations/${lid}`;
   try {
@@ -135,25 +124,47 @@ async function getLocation(locationId, { signal } = {}) {
       },
     });
     if (!res.ok) return null;
-    // ⚙️ 원문 확보 → 한 줄 로그 → 파싱
+
     const text = await res.text();
-    // ⬇️ 개발환경에서만 한 줄로 찍기 (길이 제한)
     if (__DEV__) {
-      const oneLine = text.replace(/\s+/g, " ");
-      console.log("[locations] GET", lid, oneLine.slice(0, 600));
+      const oneLine = String(text || "").replace(/\s+/g, " ");
+      console.log(
+        `[locations:${lid}] status=`,
+        res.status,
+        "body=",
+        oneLine.slice(0, 800)
+      );
     }
-    const data = text ? JSON.parse(text) : {};
-    const root = data?.location || data || {};
+    if (!res.ok || !text) return null;
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = {};
+    }
+
+    const root = data?.location || data?.data || data?.result || data || {};
+
     const packed = {
       name: root.location_name || root.title || root.name || "",
-      address: root.address || root.formatted_address || root.addr || "",
+      // 주소는 쓰지 않음
       thumb:
         root.thumbnail_url ||
         root.cover?.thumbnail_url ||
         root.images?.[0]?.thumbnail_url ||
         root.cover?.url ||
         "",
+      ratingAvg: Number.isFinite(Number(root.rating_avg))
+        ? Number(root.rating_avg)
+        : null,
     };
+    if (__DEV__)
+      console.log(`[locations:${lid}] parsed=`, {
+        name: packed.name,
+        hasThumb: !!packed.thumb,
+        ratingAvg: packed.ratingAvg,
+      });
+
     LOC_CACHE.set(lid, packed);
     return packed;
   } catch {
@@ -161,57 +172,23 @@ async function getLocation(locationId, { signal } = {}) {
   }
 }
 
-/** detail.places 우선, 없으면 fallback으로 location_id 사용 */
-async function resolvePlaces(detail, { signal } = {}) {
-  // 1) 배열 우선
-  if (Array.isArray(detail?.places) && detail.places.length > 0) {
-    const uniq = [];
-    const seen = new Set();
-    for (const p of detail.places) {
-      const id = Number(p?.locationId ?? p?.location_id);
-      if (!Number.isFinite(id) || seen.has(id)) continue;
-      seen.add(id);
-      uniq.push({ locationId: id, rating: Number(p?.rating) || null });
-    }
-    if (uniq.length === 0) return [];
-
-    // 메타 병렬 fetch (첫 항목은 바로, 이후는 타임아웃 레이스)
-    const metas = await Promise.all(
-      uniq.map(async (p, idx) => {
-        const loader =
-          idx === 0
-            ? getLocation(p.locationId, { signal })
-            : raceTimeout(getLocation(p.locationId, { signal }), 1500); // ⬅️ 오타 fix: reaceTimeout -> raceTimeout
-        const meta = await loader;
-        return { ...p, meta };
-      })
-    );
-
-    return metas.map((it) => ({
-      id: String(it.locationId),
-      name: it.meta?.name || "",
-      address: it.meta?.address || "",
-      rating: it.rating ?? null,
-      thumb: it.meta?.thumb || "",
-    }));
-  }
-
-  // 2) 단일 location_id fallback
+/** 단일 장소만: logbook.location_id 기반으로 /locations/{id} 조회 */
+async function resolveSinglePlace(detail, { signal } = {}) {
   const fallbackId = Number(detail?.location_id);
-  if (Number.isFinite(fallbackId)) {
-    const meta = await raceTimeout(getLocation(fallbackId, { signal }), 1500);
-    return [
-      {
-        id: String(fallbackId),
-        name: meta?.name || "",
-        address: meta?.address || "",
-        rating: null,
-        thumb: meta?.thumb || "",
-      },
-    ];
-  }
+  if (!Number.isFinite(fallbackId)) return [];
 
-  return [];
+  const meta = await getLocation(fallbackId, { signal });
+  if (__DEV__) console.log("[resolveSinglePlace]", { fallbackId, meta });
+  if (!meta || !meta.name) return []; // ← 이름 없으면 섹션 자체 숨김
+
+  return [
+    {
+      id: String(fallbackId),
+      name: meta.name,
+      rating: meta.ratingAvg ?? null,
+      thumb: meta.thumb || "",
+    },
+  ];
 }
 
 /* ---------- Page ---------- */
@@ -220,7 +197,7 @@ export default function MyLogDetailScreen() {
   const params = useLocalSearchParams();
 
   // StrictMode 더블 런 방지
-  const didRunRef = useRef(false); // ⬅️ 추가
+  const didRunRef = useRef(false);
 
   // 라우트 파라미터 정규화 (+ 리스트에서 넘어온 낙관값)
   const id = String(params?.id ?? "").replace(/[^0-9]/g, "");
@@ -236,8 +213,11 @@ export default function MyLogDetailScreen() {
   const [createdAt, setCreatedAt] = useState("");
   const [body, setBody] = useState("");
   const [authorName, setAuthorName] = useState("탐험가");
-  const [places, setPlaces] = useState([]); // [{id, name, address, rating?, thumb?}]
-  const [placesLoading, setPlacesLoading] = useState(true); // ⬅️ 추가: flicker 억제
+
+  // 단일 장소만 담지만, 기존 렌더 구조 유지 위해 배열 형태 사용
+  const [places, setPlaces] = useState([]); // [{id, name, rating?, thumb?}]
+  const [placesLoading, setPlacesLoading] = useState(true);
+
   const [images, setImages] = useState(
     optimisticThumb ? [optimisticThumb] : []
   );
@@ -249,9 +229,8 @@ export default function MyLogDetailScreen() {
   useEffect(() => {
     if (!id) return;
 
-    // StrictMode에서 동일 effect 두 번 실행되는 문제 차단
-    if (didRunRef.current) return; // ⬅️ 추가
-    didRunRef.current = true; // ⬅️ 추가
+    if (didRunRef.current) return;
+    didRunRef.current = true;
 
     const ac = new AbortController();
 
@@ -259,9 +238,9 @@ export default function MyLogDetailScreen() {
       try {
         setLoading(true);
         setErr(null);
-        setPlacesLoading(true); // ⬅️ 추가
+        setPlacesLoading(true);
 
-        // 1) 로그북 상세 — 도착 즉시 기본 정보 렌더
+        // 1) 로그북 상세
         const detail = await getLogbook(id, { signal: ac.signal });
 
         setTitle(detail?.entry_title || optimisticTitle || "(제목 없음)");
@@ -270,8 +249,11 @@ export default function MyLogDetailScreen() {
         const imgs = Array.isArray(detail?.image_urls) ? detail.image_urls : [];
         if (imgs.length > 0) setImages(imgs);
         else if (optimisticThumb) setImages([optimisticThumb]);
+        // detail 바로 받은 직후
+        if (__DEV__)
+          console.log("[detail] id=", id, "location_id=", detail?.location_id);
 
-        // 2) 작성자 + 3) 장소 배열/단일 동시 처리
+        // 2) 작성자
         const userPromise = (async () => {
           const userId = Number(detail?.user_id);
           if (!Number.isFinite(userId)) return null;
@@ -282,9 +264,10 @@ export default function MyLogDetailScreen() {
           return u; // { name }
         })();
 
-        const placesPromise = resolvePlaces(detail, { signal: ac.signal });
+        // 3) 단일 장소 메타
+        const placesPromise = resolveSinglePlace(detail, { signal: ac.signal });
 
-        const [userMeta, placesArr] = await Promise.all([
+        const [userMeta, placeArr] = await Promise.all([
           userPromise,
           placesPromise,
         ]);
@@ -292,13 +275,12 @@ export default function MyLogDetailScreen() {
         if (userMeta?.name) setAuthorName(userMeta.name);
         else setAuthorName((v) => v || "탐험가");
 
-        // 🔒 flicker 방지: 비어있는 name으로 기존 값을 덮지 않도록 merge
-        setPlaces((prev) => mergePlaces(prev, placesArr));
-        setPlacesLoading(false); // ⬅️ 추가
+        setPlaces(placeArr);
+        setPlacesLoading(false);
 
-        // 장소 썸네일로 대표 이미지 보강(이미 이미지가 없고, 장소 thumb가 있으면)
+        // 장소 썸네일이 있고 대표 이미지 없음 → 보강
         if ((!imgs || imgs.length === 0) && !optimisticThumb) {
-          const firstThumb = placesArr.find((p) => p.thumb)?.thumb;
+          const firstThumb = placeArr.find((p) => p.thumb)?.thumb;
           if (firstThumb) setImages([firstThumb]);
         }
 
@@ -546,8 +528,8 @@ export default function MyLogDetailScreen() {
               )}
             </View>
 
-            {/* 방문 장소 — 여러 개 지원 */}
-            {places.length > 0 && !placesLoading && (
+            {/* 방문 장소 — 단일 */}
+            {places.length > 0 && !placesLoading && !!places[0]?.name && (
               <View
                 style={{
                   paddingHorizontal: 16,
@@ -556,41 +538,36 @@ export default function MyLogDetailScreen() {
                   paddingBottom: 16,
                 }}
               >
-                {places.map((p) => (
-                  <View
-                    key={p.id}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      paddingVertical: 7.5,
-                    }}
-                  >
-                    <Icon
-                      name="location"
-                      width={20}
-                      height={20}
-                      color="#93B56C"
-                    />
-                    <View style={{ flex: 1, marginLeft: 5 }}>
-                      <Text
-                        className="text-body-1 font-pretendardMedium"
-                        numberOfLines={1}
-                      >
-                        {p.name || "(장소)"}{" "}
-                        {/* mergePlaces 덕분에 비어있는 값으로는 덮이지 않음 */}
-                      </Text>
-                      {!!p.address && (
+                {(() => {
+                  const p = places[0];
+                  return (
+                    <View
+                      key={p.id}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        paddingVertical: 7.5,
+                      }}
+                    >
+                      <Icon
+                        name="location"
+                        width={20}
+                        height={20}
+                        color="#93B56C"
+                      />
+                      <View style={{ flex: 1, marginLeft: 5 }}>
                         <Text
-                          className="text-gray700 text-body-3 font-pretendardRegular"
+                          className="text-body-1 font-pretendardMedium"
                           numberOfLines={1}
                         >
-                          {p.address}
+                          {p.name || "알 수 없는 탐험지"}
                         </Text>
-                      )}
+                        {/* 주소는 표시하지 않음 */}
+                      </View>
+                      <StarRow value={p.rating} />
                     </View>
-                    <StarRow value={p.rating} />
-                  </View>
-                ))}
+                  );
+                })()}
               </View>
             )}
 
