@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, {
   useCallback,
   useEffect,
@@ -147,8 +148,23 @@ async function fetchLocationMeta(id) {
 }
 
 export default function JourneyScreen() {
+  const router = useRouter();
+  const { justSaved } = useLocalSearchParams(); // "1" 문자열로 옴
+  const { showToast } = useToast();
   const [tab, setTab] = useState("mine");
   const [view, setView] = useState("list");
+  const params = router?.params || {};
+
+  // 화면 포커스될 때 한 번만 처리
+  useFocusEffect(
+    useCallback(() => {
+      if (justSaved === "1") {
+        showToast({ message: "여정기록이 저장되었어요", type: "success", duration: 2000, });
+        // 파라미터 제거 (같은 경로로 무파라미터 replace)
+        router.replace("/(tabs)/journey");
+      }
+    }, [justSaved, showToast, router])
+  );
 
   // 옵션 메뉴 상태 + 위치
   const [menuOpen, setMenuOpen] = useState(false);
@@ -201,8 +217,6 @@ export default function JourneyScreen() {
       setMenuTarget(null);
     });
   }, [scaleAnim, opacityAnim]);
-
-  const router = useRouter();
 
   // 정렬/필터
   const [sort, setSort] = useState("latest");
@@ -524,7 +538,6 @@ export default function JourneyScreen() {
     });
   }, [menuTarget, closeMenu, router]);
 
-  const { showToast } = useToast();
   const onPressDelete = useCallback(async () => {
     if (!menuTarget) return;
     const targetId = String(menuTarget.id);
@@ -533,9 +546,9 @@ export default function JourneyScreen() {
       // 서버 성공 후에만 제거
       await apiDeleteLogbook(targetId);
       setMyLogs((prev) => prev.filter((it) => String(it.id) !== targetId));
-    } catch (e) {
-    }
-  }, [menuTarget, closeMenu, setMyLogs]);
+      showToast({ message: "여정기록이 삭제되었어요", type: "success", duration: 2000 });
+    } catch (e) {}
+  }, [menuTarget, closeMenu, setMyLogs, showToast]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
@@ -1059,8 +1072,9 @@ export default function JourneyScreen() {
                   backgroundColor: "#fff",
                   shadowColor: "#000",
                   shadowOpacity: 0.11,
-                  shadowRadius: 6,
-                  elevation: 6,
+                  shadowRadius: 3,
+                  shadowOffset: { width: 0, height: 0 },
+                  elevation: 3,
                   transform: [{ scale: scaleAnim }],
                   opacity: opacityAnim,
                 }}

@@ -290,7 +290,7 @@ export default function ComposeScreen() {
     if (DEV_STICKY_SAVING) return;
 
     try {
-      await postLogbook({
+      const res = await postLogbook({
         title,
         body,
         isPrivate,
@@ -298,7 +298,11 @@ export default function ComposeScreen() {
         images, // http(s)만 전송
       });
       await clearPostDraft();
-      router.replace("/(tabs)/journey");
+      const newId = res?.logbook_id ?? res?.id;
+      router.replace({
+        pathname: "/(tabs)/journey",
+        params: { justSaved: "1" },
+      });
     } catch (e) {
       // console.log("[compose] save error", String(e?.message || e));
       // TODO: 토스트/알럿 연결
