@@ -28,7 +28,7 @@ import SortDropdown from "../../../../components/journey/SortDropdown";
 import Icon from "../../../../components/shared/Icon";
 import { useToast } from "../../../../providers/ToastProvider";
 
-const CHARACTER = require("../../../../assets/images/explorer.png");
+const CHARACTER = require("../../../../assets/images/monkey-write.png");
 const FALLBACK_THUMB = require("../../../../assets/images/sample.png");
 const MONKEY_PLACEHOLDER = require("../../../../assets/images/monkey-placeholder.png");
 const MONKEY_PLACEHOLDER_BOARD = require("../../../../assets/images/monkey-placeholder-board.png");
@@ -149,7 +149,7 @@ async function fetchLocationMeta(id) {
 
 export default function JourneyScreen() {
   const router = useRouter();
-  const { justSaved } = useLocalSearchParams(); // "1" 문자열로 옴
+  const { justSaved } = useLocalSearchParams();
   const { showToast } = useToast();
   const [tab, setTab] = useState("mine");
   const [view, setView] = useState("list");
@@ -158,9 +158,11 @@ export default function JourneyScreen() {
   // 화면 포커스될 때 한 번만 처리
   useFocusEffect(
     useCallback(() => {
-      if (justSaved === "1") {
-        showToast({ message: "여정기록이 저장되었어요", type: "success", duration: 2000, });
-        // 파라미터 제거 (같은 경로로 무파라미터 replace)
+      if (justSaved === "created") {
+        showToast({ message: "여정기록이 저장되었어요.", type: "success", duration: 2000 });
+        router.replace("/(tabs)/journey");
+      } else if (justSaved === "edited") {
+        showToast({ message: "여정기록이 수정되었어요.", type: "success", duration: 2000 });
         router.replace("/(tabs)/journey");
       }
     }, [justSaved, showToast, router])
@@ -533,7 +535,7 @@ export default function JourneyScreen() {
     if (!menuTarget) return;
     closeMenu();
     router.push({
-      pathname: "/journey-create",
+      pathname: "/journey-create/compose",
       params: { editId: String(menuTarget.id) },
     });
   }, [menuTarget, closeMenu, router]);
@@ -1015,7 +1017,7 @@ export default function JourneyScreen() {
       {tab === "mine" && (
         <FloatingButton
           onPress={() => router.push("/journey-create")}
-          label="+100 EXP"
+          label="+5 EXP"
           showLabel
           bottom={24}
           right={15}
