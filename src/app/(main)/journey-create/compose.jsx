@@ -2,8 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
+  Easing,
   Image,
   Keyboard,
   KeyboardAvoidingView,
@@ -26,6 +28,8 @@ const DRAFT_KEY = "journey_draft_places_v1";
 const POST_DRAFT_KEY = "journey_post_draft_v1";
 const POSTS_KEY = "journey_posts_v1";
 
+const DEV_STICKY_SAVING = false;
+
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL; // e.g. https://api.example.com
 const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN; // Bearer 토큰 (.env)
 
@@ -42,6 +46,85 @@ async function loadDraftPlaces() {
   } catch {
     return [];
   }
+}
+
+function LoadingWritingOverlay({
+  message = "여정기록을 적고 있어요",
+  monkeySource,
+}) {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  const animate = (v, delay) =>
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(v, { toValue: 1, duration: 320, delay, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(v, { toValue: 0, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      ])
+    ).start();
+
+  useEffect(() => {
+    animate(dot1, 0);
+    animate(dot2, 120);
+    animate(dot3, 240);
+  }, []);
+
+  return (
+    <View
+      pointerEvents="auto"
+      style={{
+        position: "absolute",
+        left: 0, right: 0, top: 0, bottom: 0,
+        alignItems: "center", justifyContent: "center",
+        backgroundColor: "rgba(255,255,255,0.6)",
+      }}
+    >
+      <View
+        style={{
+          alignItems: "center",
+          paddingHorizontal: 18,
+          paddingVertical: 16,
+          borderRadius: 14,
+          backgroundColor: "transparent",
+          shadowColor: "#000",
+          shadowOpacity: 0.12,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 8,
+          maxWidth: 320,
+        }}
+      >
+        {/* 원숭이 이미지 (위) */}
+        {monkeySource ? (
+          <Image
+            source={monkeySource}
+            style={{ width: 180, height: 180 }}
+            resizeMode="contain"
+          />
+        ) : null}
+
+        {/* 텍스트 + 도트 (아래) */}
+        <View style={{ flexDirection: "row", alignItems: "baseline", marginTop: 10 }}>
+          <Text
+            className="text-body-1 font-pretendardMedium"
+          >
+            {message}
+          </Text>
+
+          <Animated.View style={{ opacity: dot1, marginLeft: 4, transform: [{ translateY: dot1.interpolate({ inputRange:[0,1], outputRange:[0,-2] }) }] }}>
+            <Text style={{ fontSize: 18, color: "#1E1E1E" }}>.</Text>
+          </Animated.View>
+          <Animated.View style={{ opacity: dot2, transform: [{ translateY: dot2.interpolate({ inputRange:[0,1], outputRange:[0,-2] }) }] }}>
+            <Text style={{ fontSize: 18, color: "#1E1E1E" }}>.</Text>
+          </Animated.View>
+          <Animated.View style={{ opacity: dot3, transform: [{ translateY: dot3.interpolate({ inputRange:[0,1], outputRange:[0,-2] }) }] }}>
+            <Text style={{ fontSize: 18, color: "#1E1E1E" }}>.</Text>
+          </Animated.View>
+        </View>
+      </View>
+    </View>
+  );
 }
 
 async function loadPostDraft() {
@@ -137,6 +220,7 @@ function formatDate(date = new Date()) {
 
 export default function ComposeScreen() {
   const router = useRouter();
+  const [saving, setSaving] = useState(false);
 
   // 날짜
   const [date, setDate] = useState(new Date());
@@ -152,7 +236,7 @@ export default function ComposeScreen() {
   const [tagInput, setTagInput] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
 
-  // 📸 이미지 상태
+  // 이미지 상태
   const [images, setImages] = useState([]); // [{uri, width, height, fileName?, mimeType?}...]
 
   // 초기 로드: 장소 드래프트 + 포스트 드래프트
@@ -200,6 +284,11 @@ export default function ComposeScreen() {
   }, []);
 
   const onPressSave = useCallback(async () => {
+    if (saving) return;
+    setSaving(true);
+
+    if (DEV_STICKY_SAVING) return;
+
     try {
       await postLogbook({
         title,
@@ -209,12 +298,14 @@ export default function ComposeScreen() {
         images, // http(s)만 전송
       });
       await clearPostDraft();
-      router.replace("/journey-create");
+      router.replace("/(tabs)/journey");
     } catch (e) {
       // console.log("[compose] save error", String(e?.message || e));
-      // TODO: 토스트/알럿 연결 가능
+      // TODO: 토스트/알럿 연결
+    } finally {
+      if (!DEV_STICKY_SAVING) setSaving(false);
     }
-  }, [title, body, isPrivate, places, images, router]);
+  }, [saving, title, body, isPrivate, places, images, router]);
 
   // 카메라/갤러리 구현
 
@@ -624,12 +715,20 @@ export default function ComposeScreen() {
 
           {/* 저장하기 버튼 (공통 Button) */}
           <Button
-            title="저장하기"
+            title={saving ? "저장 중..." : "저장하기"}
             variant="primary"
             size="small"
             onPress={onPressSave}
+            disabled={saving}
           />
         </View>
+        {/* 저장 중 오버레이 */}
+        {saving && (
+          <LoadingWritingOverlay
+            message="여정기록을 저장하는 중이에요"
+            monkeySource={require("../../../assets/images/monkey-write.png")} // 원숭이 이미지 경로
+          />
+        )}
       </SafeAreaView>
     </TouchableWithoutFeedback>
   );
