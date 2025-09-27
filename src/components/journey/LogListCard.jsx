@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import Icon from "../shared/Icon";
 
@@ -9,20 +9,20 @@ export default function LogListCard({
   placeText,
   dateText,
   authorName,
-  visibility = "public", // isMine일 때만
+  visibility = "public",
   liked = false,
   bookmarked = false,
   commentsCount = 0,
   reactionsCount = 0,
   onPress,
-  onPressMore,
+  onPressOptions,
   onToggleLike,
   onToggleBookmark,
   style,
   placeholderImage,
   placeholderBg = "#D9D9D9",
 }) {
-  // console.log('[LogListCard] title=', title, 'placeText=', placeText);
+  const optionsRef = useRef(null);
   return (
     <Pressable
       onPress={onPress}
@@ -65,12 +65,19 @@ export default function LogListCard({
           </Text>
 
           {isMine ? (
-            // 내 기록 → 옵션 아이콘
-            <Pressable onPress={onPressMore} hitSlop={8}>
+            <Pressable
+              ref={optionsRef}
+              onPress={() => {
+                // 아이콘의 절대좌표를 측정해서 부모로 전달
+                optionsRef.current?.measureInWindow?.((x, y, w, h) => {
+                  onPressOptions?.({ x, y, w, h });
+                });
+              }}
+              hitSlop={8}
+            >
               <Icon name="options" width={24} height={24} />
             </Pressable>
           ) : (
-            // 다른 사람 기록 → 북마크 아이콘
             <Pressable onPress={onToggleBookmark} hitSlop={8}>
               <Icon
                 name="bookmark"
@@ -83,20 +90,18 @@ export default function LogListCard({
         </View>
 
         {/* 위치 */}
-
         <View style={styles.placeRow}>
           <Icon name="location" width={16} height={16} />
           <Text
             className="ml-1 text-body-2 text-gray700 font-pretendardMedium"
             numberOfLines={1}
           >
-            { (placeText ?? "").trim() || "알 수 없는 탐험지" }
+            {(placeText ?? "").trim() || "-"}
           </Text>
         </View>
 
         {/* 하단 행 */}
         <View style={styles.footer}>
-          {/* 왼쪽: 비공개/공개 or 작성자 | 날짜 */}
           {isMine ? (
             <Text
               className="text-body-3 font-pretendardRegular text-gray700"
@@ -113,7 +118,6 @@ export default function LogListCard({
             </Text>
           )}
 
-          {/* 오른쪽: 댓글 + 스마일 */}
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <View style={styles.actionItem}>
               <Icon name="comment_fill" width={16} height={16} />
@@ -153,32 +157,14 @@ const styles = StyleSheet.create({
     width: undefined,
     height: undefined,
   },
-  content: {
-    flex: 1,
-  },
-  placeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 5,
-  },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
+  content: { flex: 1 },
+  placeRow: { flexDirection: "row", alignItems: "center", marginTop: 5 },
+  titleRow: { flexDirection: "row", alignItems: "center" },
   footer: {
     marginTop: "auto",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  actions: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  actionItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginLeft: 10,
-  },
+  actionItem: { flexDirection: "row", alignItems: "center", marginLeft: 10 },
 });

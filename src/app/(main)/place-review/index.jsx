@@ -16,7 +16,7 @@ import {
 import Button from "../../../components/shared/Button";
 import Icon from "../../../components/shared/Icon";
 
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL.trim();
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL.trim() || "";
 
 // 개발 편의용 테스트 토큰 (env에 없으면 폴백)
 const ENV_TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN?.trim();
@@ -111,7 +111,7 @@ export default function ReviewWriteScreen() {
     stored = sanitizeToken(stored);
     if (stored && !isExpired(stored)) return stored;
 
-    const fallback = sanitizeToken(ENV_TEST_TOKEN || FALLBACK_TEST_TOKEN);
+    const fallback = sanitizeToken(ENV_TEST_TOKEN || "");
     if (!fallback) throw new Error("로그인이 필요합니다. (테스트 토큰 없음)");
     // 상세/다른 화면에서도 동일 토큰 쓰게 저장
     try {
@@ -145,7 +145,7 @@ export default function ReviewWriteScreen() {
 
       const body = {
         location_id: locationIdNum,
-        rating: Number(rating),
+        rating: Math.max(1, Math.min(5, Number(rating))),
         content: contentArray.length ? contentArray : [content.trim()],
         logbook_id: Number.isFinite(Number(logbookId)) ? Number(logbookId) : 0, // ✅ 여기
       };

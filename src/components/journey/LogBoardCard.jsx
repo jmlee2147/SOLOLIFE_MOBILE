@@ -63,7 +63,7 @@ export default function LogBoardCard({
             ]}
           >
             {placeholderImage && (
-              <Image source={placeholderImage} style={{ width: 344, height: 218 }} resizeMode="contain" />
+              <Image source={placeholderImage} style={{ width: 280, height: 218 }} resizeMode="contain" />
             )}
           </View>
         )}

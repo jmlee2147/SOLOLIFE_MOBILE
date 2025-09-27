@@ -1,5 +1,7 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, {
   useCallback,
   useEffect,
@@ -8,6 +10,7 @@ import React, {
   useState,
 } from "react";
 import {
+  Animated,
   Dimensions,
   FlatList,
   Image,
@@ -23,8 +26,9 @@ import LogBoardCard from "../../../../components/journey/LogBoardCard";
 import LogListCard from "../../../../components/journey/LogListCard";
 import SortDropdown from "../../../../components/journey/SortDropdown";
 import Icon from "../../../../components/shared/Icon";
+import { useToast } from "../../../../providers/ToastProvider";
 
-const CHARACTER = require("../../../../assets/images/explorer.png");
+const CHARACTER = require("../../../../assets/images/monkey-write.png");
 const FALLBACK_THUMB = require("../../../../assets/images/sample.png");
 const MONKEY_PLACEHOLDER = require("../../../../assets/images/monkey-placeholder.png");
 const MONKEY_PLACEHOLDER_BOARD = require("../../../../assets/images/monkey-placeholder-board.png");
@@ -33,6 +37,7 @@ const MONKEY_PLACEHOLDER_BOARD = require("../../../../assets/images/monkey-place
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL;
 const TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN;
 const USER_ID = Number(process.env.EXPO_PUBLIC_TEST_USER_ID || 1);
+const apiBase = API_BASE?.replace(/\/+$/, "") || "";
 
 // ===== 유틸 =====
 function formatYM(d) {
@@ -49,7 +54,40 @@ function fmtDateISOToYmd(iso) {
   return `${y}.${m}.${day}`;
 }
 
-// ===== 세션 캐시(선택) =====
+const sanitizeToken = (t) =>
+  String(t || "")
+    .trim()
+    .replace(/^Bearer\s+/i, "");
+async function ensureToken() {
+  const stored = sanitizeToken(await AsyncStorage.getItem("jwt"));
+  if (stored) return stored;
+  if (TOKEN) return sanitizeToken(TOKEN);
+  throw new Error("권한 토큰이 없습니다.");
+}
+async function apiDeleteLogbook(logbookId) {
+  const jwt = await ensureToken();
+  const res = await fetch(`${apiBase}/logbooks/${Number(logbookId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${jwt}` },
+  });
+  if (!res.ok) throw new Error(`DELETE /logbooks/${logbookId} ${res.status}`);
+  return true;
+}
+async function apiPatchLogbook(logbookId, payload) {
+  const jwt = await ensureToken();
+  const res = await fetch(`${apiBase}/logbooks/${Number(logbookId)}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${jwt}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`PATCH /logbooks/${logbookId} ${res.status}`);
+  return res.json();
+}
+
+// ===== 세션 캐시 =====
 const LOCATION_NAME_CACHE = new Map(); // id:number -> name
 
 // ===== API 헬퍼 =====
@@ -63,27 +101,21 @@ async function fetchLogbookDetail(logbookId) {
         ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
       },
     });
-    if (!res.ok) {
-      // console.warn("[logbookDetail] !ok", res.status, url);
-      return null;
-    }
+    if (!res.ok) return null;
     const data = await res.json();
-
-    // console.warn("[logbookDetail]", logbookId, { entry_content_len: data?.entry_content?.length });
-
-    const raw = typeof data?.entry_content === "string" ? data.entry_content : "";
+    const raw =
+      typeof data?.entry_content === "string" ? data.entry_content : "";
     const compact = raw.replace(/\s+/g, " ").trim();
-    const excerpt = compact ? compact.slice(0, 160) + (compact.length > 160 ? "…" : "") : "";
-
+    const excerpt = compact
+      ? compact.slice(0, 160) + (compact.length > 160 ? "…" : "")
+      : "";
     return { ...data, excerpt };
-  } catch (e) {
-    // console.warn("[logbookDetail] fetch error", String(e));
+  } catch {
     return null;
   }
 }
-
 async function fetchLocationMeta(id) {
-  if (!API_BASE || id === null || id === undefined) return null;
+  if (!API_BASE || id == null) return null;
   const url = `${API_BASE.replace(/\/+$/, "")}/locations/${Number(id)}`;
   try {
     const res = await fetch(url, {
@@ -92,11 +124,7 @@ async function fetchLocationMeta(id) {
         ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
       },
     });
-    if (!res.ok) {
-      // console.warn("[locations] !ok", res.status, url);
-      return null;
-    }
-
+    if (!res.ok) return null;
     const data = await res.json();
     const root = data?.location || data;
     const name =
@@ -112,33 +140,97 @@ async function fetchLocationMeta(id) {
       root.images?.[0]?.thumbnail_url ??
       root.cover?.url ??
       "";
-
-    if (name) LOCATION_NAME_CACHE.set(Number(id), name); // 세션 캐시에 저장
-
+    if (name) LOCATION_NAME_CACHE.set(Number(id), name);
     return { name, thumb };
-  } catch (e) {
-    // console.warn("[locations] fetch error", String(e));
+  } catch {
     return null;
   }
 }
 
 export default function JourneyScreen() {
+  const router = useRouter();
+  const { justSaved } = useLocalSearchParams();
+  const { showToast } = useToast();
   const [tab, setTab] = useState("mine");
   const [view, setView] = useState("list");
+  const params = router?.params || {};
 
-  // 탐험가 탭용 정렬/필터
+  // 화면 포커스될 때 한 번만 처리
+  useFocusEffect(
+    useCallback(() => {
+      if (justSaved === "created") {
+        showToast({ message: "여정기록이 저장되었어요.", type: "success", duration: 2000 });
+        router.replace("/(tabs)/journey");
+      } else if (justSaved === "edited") {
+        showToast({ message: "여정기록이 수정되었어요.", type: "success", duration: 2000 });
+        router.replace("/(tabs)/journey");
+      }
+    }, [justSaved, showToast, router])
+  );
+
+  // 옵션 메뉴 상태 + 위치
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuTarget, setMenuTarget] = useState(null); // { id, ... }
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+  const [menuH, setMenuH] = useState(0);
+
+  // 애니메이션
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  const openMenu = useCallback(
+    (item, pos) => {
+      if (tab !== "mine") return;
+      if (pos?.x != null && pos?.y != null) {
+        setMenuPos({ x: pos.x + (pos.w || 0), y: pos.y });
+      }
+      setMenuTarget(item);
+      setMenuOpen(true);
+
+      // 시작값 0으로 초기화 후 애니메이션
+      scaleAnim.setValue(0);
+      opacityAnim.setValue(0);
+      Animated.parallel([
+        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 140,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    },
+    [tab, scaleAnim, opacityAnim]
+  );
+
+  const closeMenu = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(scaleAnim, {
+        toValue: 0,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setMenuOpen(false);
+      setMenuTarget(null);
+    });
+  }, [scaleAnim, opacityAnim]);
+
+  // 정렬/필터
   const [sort, setSort] = useState("latest");
   const [region, setRegion] = useState(null);
   const [category, setCategory] = useState(null);
 
-  // 내 탭 월 네비
+  // 월 네비
   const [month, setMonth] = useState(new Date());
-
   const [mineW, setMineW] = useState(0);
   const [expW, setExpW] = useState(0);
-  const router = useRouter();
 
-  // ===== 내 로그북 =====
+  // 내/다른 사람 로그
   const [myLogs, setMyLogs] = useState([]);
   const [myPage, setMyPage] = useState(1);
   const [myHasMore, setMyHasMore] = useState(true);
@@ -146,7 +238,6 @@ export default function JourneyScreen() {
   const [myRefreshing, setMyRefreshing] = useState(false);
   const fetchedMyLocIdsRef = useRef(new Set());
 
-  // ===== 다른 탐험가 로그북 =====
   const [othersLogs, setOthersLogs] = useState([]);
   const [othersPage, setOthersPage] = useState(1);
   const [othersHasMore, setOthersHasMore] = useState(true);
@@ -154,15 +245,17 @@ export default function JourneyScreen() {
   const [othersRefreshing, setOthersRefreshing] = useState(false);
   const fetchedOthersLocIdsRef = useRef(new Set());
 
-  // ===== 목록 mapper =====
+  // 목록 mapper
   function mapApiLogToItem(it) {
-    const locId = Number.isFinite(Number(it.location_id)) ? Number(it.location_id) : null;
+    const locId = Number.isFinite(Number(it.location_id))
+      ? Number(it.location_id)
+      : null;
     return {
       id: String(it.logbook_id),
       locationId: locId,
       thumbnailUri: it.image_urls?.[0] || "",
       title: it.entry_title || "",
-      placeText: locId != null ? (LOCATION_NAME_CACHE.get(locId) || "") : "",
+      placeText: locId != null ? LOCATION_NAME_CACHE.get(locId) || "" : "",
       excerpt: "",
       dateText: fmtDateISOToYmd(it.created_at),
       visibility: "public",
@@ -173,7 +266,7 @@ export default function JourneyScreen() {
     };
   }
 
-  // ===== 내 로그 불러오기 =====
+  // 내 로그 불러오기
   const fetchMyLogs = useCallback(
     async ({ page = 1, append = false } = {}) => {
       if (!API_BASE || !USER_ID) {
@@ -215,7 +308,7 @@ export default function JourneyScreen() {
     [myLoading]
   );
 
-  // ===== 다른 탐험가 로그 불러오기 =====
+  // 다른 탐험가 로그
   const fetchOthers = useCallback(
     async ({ page = 1, append = false } = {}) => {
       if (!API_BASE) {
@@ -229,14 +322,19 @@ export default function JourneyScreen() {
         const params = new URLSearchParams({
           page: String(page),
           limit: "20",
-          order: sort === "popular" ? "likes.desc,created_at.desc" : "created_at.desc",
+          order:
+            sort === "popular"
+              ? "likes.desc,created_at.desc"
+              : "created_at.desc",
           isPublic: "true",
           ...(USER_ID ? { excludeUserId: String(USER_ID) } : {}),
           ...(region && region !== "all" ? { region } : {}),
           ...(category ? { category } : {}),
         });
-        const url = `${API_BASE.replace(/\/+$/, "")}/logbooks?${params.toString()}`;
-
+        const url = `${API_BASE.replace(
+          /\/+$/,
+          ""
+        )}/logbooks?${params.toString()}`;
         const res = await fetch(url, {
           headers: {
             Accept: "application/json",
@@ -265,19 +363,18 @@ export default function JourneyScreen() {
     [othersLoading, sort, region, category]
   );
 
-  // ===== 탭 최초 로드 =====
+  // 최초 로드
   useEffect(() => {
     if (tab === "mine") fetchMyLogs({ page: 1, append: false });
     if (tab === "explorers") fetchOthers({ page: 1, append: false });
   }, [tab, fetchMyLogs, fetchOthers]);
 
-  // ===== 상세 조회로 locationId/thumbnail/excerpt 보강 =====
+  // 상세 보강
   function useDetailEnrichment(logs, setLogs) {
     useEffect(() => {
       const needDetailIds = logs
         .filter((it) => !it.locationId || !it.thumbnailUri || !it.excerpt)
         .map((it) => it.id);
-
       if (needDetailIds.length === 0) return;
 
       let alive = true;
@@ -289,16 +386,20 @@ export default function JourneyScreen() {
               return [logbookId, { locId: null, firstImage: "", excerpt: "" }];
 
             const locId = detail?.location_id ?? detail?.locationId ?? null;
-            const firstImage = Array.isArray(detail?.image_urls) ? detail.image_urls[0] : "";
+            const firstImage = Array.isArray(detail?.image_urls)
+              ? detail.image_urls[0]
+              : "";
 
             let ex =
-              (typeof detail?.entry_content_head === "string" && detail.entry_content_head.trim()) || "";
-
+              (typeof detail?.entry_content_head === "string" &&
+                detail.entry_content_head.trim()) ||
+              "";
             if (!ex && typeof detail?.entry_content === "string") {
               const compact = detail.entry_content.replace(/\s+/g, " ").trim();
-              ex = compact ? compact.slice(0, 160) + (compact.length > 160 ? "…" : "") : "";
+              ex = compact
+                ? compact.slice(0, 160) + (compact.length > 160 ? "…" : "")
+                : "";
             }
-
             return [logbookId, { locId, firstImage, excerpt: ex }];
           })
         );
@@ -307,12 +408,12 @@ export default function JourneyScreen() {
 
         setLogs((prev) =>
           prev.map((it) => {
-            const hit = pairs.find(([logId]) => String(logId) === String(it.id));
+            const hit = pairs.find(
+              ([logId]) => String(logId) === String(it.id)
+            );
             if (!hit) return it;
-
             const [, payload] = hit;
             const { locId, firstImage, excerpt } = payload || {};
-
             return {
               ...it,
               locationId: Number.isFinite(Number(it.locationId))
@@ -332,11 +433,10 @@ export default function JourneyScreen() {
       };
     }, [logs, setLogs]);
   }
-
   useDetailEnrichment(myLogs, setMyLogs);
   useDetailEnrichment(othersLogs, setOthersLogs);
 
-  // ===== 장소 메타(이름/썸네일) 보강 =====
+  // 장소 메타 보강
   function useLocationMetaEnrichment(logs, setLogs, fetchedLocIdsRef) {
     useEffect(() => {
       const ids = logs
@@ -351,24 +451,18 @@ export default function JourneyScreen() {
         const pairs = [];
         for (const id of need) {
           const meta = await fetchLocationMeta(id);
-          if (meta?.name) {
-            fetchedLocIdsRef.current.add(id); // 성공한 것만 캐시
-          }
+          if (meta?.name) fetchedLocIdsRef.current.add(id);
           pairs.push([id, meta]);
         }
-
         if (!alive) return;
 
         const byId = new Map(pairs);
-
         setLogs((prev) =>
           prev.map((it) => {
             const locNum = Number(it.locationId);
             if (!Number.isFinite(locNum)) return it;
             const meta = byId.get(locNum);
-            if (meta === undefined) return it; // 이번 배치 아님
-            if (!meta) return it; // 실패: 다음 렌더에서 재시도
-
+            if (meta === undefined || !meta) return it;
             return {
               ...it,
               placeText: it.placeText || meta.name || "",
@@ -383,40 +477,36 @@ export default function JourneyScreen() {
       };
     }, [logs, setLogs, fetchedLocIdsRef]);
   }
-
   useLocationMetaEnrichment(myLogs, setMyLogs, fetchedMyLocIdsRef);
   useLocationMetaEnrichment(othersLogs, setOthersLogs, fetchedOthersLocIdsRef);
 
-  // ===== 새로고침 / 페이징 =====
+  // 새로고침 / 페이징
   const onRefreshMine = useCallback(() => {
     setMyRefreshing(true);
     fetchedMyLocIdsRef.current = new Set();
     fetchMyLogs({ page: 1, append: false });
   }, [fetchMyLogs]);
-
   const onEndReachedMine = useCallback(() => {
     if (tab !== "mine") return;
     if (myLoading || !myHasMore) return;
     fetchMyLogs({ page: myPage + 1, append: true });
   }, [tab, myLoading, myHasMore, myPage, fetchMyLogs]);
-
   const onRefreshOthers = useCallback(() => {
     setOthersRefreshing(true);
     fetchedOthersLocIdsRef.current = new Set();
     fetchOthers({ page: 1, append: false });
   }, [fetchOthers]);
-
   const onEndReachedOthers = useCallback(() => {
     if (tab !== "explorers") return;
     if (othersLoading || !othersHasMore) return;
     fetchOthers({ page: othersPage + 1, append: true });
   }, [tab, othersLoading, othersHasMore, othersPage, fetchOthers]);
 
-  // ===== 렌더 데이터 =====
-  const listData = useMemo(() => {
-    if (tab === "mine") return myLogs;
-    return othersLogs;
-  }, [tab, myLogs, othersLogs]);
+  // 렌더 데이터
+  const listData = useMemo(
+    () => (tab === "mine" ? myLogs : othersLogs),
+    [tab, myLogs, othersLogs]
+  );
 
   const goMyDetail = useCallback(
     (item) => {
@@ -440,10 +530,34 @@ export default function JourneyScreen() {
   const GAP = 8;
   const SIDE = 20;
 
+  // 삭제/수정
+  const onPressEdit = useCallback(() => {
+    if (!menuTarget) return;
+    closeMenu();
+    router.push({
+      pathname: "/journey-create/compose",
+      params: { editId: String(menuTarget.id) },
+    });
+  }, [menuTarget, closeMenu, router]);
+
+  const onPressDelete = useCallback(async () => {
+    if (!menuTarget) return;
+    const targetId = String(menuTarget.id);
+    closeMenu();
+    try {
+      // 서버 성공 후에만 제거
+      await apiDeleteLogbook(targetId);
+      setMyLogs((prev) => prev.filter((it) => String(it.id) !== targetId));
+      showToast({ message: "여정기록이 삭제되었어요", type: "success", duration: 2000 });
+    } catch (e) {}
+  }, [menuTarget, closeMenu, setMyLogs, showToast]);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       {/* 탭 + 하단 라인 */}
-      <View style={{ position: "relative", paddingHorizontal: 25, paddingTop: 8 }}>
+      <View
+        style={{ position: "relative", paddingHorizontal: 25, paddingTop: 8 }}
+      >
         <View
           style={{
             position: "absolute",
@@ -457,33 +571,65 @@ export default function JourneyScreen() {
         <View style={{ flexDirection: "row" }}>
           <Pressable
             onPress={() => setTab("mine")}
-            style={{ flex: 1, alignItems: "center", position: "relative", paddingBottom: 8 }}
+            style={{
+              flex: 1,
+              alignItems: "center",
+              position: "relative",
+              paddingBottom: 8,
+            }}
             hitSlop={8}
           >
             <Text
               onLayout={(e) => setMineW(e.nativeEvent.layout.width)}
-              className={["text-heading-2 font-pretendardSemiBold", tab === "mine" ? "text-black" : "text-gray500"].join(" ")}
+              className={[
+                "text-heading-2 font-pretendardSemiBold",
+                tab === "mine" ? "text-black" : "text-gray500",
+              ].join(" ")}
             >
               내 여정 기록
             </Text>
             {tab === "mine" && (
-              <View style={{ position: "absolute", bottom: -1, height: 3, width: mineW, backgroundColor: "#000" }} />
+              <View
+                style={{
+                  position: "absolute",
+                  bottom: -1,
+                  height: 3,
+                  width: mineW,
+                  backgroundColor: "#000",
+                }}
+              />
             )}
           </Pressable>
 
           <Pressable
             onPress={() => setTab("explorers")}
-            style={{ flex: 1, alignItems: "center", position: "relative", paddingBottom: 8 }}
+            style={{
+              flex: 1,
+              alignItems: "center",
+              position: "relative",
+              paddingBottom: 8,
+            }}
             hitSlop={8}
           >
             <Text
               onLayout={(e) => setExpW(e.nativeEvent.layout.width)}
-              className={["text-heading-2 font-pretendardSemiBold", tab === "explorers" ? "text-black" : "text-gray500"].join(" ")}
+              className={[
+                "text-heading-2 font-pretendardSemiBold",
+                tab === "explorers" ? "text-black" : "text-gray500",
+              ].join(" ")}
             >
               탐험가들의 기록
             </Text>
             {tab === "explorers" && (
-              <View style={{ position: "absolute", bottom: -1, height: 3, width: expW, backgroundColor: "#000" }} />
+              <View
+                style={{
+                  position: "absolute",
+                  bottom: -1,
+                  height: 3,
+                  width: expW,
+                  backgroundColor: "#000",
+                }}
+              />
             )}
           </Pressable>
         </View>
@@ -493,10 +639,17 @@ export default function JourneyScreen() {
       {tab === "mine" ? (
         <View style={{ paddingHorizontal: 20, paddingTop: 12 }}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Image source={CHARACTER} style={{ width: 46, height: 46, resizeMode: "contain" }} />
+            <Image
+              source={CHARACTER}
+              style={{ width: 46, height: 46, resizeMode: "contain" }}
+            />
             <View style={{ marginLeft: 6 }}>
-              <Text className="text-gray700 text-body-2 font-pretendardMedium">포슬감자님,</Text>
-              <Text className="text-gray700 text-body-2 font-pretendardMedium">오늘은 어떤 곳을 탐험하셨나요?</Text>
+              <Text className="text-gray700 text-body-2 font-pretendardMedium">
+                포슬감자님,
+              </Text>
+              <Text className="text-gray700 text-body-2 font-pretendardMedium">
+                오늘은 어떤 곳을 탐험하셨나요?
+              </Text>
             </View>
           </View>
 
@@ -507,8 +660,12 @@ export default function JourneyScreen() {
               { label: "표시한 감정", value: 0 },
             ].map((s, i) => (
               <View key={i} style={{ flex: 1, alignItems: "center" }}>
-                <Text className="text-heading-2 text-yellow900 font-pretendardSemiBold">{s.value}</Text>
-                <Text className="text-gray700 text-body-2  font-pretendardMedium mt-[5px]">{s.label}</Text>
+                <Text className="text-heading-2 text-yellow900 font-pretendardSemiBold">
+                  {s.value}
+                </Text>
+                <Text className="text-gray700 text-body-2  font-pretendardMedium mt-[5px]">
+                  {s.label}
+                </Text>
               </View>
             ))}
           </View>
@@ -526,7 +683,13 @@ export default function JourneyScreen() {
               colors={["rgba(0,0,0,0.08)", "rgba(0,0,0,0)"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
-              style={{ position: "absolute", left: 0, right: 0, top: 1, height: 4 }}
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: 1,
+                height: 4,
+              }}
             />
           </View>
         </View>
@@ -542,8 +705,14 @@ export default function JourneyScreen() {
               borderBottomColor: "#D4D4D4",
             }}
           >
-            <Image source={CHARACTER} style={{ width: 46, height: 46, resizeMode: "contain" }} />
-            <Text className="text-gray700 text-body-2 font-pretendardMedium" style={{ marginLeft: 6 }}>
+            <Image
+              source={CHARACTER}
+              style={{ width: 46, height: 46, resizeMode: "contain" }}
+            />
+            <Text
+              className="text-gray700 text-body-2 font-pretendardMedium"
+              style={{ marginLeft: 6 }}
+            >
               다른 탐험가들의 여정 기록을 살펴보세요!
             </Text>
           </View>
@@ -579,7 +748,11 @@ export default function JourneyScreen() {
                   <ImageBackground
                     source={item.thumbnail}
                     style={{ flex: 1 }}
-                    imageStyle={{ width: CARD_W, height: CARD_H, resizeMode: "cover" }}
+                    imageStyle={{
+                      width: CARD_W,
+                      height: CARD_H,
+                      resizeMode: "cover",
+                    }}
                   >
                     <LinearGradient
                       colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.5)"]}
@@ -594,7 +767,14 @@ export default function JourneyScreen() {
                         paddingBottom: 8,
                       }}
                     >
-                      <Text numberOfLines={1} style={{ color: "#fff", fontFamily: "Pretendard-SemiBold", fontSize: 14 }}>
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          color: "#fff",
+                          fontFamily: "Pretendard-SemiBold",
+                          fontSize: 14,
+                        }}
+                      >
                         {item.title}
                       </Text>
                     </LinearGradient>
@@ -619,28 +799,53 @@ export default function JourneyScreen() {
         >
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Pressable
-              onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+              onPress={() =>
+                setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))
+              }
               hitSlop={10}
             >
               <Icon name="triangle" width={8} height={9} />
             </Pressable>
-            <Text className="text-title-1 font-pretendardExtraBold" style={{ marginHorizontal: 10 }}>
+            <Text
+              className="text-title-1 font-pretendardExtraBold"
+              style={{ marginHorizontal: 10 }}
+            >
               {formatYM(month)}
             </Text>
             <Pressable
-              onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+              onPress={() =>
+                setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))
+              }
               hitSlop={10}
             >
-              <Icon name="triangle" width={8} height={9} style={{ transform: [{ scaleX: -1 }] }} />
+              <Icon
+                name="triangle"
+                width={8}
+                height={9}
+                style={{ transform: [{ scaleX: -1 }] }}
+              />
             </Pressable>
           </View>
 
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Pressable onPress={() => setView(view === "list" ? "board" : "list")} style={{ marginRight: 12 }} hitSlop={10}>
-              <Icon name={view === "list" ? "grid" : "list"} width={22} height={22} />
+            <Pressable
+              onPress={() => setView(view === "list" ? "board" : "list")}
+              style={{ marginRight: 12 }}
+              hitSlop={10}
+            >
+              <Icon
+                name={view === "list" ? "grid" : "list"}
+                width={22}
+                height={22}
+              />
             </Pressable>
             <Pressable onPress={() => {}} hitSlop={10}>
-              <Icon name="calendar" width={34} height={34} strokeColor="#AFAFAF" />
+              <Icon
+                name="calendar"
+                width={34}
+                height={34}
+                strokeColor="#AFAFAF"
+              />
             </Pressable>
           </View>
         </View>
@@ -702,9 +907,16 @@ export default function JourneyScreen() {
                 { label: "산책", value: "walk" },
               ]}
             />
-
-            <Pressable onPress={() => setView(view === "list" ? "board" : "list")} hitSlop={10} style={{ marginLeft: "auto" }}>
-              <Icon name={view === "list" ? "grid" : "list"} width={22} height={22} />
+            <Pressable
+              onPress={() => setView(view === "list" ? "board" : "list")}
+              hitSlop={10}
+              style={{ marginLeft: "auto" }}
+            >
+              <Icon
+                name={view === "list" ? "grid" : "list"}
+                width={22}
+                height={22}
+              />
             </Pressable>
           </>
         )}
@@ -727,7 +939,9 @@ export default function JourneyScreen() {
             tab === "mine" ? (
               <LogListCard
                 isMine
-                thumbnail={item.thumbnailUri ? { uri: item.thumbnailUri } : null}
+                thumbnail={
+                  item.thumbnailUri ? { uri: item.thumbnailUri } : null
+                }
                 placeholderImage={MONKEY_PLACEHOLDER}
                 placeholderBg="#D9D9D9"
                 title={item.title}
@@ -737,11 +951,14 @@ export default function JourneyScreen() {
                 commentsCount={item.commentsCount}
                 reactionsCount={item.reactionsCount}
                 liked={item.liked}
+                onPressOptions={(pos) => openMenu(item, pos)} // 좌표 전달
                 onPress={() => goMyDetail(item)}
               />
             ) : (
               <LogListCard
-                thumbnail={item.thumbnailUri ? { uri: item.thumbnailUri } : null}
+                thumbnail={
+                  item.thumbnailUri ? { uri: item.thumbnailUri } : null
+                }
                 placeholderImage={MONKEY_PLACEHOLDER}
                 placeholderBg="#D9D9D9"
                 title={item.title}
@@ -752,7 +969,10 @@ export default function JourneyScreen() {
                 reactionsCount={item.reactionsCount}
                 bookmarked={item.liked}
                 onPress={() => {
-                  router.push({ pathname: "/explorer/[id]", params: { id: String(item.id) } });
+                  router.push({
+                    pathname: "/explorer/[id]",
+                    params: { id: String(item.id) },
+                  });
                 }}
               />
             )
@@ -771,7 +991,7 @@ export default function JourneyScreen() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <LogBoardCard
-              isMine={tab === "mine"} // 내 탭이면 상단 프로필/날짜/북마크 숨김
+              isMine={tab === "mine"}
               profileImage={CHARACTER}
               authorName={tab === "mine" ? "나" : item.authorName}
               placeholderImage={MONKEY_PLACEHOLDER_BOARD}
@@ -783,7 +1003,8 @@ export default function JourneyScreen() {
               excerpt={item.excerpt}
               liked={item.liked}
               onPress={() => {
-                const pathname = tab === "mine" ? "/my-log/[id]" : "/explorer/[id]";
+                const pathname =
+                  tab === "mine" ? "/my-log/[id]" : "/explorer/[id]";
                 router.push({ pathname, params: { id: String(item.id) } });
               }}
               style={{ width: "100%" }}
@@ -796,7 +1017,7 @@ export default function JourneyScreen() {
       {tab === "mine" && (
         <FloatingButton
           onPress={() => router.push("/journey-create")}
-          label="+100 EXP"
+          label="+5 EXP"
           showLabel
           bottom={24}
           right={15}
@@ -804,6 +1025,90 @@ export default function JourneyScreen() {
           bubbleOffsetX={0}
           bubbleOffsetY={10}
         />
+      )}
+
+      {/* 옵션 모달 (아이콘 좌표에서 확대되며 등장) */}
+      {menuOpen && (
+        <View
+          pointerEvents="auto"
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            zIndex: 50,
+          }}
+        >
+          {/* 배경 터치 닫힘 (투명) */}
+          <Pressable
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+            }}
+            onPress={closeMenu}
+          />
+
+          {(() => {
+            const MENU_W = 176;
+            const SW = Dimensions.get("window").width;
+            const SH = Dimensions.get("window").height;
+
+            // 아이콘의 pageX/pageY에 "메뉴의 좌상단"을 딱 맞춤
+            const top = Math.max(0, Math.min(menuPos.y, SH - (menuH || 1)));
+            const left = Math.max(0, Math.min(menuPos.x - MENU_W, SW - MENU_W));
+
+            return (
+              <Animated.View
+                style={{
+                  position: "absolute",
+                  top,
+                  left,
+                  width: MENU_W,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: "#AFAFAF",
+                  backgroundColor: "#fff",
+                  shadowColor: "#000",
+                  shadowOpacity: 0.11,
+                  shadowRadius: 3,
+                  shadowOffset: { width: 0, height: 0 },
+                  elevation: 3,
+                  transform: [{ scale: scaleAnim }],
+                  opacity: opacityAnim,
+                }}
+                onLayout={(e) => setMenuH(e.nativeEvent.layout.height)}
+              >
+                <Pressable
+                  onPress={onPressDelete}
+                  style={{
+                    paddingTop: 27,
+                    marginBottom: 31,
+                    paddingHorizontal: 21,
+                  }}
+                  hitSlop={8}
+                >
+                  <Text className="text-body-2 text-gray700 font-pretendardMedium">
+                    삭제하기
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={onPressEdit}
+                  style={{ paddingBottom: 27, paddingHorizontal: 21 }}
+                  hitSlop={8}
+                >
+                  <Text className="text-body-2 text-gray700 font-pretendardMedium">
+                    수정하기
+                  </Text>
+                </Pressable>
+              </Animated.View>
+            );
+          })()}
+        </View>
       )}
     </SafeAreaView>
   );

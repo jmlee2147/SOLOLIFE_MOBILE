@@ -6,7 +6,7 @@ import SpeechBubble from "../shared/SpeechBubble";
 export default function FloatingButton({
   onPress,
   showLabel = true,
-  label = "+100 EXP",
+  label = "+5 EXP",
   bottom = 24,
   right = 25,
   size = 50,              // 버튼 지름
@@ -25,7 +25,7 @@ export default function FloatingButton({
       {/* 말풍선: 버튼 중앙 위에 배치 */}
       {showLabel && (
         <SpeechBubble
-          text="+100 EXP"
+          text="+5 EXP"
           paddingH={5}
           paddingV={4}
           maxWidth={220}

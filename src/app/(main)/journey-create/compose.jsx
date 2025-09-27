@@ -1,9 +1,17 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
+  Animated,
+  Easing,
   Image,
   Keyboard,
   KeyboardAvoidingView,
@@ -26,6 +34,8 @@ const DRAFT_KEY = "journey_draft_places_v1";
 const POST_DRAFT_KEY = "journey_post_draft_v1";
 const POSTS_KEY = "journey_posts_v1";
 
+const DEV_STICKY_SAVING = false;
+
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL; // e.g. https://api.example.com
 const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN; // Bearer 토큰 (.env)
 
@@ -42,6 +52,139 @@ async function loadDraftPlaces() {
   } catch {
     return [];
   }
+}
+
+function LoadingWritingOverlay({
+  message = "여정기록을 적고 있어요",
+  monkeySource,
+}) {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  const animate = (v, delay) =>
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(v, {
+          toValue: 1,
+          duration: 320,
+          delay,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(v, {
+          toValue: 0,
+          duration: 320,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+  useEffect(() => {
+    animate(dot1, 0);
+    animate(dot2, 120);
+    animate(dot3, 240);
+  }, []);
+
+  return (
+    <View
+      pointerEvents="auto"
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(255,255,255,0.6)",
+      }}
+    >
+      <View
+        style={{
+          alignItems: "center",
+          paddingHorizontal: 18,
+          paddingVertical: 16,
+          borderRadius: 14,
+          backgroundColor: "transparent",
+          shadowColor: "#000",
+          shadowOpacity: 0.12,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 8,
+          maxWidth: 320,
+        }}
+      >
+        {/* 원숭이 이미지 (위) */}
+        {monkeySource ? (
+          <Image
+            source={monkeySource}
+            style={{ width: 180, height: 180 }}
+            resizeMode="contain"
+          />
+        ) : null}
+
+        {/* 텍스트 + 도트 (아래) */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "baseline",
+            marginTop: 10,
+          }}
+        >
+          <Text className="text-body-1 font-pretendardMedium">{message}</Text>
+
+          <Animated.View
+            style={{
+              opacity: dot1,
+              marginLeft: 4,
+              transform: [
+                {
+                  translateY: dot1.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -2],
+                  }),
+                },
+              ],
+            }}
+          >
+            <Text style={{ fontSize: 18, color: "#1E1E1E" }}>.</Text>
+          </Animated.View>
+          <Animated.View
+            style={{
+              opacity: dot2,
+              transform: [
+                {
+                  translateY: dot2.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -2],
+                  }),
+                },
+              ],
+            }}
+          >
+            <Text style={{ fontSize: 18, color: "#1E1E1E" }}>.</Text>
+          </Animated.View>
+          <Animated.View
+            style={{
+              opacity: dot3,
+              transform: [
+                {
+                  translateY: dot3.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -2],
+                  }),
+                },
+              ],
+            }}
+          >
+            <Text style={{ fontSize: 18, color: "#1E1E1E" }}>.</Text>
+          </Animated.View>
+        </View>
+      </View>
+    </View>
+  );
 }
 
 async function loadPostDraft() {
@@ -128,6 +271,32 @@ async function postLogbook({ title, body, isPrivate, places, images }) {
   return data;
 }
 
+async function getLogbook(id) {
+  const url = `${API_BASE.replace(/\/+$/, "")}/logbooks/${Number(id)}`;
+  const res = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${TEST_TOKEN}`,
+    },
+  });
+  if (!res.ok) throw new Error(`GET /logbooks/${id} ${res.status}`);
+  return res.json();
+}
+
+async function patchLogbook(id, payload) {
+  const url = `${API_BASE.replace(/\/+$/, "")}/logbooks/${Number(id)}`;
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${TEST_TOKEN}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`PATCH /logbooks/${id} ${res.status}`);
+  return res.json();
+}
+
 function formatDate(date = new Date()) {
   const y = date.getFullYear();
   const m = (date.getMonth() + 1).toString().padStart(2, "0");
@@ -137,6 +306,9 @@ function formatDate(date = new Date()) {
 
 export default function ComposeScreen() {
   const router = useRouter();
+  const { editId } = useLocalSearchParams();
+  const isEdit = !!editId;
+  const [saving, setSaving] = useState(false);
 
   // 날짜
   const [date, setDate] = useState(new Date());
@@ -152,18 +324,44 @@ export default function ComposeScreen() {
   const [tagInput, setTagInput] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
 
-  // 📸 이미지 상태
+  // 이미지 상태
   const [images, setImages] = useState([]); // [{uri, width, height, fileName?, mimeType?}...]
 
   // 초기 로드: 장소 드래프트 + 포스트 드래프트
   useEffect(() => {
     (async () => {
-      const [pl, draft] = await Promise.all([
-        loadDraftPlaces(),
-        loadPostDraft(),
-      ]);
+      const [pl] = await Promise.all([loadDraftPlaces()]);
       setPlaces(pl);
 
+      if (isEdit) {
+        try {
+          const data = await getLogbook(editId);
+          setTitle(String(data?.entry_title || ""));
+          setBody(String(data?.entry_content || ""));
+          setIsPrivate(!Boolean(data?.is_public));
+          if (data?.created_at) setDate(new Date(data.created_at));
+          // 서버 image_urls -> 로컬 미리보기 형태로 변환
+          const imgs = Array.isArray(data?.image_urls)
+            ? data.image_urls.filter(Boolean).map((u) => ({ uri: u }))
+            : [];
+          setImages(imgs);
+          // 장소
+          const pp = Array.isArray(data?.places)
+            ? data.places.map((p) => ({
+                id: p.locationId ?? p.location_id ?? p.id,
+                locationId: p.locationId ?? p.location_id ?? p.id,
+                rating: p.rating,
+                name: p.name,
+                address: p.address,
+              }))
+            : [];
+          setPlaces((prev) => (pp.length ? pp : prev));
+        } catch {}
+        return; // 수정 모드에선 초안 복원 스킵
+      }
+
+      // 신규 작성일 때만 초안 복원
+      const draft = await loadPostDraft();
       if (draft) {
         setTitle(draft.title ?? "");
         setBody(draft.body ?? "");
@@ -173,10 +371,11 @@ export default function ComposeScreen() {
         if (Array.isArray(draft.images)) setImages(draft.images);
       }
     })();
-  }, []);
+  }, [isEdit, editId]);
 
   // 변경 시 글쓰기 드래프트 자동 저장(간단)
   useEffect(() => {
+    if (isEdit) return;
     const draft = {
       title,
       body,
@@ -200,21 +399,48 @@ export default function ComposeScreen() {
   }, []);
 
   const onPressSave = useCallback(async () => {
+    if (saving) return;
+    setSaving(true);
+
+    if (DEV_STICKY_SAVING) return;
+
     try {
-      await postLogbook({
-        title,
-        body,
-        isPrivate,
-        places, // { locationId(정수), rating } 포함
-        images, // http(s)만 전송
-      });
-      await clearPostDraft();
-      router.replace("/journey-create");
+      if (isEdit) {
+        // PATCH: 스펙 허용 필드만 보냄
+        const patchPayload = {
+          entry_title: String(title || "").trim(),
+          entry_content: String(body || "").trim(),
+          is_public: !isPrivate,
+          image_urls: toHttpImageUrls(images),
+        };
+        await patchLogbook(editId, patchPayload);
+
+        router.replace({
+          pathname: "/(tabs)/journey",
+          params: { justSaved: "edited" }, 
+        });
+      } else {
+        // POST: (title/body/isPrivate/places/images)
+        await postLogbook({
+          title,
+          body,
+          isPrivate,
+          places,
+          images,
+        });
+        await clearPostDraft();
+        router.replace({
+          pathname: "/(tabs)/journey",
+          params: { justSaved: "created" },
+        });
+      }
     } catch (e) {
+      // 실패 시 콘솔 보조 (원하면 토스트 연결)
       // console.log("[compose] save error", String(e?.message || e));
-      // TODO: 토스트/알럿 연결 가능
+    } finally {
+      if (!DEV_STICKY_SAVING) setSaving(false);
     }
-  }, [title, body, isPrivate, places, images, router]);
+  }, [saving, isEdit, editId, title, body, isPrivate, images, places, router]);
 
   // 카메라/갤러리 구현
 
@@ -624,12 +850,32 @@ export default function ComposeScreen() {
 
           {/* 저장하기 버튼 (공통 Button) */}
           <Button
-            title="저장하기"
+            title={
+              saving
+                ? isEdit
+                  ? "수정 중..."
+                  : "저장 중..."
+                : isEdit
+                ? "수정 완료"
+                : "저장하기"
+            }
             variant="primary"
             size="small"
             onPress={onPressSave}
+            disabled={saving}
           />
         </View>
+        {/* 저장 중 오버레이 */}
+        {saving && (
+          <LoadingWritingOverlay
+            message={
+              isEdit
+                ? "수정 내용을 저장하는 중이에요"
+                : "여정기록을 저장하는 중이에요"
+            }
+            monkeySource={require("../../../assets/images/monkey-write.png")} // 원숭이 이미지 경로
+          />
+        )}
       </SafeAreaView>
     </TouchableWithoutFeedback>
   );
