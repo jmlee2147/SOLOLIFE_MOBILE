@@ -21,6 +21,7 @@ export default function MapView({
             lng: Number(m.lng),
             name: String(m.name ?? ""),
             label: String(m.label ?? i + 1),
+            liked: !!m.liked,
           }))
           .filter((m) => Number.isFinite(m.lat) && Number.isFinite(m.lng))
       : [];
@@ -76,6 +77,28 @@ export default function MapView({
     \`;
   }
 
+  // 좋아요 핀
+  function likedPinSVG(fillColor){
+    return \`
+      <div style="position:relative; transform: translate(-50%, -50%);
+                  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.25));
+                  pointer-events:none;">
+        <svg width="25" height="25" viewBox="0 0 25 25" xmlns="http://www.w3.org/2000/svg">
+          <!-- 바탕 원 -->
+          <circle cx="12.5" cy="12.5" r="12.5" fill="#FFFFFF"/>
+          <!-- 하트 (중앙 정렬) -->
+          <g transform="translate(4,4) scale(0.708333)">
+          <path
+            d="m12 21-1.45-1.295C5.4 15.125 2 12.093 2 8.395
+               2 5.364 4.42 3 7.5 3c1.74 0 3.41.795 4.5 2.04A6.062 6.062 0 0 1 16.5 3
+               C19.58 3 22 5.364 22 8.395c0 3.698-3.4 6.73-8.55 11.31L12 21Z"
+            fill="#EE7A13"/>
+          </g>
+        </svg>
+    </div>
+    \`;
+  }
+
     function init() {
       var markerData = ${markersJSON};
       var hasMany = Array.isArray(markerData) && markerData.length > 0;
@@ -117,7 +140,9 @@ export default function MapView({
           map: map,
           title: m.name || "",
           icon: {
-            content: pinSVG(m.label || "", "${singleColor}"),
+            content: m.liked
+              ? likedPinSVG("${singleColor}")  // 하트 마커
+              : pinSVG(m.label || "", "${singleColor}"), // 번호 마커
             size: new naver.maps.Size(25,34),
             anchor: new naver.maps.Point(12,34)
           }

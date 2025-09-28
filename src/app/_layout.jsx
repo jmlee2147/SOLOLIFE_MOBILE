@@ -18,7 +18,6 @@ export default function MainLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ToastProvider>
-        
           <StatusBar style="dark" translucent={true} />
           <Stack
             screenOptions={{
@@ -30,7 +29,6 @@ export default function MainLayout() {
             }}
           >
           </Stack>
-        
       </ToastProvider>
     </GestureHandlerRootView>
   );
