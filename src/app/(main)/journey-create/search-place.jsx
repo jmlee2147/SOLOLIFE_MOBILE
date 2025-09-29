@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,7 +16,6 @@ import {
 import Icon from '../../../components/shared/Icon';
 import SearchHeader from '../../../components/shared/SearchHeader';
 
-// ====== 설정 ======
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 // ====== 최근 검색 ======
@@ -63,21 +62,19 @@ async function removeSaved(label) {
   } catch { return loadSaved(); }
 }
 
-// ====== 검색 API 교체: GET /search/locations-lite ======
+// ====== 검색 API (일반 페이지에서만 사용) ======
 async function locationsLiteSearch(q, page = 1, limit = 20) {
   if (!q?.trim()) return { items: [], page: 1, limit, total: 0 };
   const url = `${API_BASE}/search/locations?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`;
-  console.log('[locationsLiteSearch] GET', url);
-  const res = await fetch(url, { headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } });
-  console.log('[locationsLiteSearch] status', res.status);
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
-  // 리스트 화면용 경량 스키마 매핑
   const items = (data.items || []).map(({ location_id, title, address }) => ({
     id: location_id,
     title,
     address,
-    // label은 로컬 저장/표시에 사용 (고유성 위해 id 포함)
     label: `${title} · ${address}`,
   }));
   return { items, page: data.page, limit: data.limit, total: data.total };
@@ -85,6 +82,8 @@ async function locationsLiteSearch(q, page = 1, limit = 20) {
 
 export default function LocationSearchScreen() {
   const router = useRouter();
+  const { returnTo } = useLocalSearchParams();   // 'map'이면 지도탭으로 복귀
+  const isMapReturn = returnTo === 'map';
 
   const [tab, setTab] = useState('recent');
   const [query, setQuery] = useState('');
@@ -99,43 +98,53 @@ export default function LocationSearchScreen() {
   useEffect(() => { (async () => setRecent(await loadRecent()))(); }, []);
   useEffect(() => { (async () => setSaved(await loadSaved()))(); }, []);
 
+  // 제출(엔터/검색 버튼)
   const submitSearch = useCallback(async () => {
     const q = query.trim();
     if (!q) return;
     Keyboard.dismiss();
+    await saveRecent({ id: undefined, title: q, address: '', label: q });
+
+    if (isMapReturn) {
+      // ✅ 지도탭 모드: API 호출하지 않고 지도탭으로 복귀 + q 전달
+      router.replace({ pathname: '/(main)/(tabs)/map', params: { q } });
+      return;
+    }
+
+    // ✅ 일반 모드: 기존처럼 검색 결과 바로 표시
     setLoading(true);
     try {
       const { items } = await locationsLiteSearch(q, 1, 20);
       setResults(items);
-    } catch (e) {
+    } catch {
       setResults([]);
-    } finally { setLoading(false); }
-  }, [query]);
+    } finally {
+      setLoading(false);
+    }
+  }, [query, isMapReturn, router]);
 
+  // 리스트에서 항목 선택
   const choose = useCallback(async (item) => {
-    // 백엔드 응답 구조 기반: title / address 사용
     const name = String(item.title || '').trim();
     const address = String(item.address || '').trim();
 
-    await saveRecent({
-      // 로컬 저장용 최소 필드
-      id: item.id,
-      title: name,
-      address,
-      label: name,
-    });
+    await saveRecent({ id: item.id, title: name, address, label: name });
+
+    if (isMapReturn) {
+      router.replace({ pathname: '/(main)/(tabs)/map', params: { q: name } });
+      return;
+    }
 
     router.push({
-      pathname: "/journey-create/rate",
+      pathname: '/journey-create/rate',
       params: {
         savedName: name,
         savedAddress: address,
-        savedCategory: "",
-        // 필요시 location_id 전달
+        savedCategory: '',
         locationId: String(item.id ?? ''),
       },
     });
-  }, [router]);
+  }, [isMapReturn, router]);
 
   const setCurrentLocation = useCallback(async () => {
     try {
@@ -168,20 +177,24 @@ export default function LocationSearchScreen() {
   );
 
   const renderStoredRow = (listType) => ({ item }) => {
-    <View style={styles.storedRow}>
-      <Pressable style={{ flex: 1 }} onPress={() => choose(item)}>
-        <Text numberOfLines={1} className="text-body-0 font-pretendardLight">{item.name}</Text>
-      </Pressable>
-      <Pressable
-        onPress={async () => {
-          if (listType === 'recent') setRecent(await removeRecent(item.label));
-          else setSaved(await removeSaved(item.label));
-        }}
-        hitSlop={10}
-      >
-        <Icon name="close" width={20} height={20} color="#AFAFAF" />
-      </Pressable>
-    </View>
+    return (
+      <View style={styles.storedRow}>
+        <Pressable style={{ flex: 1 }} onPress={() => choose(item)}>
+          <Text numberOfLines={1} className="text-body-0 font-pretendardLight">
+            {item.title || item.name}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={async () => {
+            if (listType === 'recent') setRecent(await removeRecent(item.label));
+            else setSaved(await removeSaved(item.label));
+          }}
+          hitSlop={10}
+        >
+          <Icon name="close" width={20} height={20} color="#AFAFAF" />
+        </Pressable>
+      </View>
+    );
   };
 
   return (
@@ -201,17 +214,13 @@ export default function LocationSearchScreen() {
 
       {/* 헤더 밑 구분 영역 */}
       <View style={{
-        height: 10,
-        backgroundColor: "#F4F4F4",
-        marginTop: 12,
-        marginHorizontal: -20,
-        overflow: "hidden",
+        height: 10, backgroundColor: '#F4F4F4', marginTop: 12,
+        marginHorizontal: -20, overflow: 'hidden',
       }}>
         <LinearGradient
-          colors={["rgba(0,0,0,0.08)", "rgba(0,0,0,0)"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={{ position: "absolute", left: 0, right: 0, top: 1, height: 4 }}
+          colors={['rgba(0,0,0,0.08)', 'rgba(0,0,0,0)']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+          style={{ position: 'absolute', left: 0, right: 0, top: 1, height: 4 }}
           pointerEvents="none"
         />
       </View>
@@ -238,7 +247,6 @@ export default function LocationSearchScreen() {
           {/* 탭 */}
           <View style={styles.tabWrap}>
             <View style={styles.tabGrayLine} />
-
             <Pressable onPress={() => setTab('recent')} style={styles.tabBtnLeft} hitSlop={8}>
               <Text
                 onLayout={(e) => setRecentW(e.nativeEvent.layout.width)}
@@ -302,43 +310,13 @@ export default function LocationSearchScreen() {
 }
 
 const styles = StyleSheet.create({
-  listHeader: {
-    paddingHorizontal: 25,
-    paddingTop: 10,
-    paddingBottom: 6,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-  },
+  listHeader: { paddingHorizontal: 25, paddingTop: 10, paddingBottom: 6 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 14 },
   sep: { height: 1, backgroundColor: '#E5E5E5', marginLeft: 24 },
-  storedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 25,
-    paddingVertical: 9,
-  },
-  emptyBox: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  tabWrap: {
-    position: 'relative',
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingTop: 16,
-    paddingBottom: 9,
-  },
-  tabGrayLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 1,
-    backgroundColor: '#D4D4D4',
-  },
+  storedRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, paddingVertical: 9 },
+  emptyBox: { alignItems: 'center', paddingVertical: 24 },
+  tabWrap: { position: 'relative', flexDirection: 'row', alignItems: 'flex-end', paddingTop: 16, paddingBottom: 9 },
+  tabGrayLine: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, backgroundColor: '#D4D4D4' },
   tabBtnLeft: { paddingLeft: 25, paddingRight: 10, position: 'relative' },
   tabBtnRight: { marginLeft: 25, paddingRight: 10, position: 'relative' },
   activeUnderline: { position: 'absolute', bottom: -10, height: 3, backgroundColor: '#000' },

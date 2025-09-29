@@ -1103,6 +1103,21 @@ const icons = {
       />
     </Svg>
   ),
+  share2: ({ width = 24, height = 24, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
+      <Path
+        stroke="#AFAFAF"
+        strokeWidth={2}
+        d="M18.222 12.889V20H4V5.778h7.111M13.778 10.222 20 4M14.667 4H20v5.333"
+      />
+    </Svg>
+  ),
 };
 
 const Icon = ({ name, width, height, style, ...props }) => {
