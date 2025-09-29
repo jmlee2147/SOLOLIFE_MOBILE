@@ -28,6 +28,9 @@ import Icon from "../../../../components/shared/Icon";
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN;
 
+// 🔹 사진 없을 때 카드 썸네일 대체 이미지
+const PLACEHOLDER = require("../../../../assets/images/map_placeholder.png");
+
 export default function MapScreen() {
   const router = useRouter();
 
@@ -52,7 +55,27 @@ export default function MapScreen() {
     stiffness: 500,
   });
 
-  // 1) 좋아요 목록(초기)
+  // 🔹 상세에서 사진 최대 3장 가져오기 (문자열 배열 반환)
+  const fetchLocationDetailPhotos = useCallback(async (id) => {
+    if (!id) return [];
+    try {
+      const r = await fetch(`${API_BASE_URL}/locations/${id}`, {
+        headers: { Accept: "application/json" },
+      });
+      const d = await r.json();
+      const photos =
+        Array.isArray(d.photos) && d.photos.length
+          ? d.photos.slice(0, 3)
+          : d.fallback_photo_url
+          ? [d.fallback_photo_url]
+          : [];
+      return photos.filter(Boolean);
+    } catch {
+      return [];
+    }
+  }, []);
+
+  // 1) 좋아요 목록(초기) + 🔹 각 장소 사진 디테일 보강
   useEffect(() => {
     async function fetchLikes() {
       try {
@@ -62,7 +85,9 @@ export default function MapScreen() {
         const data = await res.json();
         const ids = (data.items || []).map((it) => it.location.location_id);
         setLikedIds(new Set(ids));
-        const list = (data.items || []).map((it) => ({
+
+        // 기본 스키마(사진은 일단 비움 → 이후 보강)
+        const baseList = (data.items || []).map((it) => ({
           id: String(it.location.location_id),
           name: it.location.location_name,
           address: it.location.address ?? "",
@@ -72,16 +97,30 @@ export default function MapScreen() {
           rating: it.location.rating_avg ?? null,
           reviews: it.location.review_count ?? null,
           tags: it.location.tags || it.location.features_flat || [],
-          photos: it.location.photos || [],
+          photos: [], // 🔸 나중에 보강
           liked: true,
         }));
-        setLikedPlaces(list);
+        setLikedPlaces(baseList);
+
+        // 상세로 사진 보강 (병렬)
+        const photoLists = await Promise.all(
+          ids.map((id) => fetchLocationDetailPhotos(id))
+        );
+        const byId = new Map(
+          ids.map((id, i) => [String(id), photoLists[i] || []])
+        );
+        setLikedPlaces((prev) =>
+          prev.map((p) => ({
+            ...p,
+            photos: byId.get(p.id) ?? [],
+          }))
+        );
       } catch (err) {
         console.error("좋아요 목록 불러오기 실패", err);
       }
     }
     fetchLikes();
-  }, []);
+  }, [API_BASE_URL, TEST_TOKEN, fetchLocationDetailPhotos]);
 
   // 2) 검색 실행 (라이트 + 디테일 보강)
   const handleSearch = useCallback(
@@ -210,22 +249,37 @@ export default function MapScreen() {
     ? `‘${lastQuery}’ 검색 결과`
     : "좋아요 누른 장소";
 
-  // 6) 좋아요(초기) 카드
+  // 6) 좋아요(초기) 카드 — 🔹 사진 실제 반영 (없으면 회색 + placeholder)
   const renderLikedItem = useCallback(
-    ({ item }) => (
-      <View style={styles.smallCard}>
-        <Image
-          source={require("../../../../assets/images/sample.png")}
-          style={styles.smallCardImage}
-        />
-        <Text style={styles.smallCardTitle} numberOfLines={1}>
-          {item.name}
-        </Text>
-        <Text style={styles.smallCardAddr} numberOfLines={1}>
-          {item.address}
-        </Text>
-      </View>
-    ),
+    ({ item }) => {
+      const firstPhoto = Array.isArray(item.photos) ? item.photos[0] : null;
+      const hasPhoto = typeof firstPhoto === "string" && firstPhoto.length > 0;
+
+      return (
+        <View style={styles.smallCard}>
+          {hasPhoto ? (
+            <Image
+              source={{ uri: firstPhoto }}
+              style={styles.smallCardImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.smallCardImage, styles.placeholderCenter]}>
+              <Image
+                source={PLACEHOLDER}
+                style={{ width: 48, height: 48, resizeMode: "contain" }}
+              />
+            </View>
+          )}
+          <Text style={styles.smallCardTitle} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text style={styles.smallCardAddr} numberOfLines={1}>
+            {item.address}
+          </Text>
+        </View>
+      );
+    },
     []
   );
 
@@ -338,7 +392,6 @@ export default function MapScreen() {
         // 태그 계열은 둘 다 채워주면 페이지에서 하이라이트/표시하기 편함
         keywords: Array.isArray(item.tags) ? item.tags : [],
         features_flat: Array.isArray(item.tags) ? item.tags : [],
-        // 필요시 price_level, opening_hours 등도 여기서 같이 전달 가능
         __thumbs__: item.photos || [],
       };
 
@@ -347,8 +400,6 @@ export default function MapScreen() {
         params: {
           id: String(item.id),
           initial: encodeURIComponent(JSON.stringify(initialPayload)),
-          // moodsKo: JSON.stringify([]),
-          // keywordsKo: JSON.stringify([]),
         },
       });
     },
@@ -445,10 +496,6 @@ export default function MapScreen() {
                   item={item}
                   onPress={goToDetail}
                 />
-                {/* 마지막 아이템 제외하고 구분선(카드 내부에 하나 있으니 바깥에선 X) */}
-                {false && idx < searchResults.length - 1 && (
-                  <View style={styles.fullDivider} />
-                )}
               </View>
             ))}
           </BottomSheetScrollView>
@@ -522,8 +569,13 @@ const styles = StyleSheet.create({
   },
 
   // 좋아요(초기) 작은 카드
-  smallCard: { width: 120, marginRight: 16 },
-  smallCardImage: { width: "100%", height: 100, borderRadius: 8 },
+  smallCard: { width: 100, marginRight: 20 },
+  smallCardImage: { width: "100%", height: 100, borderRadius: 5 },
+  placeholderCenter: {
+    backgroundColor: "#D9D9D9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   smallCardTitle: { marginTop: 6, fontWeight: "600" },
   smallCardAddr: { color: "#666", fontSize: 12 },
 
