@@ -1,7 +1,10 @@
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import "react-native-gesture-handler";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import "react-native-reanimated";
 import "../../global.css";
 import { ToastProvider } from "../providers/ToastProvider";
 
@@ -17,7 +20,8 @@ export default function MainLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ToastProvider>
+      <BottomSheetModalProvider>
+        <ToastProvider>
           <StatusBar style="dark" translucent={true} />
           <Stack
             screenOptions={{
@@ -27,9 +31,9 @@ export default function MainLayout() {
               gestureEnabled: true,
               contentStyle: { backgroundColor: "transparent" },
             }}
-          >
-          </Stack>
-      </ToastProvider>
+          ></Stack>
+        </ToastProvider>
+      </BottomSheetModalProvider>
     </GestureHandlerRootView>
   );
 }
