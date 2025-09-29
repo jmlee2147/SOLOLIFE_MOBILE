@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -16,6 +17,10 @@ import MapView from "../../../components/map/MapView";
 import RouteStepCard from "../../../components/route/RouteStepCard";
 import Header from "../../../components/shared/Header";
 import { postRouteNext } from "../../../services/api";
+
+/** ---- ENV ---- */
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN?.trim();
 
 /** ---- 안전 폴백 ---- */
 const FALLBACK_FIRST = {
@@ -189,7 +194,117 @@ export default function RouteSummaryScreen() {
   const [loading, setLoading] = useState(!hasPrefetched);
   const [err, setErr] = useState("");
 
-  // API 호출
+  /** ===== (NEW) Journeys Preview: 제목/요약 ===== */
+  const [previewTitle, setPreviewTitle] = useState("");
+  const [previewSummary, setPreviewSummary] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewErr, setPreviewErr] = useState("");
+
+  // 토큰 가져오기 (AsyncStorage `jwt` → env TEST_TOKEN 폴백)
+  const getAuthToken = useMemo(
+    () => async () => {
+      try {
+        const jwt = await AsyncStorage.getItem("jwt");
+        return jwt || TEST_TOKEN || "";
+      } catch {
+        return TEST_TOKEN || "";
+      }
+    },
+    []
+  );
+
+  // items가 확정될 때마다 /journeys/preview 호출
+  // items가 확정될 때마다 /journeys/preview 호출
+  useEffect(() => {
+    let aborted = false;
+    const controller = new AbortController();
+
+    async function run() {
+      try {
+        // location_id 뽑기 (최소 1개 필요)
+        const locationIds = items
+          .map((p) => Number(p.location_id))
+          .filter((n) => Number.isFinite(n));
+
+        if (locationIds.length === 0 || !API_BASE_URL) {
+          setPreviewTitle(
+            items[0]?.title ? `${items[0].title} 루트` : "추천 루트"
+          );
+          setPreviewSummary("");
+          return;
+        }
+
+        setPreviewLoading(true);
+        setPreviewErr("");
+        const token = await getAuthToken();
+
+        const r = await fetch(`${API_BASE_URL}/journeys/preview`, {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            locations: locationIds.map((id) => ({ location_id: id })),
+          }),
+        });
+
+        const text = await r.text();
+        console.log("[preview raw]", text);
+
+        if (!r.ok) {
+          throw new Error(`Preview failed (HTTP ${r.status})`);
+        }
+
+        let data = {};
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = {};
+        }
+        console.log("[preview parsed]", data);
+
+        if (!aborted) {
+          setPreviewTitle(
+            typeof (data?.journey_title ?? data?.title) === "string" &&
+              (data?.journey_title ?? data?.title).trim()
+              ? (data?.journey_title ?? data?.title).trim()
+              : items[0]?.title
+              ? `${items[0].title} 루트`
+              : "추천 루트"
+          );
+          setPreviewSummary(
+            typeof (data?.journey_summary ?? data?.summary) === "string"
+              ? data?.journey_summary ?? data?.summary
+              : ""
+          );
+        }
+      } catch (e) {
+        if (!aborted) {
+          console.warn("[preview error]", e);
+          setPreviewErr(e?.message || "요약 생성에 실패했어요.");
+          setPreviewTitle(
+            items[0]?.title ? `${items[0].title} 루트` : "추천 루트"
+          );
+          setPreviewSummary("");
+        }
+      } finally {
+        !aborted && setPreviewLoading(false);
+      }
+    }
+
+    // items가 바뀔 때마다 재요청
+    if (items?.length) run();
+
+    return () => {
+      aborted = true;
+      controller.abort();
+    };
+  }, [items, getAuthToken]);
+
+  // API 호출 (후보 추천)
   const didRunRef = useRef(false);
   useEffect(() => {
     if (hasPrefetched) {
@@ -263,14 +378,10 @@ export default function RouteSummaryScreen() {
           const need = 3 - next.length;
           next = [...next, ...FALLBACK_OTHERS.slice(0, need)];
         }
-        if (!canceled) {
-          setItems(next);
-        }
+        setItems(next);
       } catch (e) {
-        if (!canceled) {
-          setErr(e?.message || "추천을 불러오지 못했어요.");
-          setItems([first, ...FALLBACK_OTHERS]);
-        }
+        setErr(e?.message || "추천을 불러오지 못했어요.");
+        setItems([first, ...FALLBACK_OTHERS]);
       } finally {
         !canceled && setLoading(false);
       }
@@ -367,6 +478,17 @@ export default function RouteSummaryScreen() {
     [maxY, sheetY]
   );
 
+  /** ====== UI ====== */
+  const displayTitle =
+    previewLoading && !previewTitle
+      ? "오늘의 탐험 루트"
+      : previewTitle || `${items[0]?.title ?? "추천"} 루트`;
+
+  const displaySummary =
+    previewLoading && !previewSummary
+      ? "AI가 여정 요약을 준비하고 있어요..."
+      : previewSummary || "AI가 여정을 구성하고 있어요.";
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       <Header
@@ -379,13 +501,16 @@ export default function RouteSummaryScreen() {
 
       <View style={{ paddingHorizontal: 25, marginBottom: 5 }}>
         <Text className="text-title-1 font-pretendardExtraBold mb-[6px]">
-          도심 힐링 루트
+          {displayTitle}
         </Text>
         <Text className="text-heading-3 font-pretendardSemiBold text-gray700">
-          북적이는 도심 속에서 잠시 벗어나 여유로운 시간을 보낼 수 있는
-          루트입니다. 아기자기한 카페와 조용한 공원을 거치며, 하루의 피로를 풀
-          수 있도록 구성했어요.
+          {displaySummary}
         </Text>
+        {!!previewErr && (
+          <Text style={{ color: "#DC2626", marginTop: 6, fontSize: 12 }}>
+            {previewErr}
+          </Text>
+        )}
       </View>
 
       {/* 전체 컨테이너 높이 측정 */}
@@ -473,7 +598,9 @@ export default function RouteSummaryScreen() {
                           )
                         )
                       ),
-                      defaultName: `${items[0]?.title ?? "무명"} 루트`,
+                      defaultName:
+                        (previewTitle && previewTitle.trim()) ||
+                        `${items[0]?.title ?? "무명"} 루트`,
                       thumbs: JSON.stringify(
                         items
                           .slice(0, 3)
