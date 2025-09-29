@@ -167,7 +167,7 @@ export default function PlaceDetailScreen() {
     [imgIndex, images.length]
   );
 
-  // —— 탭
+  // 탭
   const [tab, setTab] = useState("review");
   const [wReview, setWReview] = useState(0);
   const [wRoute, setWRoute] = useState(0);

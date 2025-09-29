@@ -1,8 +1,10 @@
 import BottomSheet, {
   BottomSheetFlashList,
+  BottomSheetScrollView,
   BottomSheetView,
   useBottomSheetSpringConfigs,
 } from "@gorhom/bottom-sheet";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, {
   useCallback,
   useEffect,
@@ -17,7 +19,6 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -28,14 +29,21 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN;
 
 export default function MapScreen() {
-  const [searchResults, setSearchResults] = useState([]);
-  const [likedPlaces, setLikedPlaces] = useState([]);
-  const [likedIds, setLikedIds] = useState(new Set());
+  const router = useRouter();
 
-  // 바텀시트 ref
+  // 검색화면에서 넘겨주는 쿼리 q (returnTo=map)
+  const { q: rawQ } = useLocalSearchParams();
+  const qFromRoute = Array.isArray(rawQ) ? rawQ[0] : rawQ;
+
+  // 상태
+  const [searchResults, setSearchResults] = useState([]); // 디테일까지 보강된 검색 결과
+  const [likedPlaces, setLikedPlaces] = useState([]); // 좋아요 장소(마커/초기 바텀시트용)
+  const [likedIds, setLikedIds] = useState(new Set());
+  const [lastQuery, setLastQuery] = useState(""); // 바텀시트 제목/분기용
+
+  // 바텀시트
   const bottomSheetRef = useRef(null);
   const snapPoints = useMemo(() => ["35%", "60%"], []);
-
   const animationConfigs = useBottomSheetSpringConfigs({
     damping: 100,
     overshootClamping: true,
@@ -44,7 +52,7 @@ export default function MapScreen() {
     stiffness: 500,
   });
 
-  // 좋아요 목록 불러오기
+  // 1) 좋아요 목록(초기)
   useEffect(() => {
     async function fetchLikes() {
       try {
@@ -52,17 +60,22 @@ export default function MapScreen() {
           headers: { Authorization: `Bearer ${TEST_TOKEN}` },
         });
         const data = await res.json();
-        const ids = data.items.map((it) => it.location.location_id);
+        const ids = (data.items || []).map((it) => it.location.location_id);
         setLikedIds(new Set(ids));
-        setLikedPlaces(
-          data.items.map((it) => ({
-            id: String(it.location.location_id),
-            lat: it.location.latitude,
-            lng: it.location.longitude,
-            name: it.location.location_name,
-            liked: true,
-          }))
-        );
+        const list = (data.items || []).map((it) => ({
+          id: String(it.location.location_id),
+          name: it.location.location_name,
+          address: it.location.address ?? "",
+          lat: Number(it.location.latitude),
+          lng: Number(it.location.longitude),
+          category: it.location.category ?? "",
+          rating: it.location.rating_avg ?? null,
+          reviews: it.location.review_count ?? null,
+          tags: it.location.tags || it.location.features_flat || [],
+          photos: it.location.photos || [],
+          liked: true,
+        }));
+        setLikedPlaces(list);
       } catch (err) {
         console.error("좋아요 목록 불러오기 실패", err);
       }
@@ -70,63 +83,281 @@ export default function MapScreen() {
     fetchLikes();
   }, []);
 
-  // 검색
-  async function handleSearch(q) {
-    try {
-      const res = await fetch(
-        `${API_BASE_URL}/locations/search?q=${encodeURIComponent(q)}`,
-        { headers: { Authorization: `Bearer ${TEST_TOKEN}` } }
-      );
-      const data = await res.json();
-      setSearchResults(data.items || []);
-    } catch (err) {
-      console.error("검색 실패", err);
-    }
-  }
+  // 2) 검색 실행 (라이트 + 디테일 보강)
+  const handleSearch = useCallback(
+    async (query) => {
+      if (!query?.trim()) return;
+      try {
+        // 2-1. 라이트 검색
+        const res = await fetch(
+          `${API_BASE_URL}/search/locations?q=${encodeURIComponent(
+            query
+          )}&limit=20`
+        );
+        const data = await res.json();
+        const items = data?.items || [];
 
-  // 지도 마커 (좋아요 + 검색 결과 합치기)
-  const markers = useMemo(() => {
-    const searchMarkers = searchResults.map((p, i) => ({
-      id: String(p.location_id),
-      lat: p.latitude,
-      lng: p.longitude,
-      name: p.location_name,
-      label: String(i + 1),
-      liked: likedIds.has(p.location_id),
-    }));
-    return [...likedPlaces, ...searchMarkers];
-  }, [searchResults, likedPlaces, likedIds]);
+        // 2-2. 디테일로 좌표/메타 보강
+        const detailed = await Promise.all(
+          items.map(async (it) => {
+            const id = it.location_id;
+            try {
+              const dRes = await fetch(`${API_BASE_URL}/locations/${id}`);
+              const det = await dRes.json();
 
-  // 카드 리스트 데이터
-  const cards = useMemo(
-    () => [...searchResults, ...likedPlaces].slice(0, 10),
-    [searchResults, likedPlaces]
+              const photos =
+                Array.isArray(det.photos) && det.photos.length
+                  ? det.photos.slice(0, 3)
+                  : det.fallback_photo_url
+                  ? [
+                      det.fallback_photo_url,
+                      det.fallback_photo_url,
+                      det.fallback_photo_url,
+                    ].slice(0, 3)
+                  : [];
+
+              return {
+                id: String(id),
+                name: det.location_name ?? it.title ?? "",
+                address: det.address ?? it.address ?? "",
+                lat: Number(det.latitude),
+                lng: Number(det.longitude),
+                category: det.category ?? "",
+                rating: det.rating_avg ?? null,
+                reviews: det.review_count ?? null,
+                tags: Array.from(
+                  new Set([
+                    ...(det.keywords || []),
+                    ...(det.features_flat || []),
+                  ])
+                ),
+                photos,
+                opening_hours: det.opening_hours || null,
+                liked: likedIds.has(id),
+                price_level: det.price_level ?? null,
+              };
+            } catch {
+              // 디테일 실패 시 최소 스키마
+              return {
+                id: String(id),
+                name: it.title ?? "",
+                address: it.address ?? "",
+                lat: null,
+                lng: null,
+                category: "",
+                rating: null,
+                reviews: null,
+                tags: [],
+                photos: [],
+                opening_hours: null,
+                liked: likedIds.has(id),
+              };
+            }
+          })
+        );
+
+        setSearchResults(detailed);
+        setLastQuery(query);
+        bottomSheetRef.current?.snapToIndex(1);
+      } catch (err) {
+        console.error("검색 실패", err);
+        setSearchResults([]);
+        setLastQuery(query);
+      }
+    },
+    [likedIds]
   );
 
-  // FlashList item 렌더러
-  const renderItem = useCallback(({ item }) => {
-    return (
-      <View style={styles.card}>
+  // 3) 검색화면에서 돌아오면 자동검색
+  useFocusEffect(
+    React.useCallback(() => {
+      if (qFromRoute) handleSearch(qFromRoute);
+    }, [qFromRoute, handleSearch])
+  );
+
+  // 4) 지도 마커 = 검색 중엔 검색 결과만, 아니면 좋아요만
+  const markers = useMemo(() => {
+    const isSearched = lastQuery.trim().length > 0;
+    const isLiked = (id) =>
+      likedIds.has(Number(id)) || likedIds.has(String(id));
+
+    if (isSearched) {
+      return searchResults
+        .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+        .map((p, i) => ({
+          id: p.id ?? String(i),
+          lat: p.lat,
+          lng: p.lng,
+          name: p.name ?? "",
+          label: String(i + 1),
+          liked: isLiked(p.id),
+        }));
+    }
+    return likedPlaces
+      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+      .map((p) => ({
+        id: p.id,
+        lat: p.lat,
+        lng: p.lng,
+        name: p.name ?? "",
+        liked: true,
+      }));
+  }, [searchResults, likedPlaces, likedIds, lastQuery]);
+
+  // 5) 바텀시트 뷰 데이터/타이틀
+  const isSearched = lastQuery.length > 0;
+  const sheetTitle = isSearched
+    ? `‘${lastQuery}’ 검색 결과`
+    : "좋아요 누른 장소";
+
+  // 6) 좋아요(초기) 카드
+  const renderLikedItem = useCallback(
+    ({ item }) => (
+      <View style={styles.smallCard}>
         <Image
           source={require("../../../../assets/images/sample.png")}
-          style={styles.cardImage}
+          style={styles.smallCardImage}
         />
-        <Text
-          className="text-heading-3 font-pretendardSemiBold mt-[5px]"
-          numberOfLines={1}
-        >
+        <Text style={styles.smallCardTitle} numberOfLines={1}>
           {item.name}
         </Text>
-        <Text className="text-caption font-pretendardRegular text-gray700">
-          수원 영통구 영통동
+        <Text style={styles.smallCardAddr} numberOfLines={1}>
+          {item.address}
         </Text>
+      </View>
+    ),
+    []
+  );
+
+  // 7) 검색 결과 카드 — 장소명 누르면 상세로 이동
+  const SearchResultCard = useCallback(({ item, onPress }) => {
+    return (
+      <View style={styles.resultCard}>
+        {/* 타이틀행 */}
+        <View style={styles.resultHeaderRow}>
+          <Pressable
+            onPress={() => onPress?.(item)}
+            hitSlop={8}
+            accessibilityRole="button"
+          >
+            <Text
+              className="text-heading-2 font-pretendardSemiBold text-[#244DD3]"
+              numberOfLines={1}
+            >
+              {item.name}
+            </Text>
+          </Pressable>
+          <View style={styles.resultHeaderIcons}>
+            <Pressable hitSlop={10} style={{ marginRight: 10 }}>
+              <Icon name="share2" width={25} height={25} />
+            </Pressable>
+            <Pressable hitSlop={10}>
+              <Icon name="heart_outline" width={25} height={25} />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* 카테고리 / 주소 */}
+        {!!item.category && (
+          <Text
+            className="text-body-3 font-pretendardRegular text-gray700"
+            numberOfLines={1}
+          >
+            {item.category}
+          </Text>
+        )}
+        {!!item.address && (
+          <Text
+            className="text-body-3 font-pretendardRegular text-gray700"
+            numberOfLines={1}
+          >
+            {item.address}
+          </Text>
+        )}
+
+        {/* 평점 */}
+        {(item.rating ?? null) !== null && (
+          <View style={styles.resultRatingRow}>
+            <Icon name="star" width={18} height={18} />
+            <Text style={styles.resultRatingText}>
+              {Number(item.rating).toFixed(1)}
+            </Text>
+            {item.reviews ? (
+              <Text style={styles.resultReviewCount}>({item.reviews})</Text>
+            ) : null}
+          </View>
+        )}
+
+        {/* 해시태그 */}
+        {Array.isArray(item.tags) && item.tags.length > 0 && (
+          <View style={styles.tagsRow}>
+            {item.tags.slice(0, 4).map((t, idx) => (
+              <Text
+                key={idx}
+                className="text-caption font-pretendardRegular text-gray700"
+                numberOfLines={1}
+              >
+                #{String(t)}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {/* 사진 3장 스트립 */}
+        <View style={styles.photoRow}>
+          {(item.photos?.length ? item.photos : [1, 2, 3])
+            .slice(0, 3)
+            .map((ph, i) => {
+              const src =
+                typeof ph === "string"
+                  ? { uri: ph }
+                  : require("../../../../assets/images/sample.png");
+              return <Image key={i} source={src} style={styles.photoThumb} />;
+            })}
+        </View>
+
+        {/* 카드 하단 꽉 찬 구분선 */}
+        <View style={styles.fullDivider} />
       </View>
     );
   }, []);
 
+  const goToDetail = useCallback(
+    (item) => {
+      // detail 화면이 재사용하는 초기 payload 형태로 맞춰줌
+      const initialPayload = {
+        location_id: Number(item.id),
+        location_name: item.name ?? "",
+        rating_avg: item.rating ?? null,
+        category: item.category ?? "",
+        address: item.address ?? "",
+        latitude: Number(item.lat),
+        longitude: Number(item.lng),
+        photos: item.photos || [],
+        opening_hours: item.opening_hours || null,
+        // 태그 계열은 둘 다 채워주면 페이지에서 하이라이트/표시하기 편함
+        keywords: Array.isArray(item.tags) ? item.tags : [],
+        features_flat: Array.isArray(item.tags) ? item.tags : [],
+        // 필요시 price_level, opening_hours 등도 여기서 같이 전달 가능
+        __thumbs__: item.photos || [],
+      };
+
+      router.push({
+        pathname: "/place-recommend/detail/[id]",
+        params: {
+          id: String(item.id),
+          initial: encodeURIComponent(JSON.stringify(initialPayload)),
+          // moodsKo: JSON.stringify([]),
+          // keywordsKo: JSON.stringify([]),
+        },
+      });
+    },
+    [router]
+  );
+
   return (
     <View style={{ flex: 1 }}>
-      {/* 안드로이드 status bar */}
+      {/* Android status bar 투명 */}
       {Platform.OS === "android" && (
         <StatusBar
           translucent
@@ -135,22 +366,28 @@ export default function MapScreen() {
         />
       )}
 
-      {/* 지도 */}
+      {/* 지도 (배경 전면) */}
       <View style={[StyleSheet.absoluteFill, { zIndex: 0 }]}>
-        <MapView markers={markers} />
+        {/* 지도탭에서는 숫자 라벨 숨김 */}
+        <MapView markers={markers.map((m) => ({ ...m, label: "" }))} />
       </View>
 
-      {/* 검색창 오버레이 */}
+      {/* 상단 검색 오버레이 */}
       <SafeAreaView style={styles.overlay} pointerEvents="box-none">
         <View style={styles.topContainer}>
-          <View style={styles.searchBox}>
-            <TextInput
-              placeholder="장소 검색하기"
-              onSubmitEditing={(e) => handleSearch(e.nativeEvent.text)}
-              style={styles.searchInput}
-            />
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: "/journey-create/search-place",
+                params: { returnTo: "map" },
+              })
+            }
+            style={styles.searchBox}
+          >
+            <Text style={styles.searchPlaceholder}>장소 검색하기</Text>
             <Icon name="search_outline" width={20} height={20} />
-          </View>
+          </Pressable>
+
           <View style={styles.chipsRow}>
             {["카페", "활동", "쇼핑", "먹거리"].map((cat) => (
               <Pressable
@@ -191,22 +428,48 @@ export default function MapScreen() {
           borderRadius: 50,
         }}
       >
-        <BottomSheetView style={{ paddingHorizontal: 25, paddingTop: 20 }}>
-          <Text className="text-heading-2 font-pretendardSemiBold mb-[11px]">
-            현재 위치에서 많이 찾는 장소
-          </Text>
+        {isSearched ? (
+          <BottomSheetScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 25, paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text className="text-heading-2 font-pretendardSemiBold mb-[11px]">
+              {sheetTitle}
+            </Text>
 
-          <BottomSheetFlashList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={cards}
-            keyExtractor={(item) => item.id}
-            renderItem={renderItem}
-            estimatedItemSize={140}
-            contentContainerStyle={{ paddingRight: 25 }}
-            style={{ height: 170 }}
-          />
-        </BottomSheetView>
+            {searchResults.map((item, idx) => (
+              <View key={item.id}>
+                <SearchResultCard
+                  key={item.id}
+                  item={item}
+                  onPress={goToDetail}
+                />
+                {/* 마지막 아이템 제외하고 구분선(카드 내부에 하나 있으니 바깥에선 X) */}
+                {false && idx < searchResults.length - 1 && (
+                  <View style={styles.fullDivider} />
+                )}
+              </View>
+            ))}
+          </BottomSheetScrollView>
+        ) : (
+          <BottomSheetView style={{ paddingHorizontal: 25, paddingTop: 20 }}>
+            <Text className="text-heading-2 font-pretendardSemiBold mb-[11px]">
+              {sheetTitle}
+            </Text>
+            <BottomSheetFlashList
+              key="likes-horizontal"
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={likedPlaces}
+              keyExtractor={(item) => item.id}
+              renderItem={renderLikedItem}
+              estimatedItemSize={120}
+              contentContainerStyle={{ paddingRight: 25 }}
+              style={{ height: 170 }}
+            />
+          </BottomSheetView>
+        )}
       </BottomSheet>
     </View>
   );
@@ -234,7 +497,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     elevation: 3,
   },
-  searchInput: { flex: 1, fontSize: 16, paddingVertical: 0 },
+  searchPlaceholder: {
+    flex: 1,
+    color: "#AFAFAF",
+    fontSize: 16,
+    fontWeight: 500,
+  },
   chipsRow: { flexDirection: "row", marginTop: 8 },
   chip: {
     backgroundColor: "white",
@@ -252,6 +520,46 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     elevation: 3,
   },
-  card: { width: 100, marginRight: 20 },
-  cardImage: { width: "100%", height: 100, borderRadius: 5 },
+
+  // 좋아요(초기) 작은 카드
+  smallCard: { width: 120, marginRight: 16 },
+  smallCardImage: { width: "100%", height: 100, borderRadius: 8 },
+  smallCardTitle: { marginTop: 6, fontWeight: "600" },
+  smallCardAddr: { color: "#666", fontSize: 12 },
+
+  // 검색 결과 카드
+  resultCard: {
+    paddingBottom: 18,
+    marginBottom: 0,
+  },
+  resultHeaderRow: { flexDirection: "row", alignItems: "center" },
+  resultHeaderIcons: { flexDirection: "row", marginLeft: "auto" },
+  resultRatingRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
+  resultRatingText: {
+    marginLeft: 6,
+    color: "#EE7A13",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  resultReviewCount: { marginLeft: 4, color: "#666" },
+  tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 6 },
+  photoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  photoThumb: {
+    flex: 1,
+    aspectRatio: 1,
+    marginHorizontal: 2,
+    borderRadius: 5,
+    backgroundColor: "#EEE",
+  },
+  fullDivider: {
+    height: 1,
+    backgroundColor: "#D4D4D4",
+    marginTop: 17,
+    marginHorizontal: -25, // 좌우 꽉차게
+    alignSelf: "stretch",
+  },
 });
