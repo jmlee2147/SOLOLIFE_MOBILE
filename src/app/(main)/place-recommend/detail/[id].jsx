@@ -1,10 +1,11 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
   Image,
   Pressable,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -21,34 +22,9 @@ const { width: SCREEN_W } = Dimensions.get("window");
 const HIGHLIGHT_COLOR = "#EE7A13";
 const TAG_COLOR = "#6B6B6B";
 
-const REVIEWS_MOCK = [
-  {
-    id: "rv-1",
-    user: "집가고 싶은 나",
-    rating: 4,
-    content: "분위기 좋고 좌석 간격 넓어서 집중하기 편해요.",
-    photos: [
-      "https://picsum.photos/seed/rev1a/600/400",
-      "https://picsum.photos/seed/rev1b/600/400",
-      "https://picsum.photos/seed/rev1c/600/400",
-    ],
-  },
-  {
-    id: "rv-2",
-    user: "감자튀김",
-    rating: 5,
-    content:
-      "조용해서 작업하기 좋았어요. 디저트도 깔끔! 콘센트 자리도 많네요.",
-    photos: ["https://picsum.photos/seed/rev2a/600/400"],
-  },
-  {
-    id: "rv-3",
-    user: "배고픈판다",
-    rating: 3,
-    content: "주말엔 조금 붐벼요. 평일 오전 추천!",
-    photos: [],
-  },
-];
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL;
+const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN;
+// const TEST_USER_ID = process.env.EXPO_PUBLIC_TEST_USER_ID; // 필요시 사용
 
 // 문자열/객체/require 섞여도 안전하게 이미지 소스로 변환
 function normalizeToImageSources(arr) {
@@ -66,6 +42,8 @@ function normalizeToImageSources(arr) {
 export default function PlaceDetailScreen() {
   const router = useRouter();
   const { id, initial, moodsKo, keywordsKo } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
+
   const scrollX = useRef(new Animated.Value(0)).current;
   const [liked, setLiked] = useState(false);
 
@@ -82,10 +60,7 @@ export default function PlaceDetailScreen() {
     () => [...parseJsonArr(moodsKo), ...parseJsonArr(keywordsKo)].map(String),
     [moodsKo, keywordsKo]
   );
-  const highlightSet = useMemo(
-    () => new Set(highlightedTags),
-    [highlightedTags]
-  );
+  const highlightSet = useMemo(() => new Set(highlightedTags), [highlightedTags]);
 
   // 초기(옵션) 데이터 파싱
   const initialItem = useMemo(() => {
@@ -100,7 +75,7 @@ export default function PlaceDetailScreen() {
   // initialItem 기반으로 상세 뷰 모델 생성
   const place = useMemo(() => {
     if (!initialItem) {
-      // 안전 기본값 (MOCK 의존성 제거)
+      // 안전 기본값
       return {
         id: String(id || ""),
         name: "",
@@ -114,7 +89,6 @@ export default function PlaceDetailScreen() {
         hasHours: false,
         phone: "",
         price: "",
-        reviews: [],
         coords: { lat: "", lng: "" },
       };
     }
@@ -135,42 +109,110 @@ export default function PlaceDetailScreen() {
       images: mergedImages,
       tags: [
         ...(Array.isArray(initialItem.keywords) ? initialItem.keywords : []),
-        ...(Array.isArray(initialItem.features_flat)
-          ? initialItem.features_flat
-          : []),
+        ...(Array.isArray(initialItem.features_flat) ? initialItem.features_flat : []),
       ],
       address: initialItem.address ?? "",
-      hoursText,     // "오전 9:30 - 오후 10:30" 또는 null
-      openNow,       // true/false/null
-      hasHours,      // boolean
+      hoursText, // "오전 9:30 - 오후 10:30" 또는 null
+      openNow, // true/false/null
+      hasHours, // boolean
       phone: "",
       price: initialItem.price_level ? `₩ Lv.${initialItem.price_level}` : "",
-      reviews: [],
       coords: { lat: initialItem.latitude, lng: initialItem.longitude },
     };
   }, [initialItem, id]);
 
-  const insets = useSafeAreaInsets();
-
   // 캐러셀 이미지
-  const images = place.images?.length
-    ? place.images
-    : [require("../../../../assets/images/sample.png")];
-
+  const images = place.images?.length ? place.images : [require("../../../../assets/images/sample.png")];
   const IMG_W = SCREEN_W;
   const IMG_H = 346 - insets.top;
 
   // 페이지 인덱스 동적 반영
   const [imgIndex, setImgIndex] = useState(0);
-  const pageIndexText = useMemo(
-    () => `${imgIndex + 1} / ${images.length}`,
-    [imgIndex, images.length]
-  );
+  const pageIndexText = useMemo(() => `${imgIndex + 1} / ${images.length}`, [imgIndex, images.length]);
 
   // 탭
   const [tab, setTab] = useState("review");
   const [wReview, setWReview] = useState(0);
   const [wRoute, setWRoute] = useState(0);
+
+  // ===== 리뷰 상태 =====
+  const PAGE_SIZE = 20;
+  const [reviews, setReviews] = useState([]); // 서버 스키마 그대로 items 원소를 저장
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+
+  // 리뷰 조회 (+ 최소 콘솔 디버깅)
+  async function fetchReviews({ reset = false } = {}) {
+    if (!place?.id) {
+      console.log("[reviews] skip: missing place.id");
+      return;
+    }
+    if (loading) return;
+
+    const nextPage = reset ? 1 : page;
+    const url =
+      `${API_BASE}/reviews?locationId=${encodeURIComponent(place.id)}` +
+      `&page=${nextPage}&limit=${PAGE_SIZE}&order=created_at.desc`;
+
+    console.log("[reviews] fetching:", { placeId: place.id, url, nextPage });
+
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          // Authorization: `Bearer ${TEST_TOKEN}`, // 공개 목록이면 불필요
+        },
+      });
+      console.log("[reviews] status:", res.status);
+
+      const raw = await res.text();
+      let json;
+      try {
+        json = JSON.parse(raw);
+      } catch (e) {
+        console.log("[reviews] JSON parse error, raw:", raw?.slice(0, 500));
+        throw e;
+      }
+
+      console.log("[reviews] json keys:", Object.keys(json || {}));
+      const items = Array.isArray(json.items) ? json.items : [];
+      console.log("[reviews] items.length:", items.length, "sample:", items[0]);
+
+      setReviews((prev) => (reset ? items : [...prev, ...items]));
+      setHasMore(items.length === PAGE_SIZE);
+      setPage(nextPage + 1);
+    } catch (e) {
+      console.log("[reviews] error:", e?.message || e);
+      setError(String(e?.message || e));
+    } finally {
+      setLoading(false);
+      if (reset) setRefreshing(false);
+    }
+  }
+
+  // 최초 로드
+  useEffect(() => {
+    if (!place?.id) return;
+    console.log("[reviews] initial load for placeId:", place.id);
+    setPage(1);
+    setHasMore(true);
+    setReviews([]);
+    fetchReviews({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [place?.id]);
+
+  const onRefresh = () => {
+    console.log("[reviews] pull-to-refresh");
+    setRefreshing(true);
+    setPage(1);
+    setHasMore(true);
+    fetchReviews({ reset: true });
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -185,6 +227,7 @@ export default function PlaceDetailScreen() {
       <ScrollView
         contentContainerStyle={{ paddingBottom: 110 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* 이미지 캐러셀 */}
         <View style={{ width: IMG_W, height: IMG_H }}>
@@ -195,23 +238,15 @@ export default function PlaceDetailScreen() {
             data={images}
             keyExtractor={(_, i) => `img-${i}`}
             renderItem={({ item }) => (
-              <Image
-                source={item}
-                resizeMode="cover"
-                style={{ width: IMG_W, height: IMG_H }}
-              />
+              <Image source={item} resizeMode="cover" style={{ width: IMG_W, height: IMG_H }} />
             )}
-            onScroll={Animated.event(
-              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-              { useNativeDriver: false }
-            )}
+            onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+              useNativeDriver: false,
+            })}
             scrollEventThrottle={16}
             onMomentumScrollEnd={(e) => {
               const x = e?.nativeEvent?.contentOffset?.x ?? 0;
-              const idx = Math.max(
-                0,
-                Math.min(images.length - 1, Math.round(x / IMG_W))
-              );
+              const idx = Math.max(0, Math.min(images.length - 1, Math.round(x / IMG_W)));
               setImgIndex(idx);
             }}
           />
@@ -226,9 +261,7 @@ export default function PlaceDetailScreen() {
               backgroundColor: "rgba(0,0,0,0.55)",
             }}
           >
-            <Text className="text-white text-body-3 font-pretendardRegular">
-              {pageIndexText}
-            </Text>
+            <Text className="text-white text-body-3 font-pretendardRegular">{pageIndexText}</Text>
           </View>
         </View>
 
@@ -244,11 +277,7 @@ export default function PlaceDetailScreen() {
               {place.name || "알 수 없는 장소"}
             </Text>
             <Pressable onPress={() => setLiked((v) => !v)} hitSlop={8}>
-              <Icon
-                name={liked ? "heart" : "heart_outline"}
-                width={25}
-                height={25}
-              />
+              <Icon name={liked ? "heart" : "heart_outline"} width={25} height={25} />
             </Pressable>
           </View>
 
@@ -302,57 +331,26 @@ export default function PlaceDetailScreen() {
         {/* 정보 목록 */}
         <View style={{ marginTop: 12 }}>
           {/* 주소 */}
-          <View style={styles.infoRow}>
-            <View style={styles.iconBox}>
-              <Icon name="location_outline" width={24} height={24} />
-            </View>
-            <View style={styles.textCol}>
-              <Text
-                className="text-gray700 font-pretendardMedium text-body-1"
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {place.address?.trim()?.length
-                  ? place.address
-                  : "아직 정보가 없어요."}
-              </Text>
-            </View>
-          </View>
-
+          <InfoRow icon="location_outline" text={place.address?.trim()?.length ? place.address : "아직 정보가 없어요."} />
           {/* 오늘 영업시간 · 상태 */}
           <View style={styles.infoRow}>
             <View style={styles.iconBox}>
               <Icon name="time" width={24} height={24} />
             </View>
             <View style={styles.textCol}>
-              <Text
-                className="text-gray700 font-pretendardMedium text-body-1"
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
+              <Text className="text-gray700 font-pretendardMedium text-body-1" numberOfLines={1} ellipsizeMode="tail">
                 {place.hasHours && place.hoursText ? (
                   <>
                     {place.hoursText}
                     {typeof place.openNow === "boolean" && (
-                      <Text
-                        style={{
-                          color: place.openNow ? "#62974F" : "#DC2626",
-                          fontWeight: "500",
-                        }}
-                      >
+                      <Text style={{ color: place.openNow ? "#62974F" : "#DC2626", fontWeight: "500" }}>
                         {"  •  "}
                         {place.openNow ? "영업 중" : "영업 종료"}
                       </Text>
                     )}
                   </>
                 ) : typeof place.openNow === "boolean" ? (
-                  // 시간은 없고 상태만 있을 때 → 상태만 표시
-                  <Text
-                    style={{
-                      color: place.openNow ? "#62974F" : "#DC2626",
-                      fontWeight: "500",
-                    }}
-                  >
+                  <Text style={{ color: place.openNow ? "#62974F" : "#DC2626", fontWeight: "500" }}>
                     {place.openNow ? "영업 중" : "영업 종료"}
                   </Text>
                 ) : (
@@ -361,42 +359,10 @@ export default function PlaceDetailScreen() {
               </Text>
             </View>
           </View>
-
           {/* 전화 */}
-          <View style={styles.infoRow}>
-            <View style={styles.iconBox}>
-              <Icon name="phone" width={24} height={24} />
-            </View>
-            <View style={styles.textCol}>
-              <Text
-                className="text-gray700 font-pretendardMedium text-body-1"
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {place.phone?.trim()?.length
-                  ? place.phone
-                  : "아직 정보가 없어요."}
-              </Text>
-            </View>
-          </View>
-
+          <InfoRow icon="phone" text={place.phone?.trim()?.length ? place.phone : "아직 정보가 없어요."} />
           {/* 가격 */}
-          <View style={styles.infoRow}>
-            <View style={styles.iconBox}>
-              <Icon name="price" width={24} height={24} />
-            </View>
-            <View style={styles.textCol}>
-              <Text
-                className="text-gray700 font-pretendardMedium text-body-1"
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {place.price?.trim()?.length
-                  ? place.price
-                  : "아직 정보가 없어요."}
-              </Text>
-            </View>
-          </View>
+          <InfoRow icon="price" text={place.price?.trim()?.length ? place.price : "아직 정보가 없어요."} />
         </View>
 
         {/* 탭 */}
@@ -414,61 +380,30 @@ export default function PlaceDetailScreen() {
                 backgroundColor: "#D4D4D4",
               }}
             />
-
             <View style={{ flexDirection: "row" }}>
               {/* 리뷰 탭 */}
-              <Pressable
-                onPress={() => setTab("review")}
-                hitSlop={8}
-                style={{ paddingBottom: 8, marginRight: 34 }}
-              >
+              <Pressable onPress={() => setTab("review")} hitSlop={8} style={{ paddingBottom: 8, marginRight: 34 }}>
                 <Text
                   onLayout={(e) => setWReview(e.nativeEvent.layout.width)}
-                  className={[
-                    "text-heading-2 font-pretendardSemiBold",
-                    tab === "review" ? "text-black" : "text-gray500",
-                  ].join(" ")}
+                  className={["text-heading-2 font-pretendardSemiBold", tab === "review" ? "text-black" : "text-gray500"].join(" ")}
                 >
                   리뷰
                 </Text>
                 {tab === "review" && (
-                  <View
-                    style={{
-                      position: "absolute",
-                      bottom: -1,
-                      height: 3,
-                      width: wReview,
-                      backgroundColor: "#000",
-                    }}
-                  />
+                  <View style={{ position: "absolute", bottom: -1, height: 3, width: wReview, backgroundColor: "#000" }} />
                 )}
               </Pressable>
 
               {/* 관련 여정 탭 */}
-              <Pressable
-                onPress={() => setTab("route")}
-                hitSlop={8}
-                style={{ paddingBottom: 8 }}
-              >
+              <Pressable onPress={() => setTab("route")} hitSlop={8} style={{ paddingBottom: 8 }}>
                 <Text
                   onLayout={(e) => setWRoute(e.nativeEvent.layout.width)}
-                  className={[
-                    "text-heading-2 font-pretendardSemiBold",
-                    tab === "route" ? "text-black" : "text-gray500",
-                  ].join(" ")}
+                  className={["text-heading-2 font-pretendardSemiBold", tab === "route" ? "text-black" : "text-gray500"].join(" ")}
                 >
                   관련 여정
                 </Text>
                 {tab === "route" && (
-                  <View
-                    style={{
-                      position: "absolute",
-                      bottom: -1,
-                      height: 3,
-                      width: wRoute,
-                      backgroundColor: "#000",
-                    }}
-                  />
+                  <View style={{ position: "absolute", bottom: -1, height: 3, width: wRoute, backgroundColor: "#000" }} />
                 )}
               </Pressable>
             </View>
@@ -478,9 +413,9 @@ export default function PlaceDetailScreen() {
           {tab === "review" ? (
             <View className="mt-[17px]">
               <View className="flex-row items-center justify-between">
-                <Text className="text-heading-3 font-pretendardSemiBold">
-                  최신순
-                </Text>
+                <Text className="text-heading-3 font-pretendardSemiBold">최신순</Text>
+
+                {/* 리뷰 작성: 작성 페이지로 이동(해당 화면에서 POST /reviews 호출) */}
                 <Pressable
                   onPress={() =>
                     router.push({
@@ -493,15 +428,38 @@ export default function PlaceDetailScreen() {
                     })
                   }
                 >
-                  <Text className="text-body-1 font-pretendardMedium text-[#244DD3]">
-                    리뷰 작성하기
-                  </Text>
+                  <Text className="text-body-1 font-pretendardMedium text-[#244DD3]">리뷰 작성하기</Text>
                 </Pressable>
               </View>
+
+              {/* 리뷰 목록 */}
               <View className="mt-3">
-                {REVIEWS_MOCK.map((r) => (
-                  <ReviewItem key={r.id} review={r} />
-                ))}
+                {loading && !reviews.length ? (
+                  <Text className="text-gray600">리뷰 불러오는 중…</Text>
+                ) : error ? (
+                  <View>
+                    <Text className="text-red-600">리뷰 로드 실패: {error}</Text>
+                    <Pressable onPress={() => fetchReviews({ reset: true })}>
+                      <Text className="text-[#244DD3] mt-1">다시 시도</Text>
+                    </Pressable>
+                  </View>
+                ) : !reviews.length ? (
+                  <Text className="text-gray600">아직 리뷰가 없어요.</Text>
+                ) : (
+                  <>
+                    {reviews.map((r) => (
+                      <ReviewItem key={r.review_id} review={r} />
+                    ))}
+                    {hasMore && (
+                      <Pressable onPress={() => fetchReviews()} style={{ marginTop: 12, alignSelf: "center" }}>
+                        <Text className="text-body-1 font-pretendardMedium text-[#244DD3]">더 보기</Text>
+                      </Pressable>
+                    )}
+                    {loading && reviews.length > 0 && (
+                      <Text className="mt-2 text-gray600">더 불러오는 중…</Text>
+                    )}
+                  </>
+                )}
               </View>
             </View>
           ) : (
@@ -544,25 +502,20 @@ export default function PlaceDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 4.5,
-    gap: 7,
-  },
-  iconBox: {
-    width: 24,
-    height: 24,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  textCol: {
-    flex: 1,
-    paddingRight: 25,
-  },
-});
+function InfoRow({ icon, text }) {
+  return (
+    <View style={styles.infoRow}>
+      <View className="items-center justify-center" style={styles.iconBox}>
+        <Icon name={icon} width={24} height={24} />
+      </View>
+      <View style={styles.textCol}>
+        <Text className="text-gray700 font-pretendardMedium text-body-1" numberOfLines={1} ellipsizeMode="tail">
+          {text}
+        </Text>
+      </View>
+    </View>
+  );
+}
 
 function ReviewItem({ review }) {
   const SIDE = 25;
@@ -570,37 +523,28 @@ function ReviewItem({ review }) {
   const COLS = 3;
   const itemW = Math.floor((SCREEN_W - SIDE * 2 - GAP * (COLS - 1)) / COLS);
 
-  const photos = Array.isArray(review.photos) ? review.photos : [];
+  // 서버 스키마 준수: 배열이면 조합해서 한 줄로 표시
+  const username = review?.user?.username ?? review?.user?.name ?? "익명";
+  const rating = Number.isFinite(Number(review?.rating)) ? Number(review.rating) : 0;
+  const contentText = Array.isArray(review?.content)
+    ? review.content.filter((s) => String(s).trim().length).join(" · ")
+    : String(review?.content || "").trim();
+
+  // 현재 스키마엔 리뷰 사진 필드 없음 → 필요 시 확장
+  const photos = Array.isArray(review?.photos) ? review.photos : [];
 
   return (
     <View style={{ paddingVertical: 16 }}>
       {/* 헤더 */}
-      <View
-        style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
-      >
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <View
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: "#DADADA",
-            }}
-          />
+          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#DADADA" }} />
           <View style={{ marginLeft: 8 }}>
-            <Text className="text-gray700 text-body-2 font-pretendardMedium">
-              {review.user}
-            </Text>
+            <Text className="text-gray700 text-body-2 font-pretendardMedium">{username}</Text>
             {/* 별점 아이콘 */}
             <View className="flex-row items-center">
               {Array.from({ length: 5 }).map((_, i) => (
-                <Icon
-                  key={i}
-                  name={i < review.rating ? "star" : "star_outline"}
-                  color="#000"
-                  width={16}
-                  height={16}
-                />
+                <Icon key={i} name={i < rating ? "star" : "star_outline"} color="#000" width={16} height={16} />
               ))}
             </View>
           </View>
@@ -608,29 +552,27 @@ function ReviewItem({ review }) {
       </View>
 
       {/* 본문 */}
-      {!!review.content && (
+      {!!contentText && (
         <Text style={{ marginTop: 7 }} className="text-gray700 text-body-2 font-pretendardMedium">
-          {review.content}
+          {contentText}
         </Text>
       )}
 
-      {/* 사진 그리드 */}
+      {/* 사진 그리드(옵션 확장용) */}
       {!!photos.length && (
-        <View style={{ flexDirection: "row", gap: GAP, marginTop: 7 }}>
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 7 }}>
           {photos.slice(0, 3).map((uri, i) => (
             <Image
-              key={`${review.id}-p-${i}`}
+              key={`${review.review_id}-p-${i}`}
               source={{ uri }}
-              style={{
-                width: itemW,
-                height: itemW,
-                backgroundColor: "#EDEDED",
-              }}
+              style={{ width: itemW, height: itemW, backgroundColor: "#EDEDED" }}
               resizeMode="cover"
             />
           ))}
         </View>
       )}
+
+      {/* 하단 구분선 */}
       <View
         style={{
           position: "absolute",
@@ -645,3 +587,21 @@ function ReviewItem({ review }) {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 4.5,
+    gap: 7,
+  },
+  iconBox: {
+    width: 24,
+    height: 24,
+  },
+  textCol: {
+    flex: 1,
+    paddingRight: 25,
+  },
+});
