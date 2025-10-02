@@ -9,17 +9,25 @@ export default function TreasureOpening({
   onComplete,
   sources,
   style,
+
   // 레이 유지(오픈 후) 설정
-  raysIdleOpacity = 0.65,     // 열린 상태에서 지속 불투명도
-  raysIdleRotateMs = 6000,    // 열린 상태에서 1바퀴 회전 시간
+  raysIdleOpacity = 0.65,
+  raysIdleRotateMs = 6000,
 
   // 흔들림/정지/폭발 파라미터
-  trembleMs = 550,            // 부들부들 총 시간
-  trembleAmplitude = 4,       // 좌우 흔들림 px
-  trembleRotateDeg = 2.2,     // 흔들릴 때 회전 각도(deg)
-  pauseMs = 200,              // 흔들린 뒤 잠깐 멈춤 시간
-  explodeMs = 220,            // 펑 시간
-  explodeScale = 1.18,        // 펑 최대 스케일
+  trembleMs = 550,
+  trembleAmplitude = 4,
+  trembleRotateDeg = 2.2,
+  pauseMs = 200,
+  explodeMs = 220,
+  explodeScale = 1.18,
+
+  // 새로 추가: 열린 뒤 상자 감추기 & 캐릭터 등장 제어
+  hideChestAfterOpen = true,               // 열리면 상자 프레임 감춤
+  characterEnterMs = 600,                  // 캐릭터 등장 시간
+  characterFromScale = 0.82,               // 캐릭터 시작 스케일
+  characterFromY = 18,                     // 캐릭터 시작 Y오프셋(+ 아래)
+  renderAfterOpen,                         // (size) => ReactNode  캐릭터 렌더 함수
 }) {
   const CLOSED = sources?.closed || require("../../assets/images/treasure_close.png");
   const MID    = sources?.mid    || require("../../assets/images/treasure_half.png");
@@ -30,6 +38,7 @@ export default function TreasureOpening({
   const closedOpacity = useRef(new Animated.Value(1)).current;
   const midOpacity    = useRef(new Animated.Value(0)).current;
   const openOpacity   = useRef(new Animated.Value(0)).current;
+  const chestOpacity  = useRef(new Animated.Value(1)).current;
 
   // 팝/이동
   const scaleX     = useRef(new Animated.Value(1)).current;
@@ -41,9 +50,14 @@ export default function TreasureOpening({
   const raysScale   = useRef(new Animated.Value(1)).current;
   const raysRotate  = useRef(new Animated.Value(0)).current;
 
-  // 🔥 추가: 흔들림용 값
-  const shakeX      = useRef(new Animated.Value(0)).current; // -amp ~ +amp
-  const shakeRotVal = useRef(new Animated.Value(0)).current; // -1 ~ +1 -> deg로 보간
+  // 흔들림
+  const shakeX      = useRef(new Animated.Value(0)).current;
+  const shakeRotVal = useRef(new Animated.Value(0)).current;
+
+  // 캐릭터 등장 애니
+  const charOpacity    = useRef(new Animated.Value(0)).current;
+  const charScale      = useRef(new Animated.Value(characterFromScale)).current;
+  const charTranslateY = useRef(new Animated.Value(characterFromY)).current;
 
   // 레이 원본 사이즈
   const [raysSize, setRaysSize] = useState({ w: null, h: null });
@@ -57,7 +71,7 @@ export default function TreasureOpening({
     const src = RAYS;
     if (typeof src === "number") {
       const { width, height } = Image.resolveAssetSource(src) || {};
-      if (width && height) setRaysSize({ w: width / 3 , h: height / 3 });
+      if (width && height) setRaysSize({ w: width / 3, h: height / 3 });
     } else if (src?.uri) {
       Image.getSize(
         src.uri,
@@ -69,7 +83,7 @@ export default function TreasureOpening({
     }
   }, [RAYS, size]);
 
-  // 열린 상태 레이 무한회전 시작/정지
+  // 레이 무한 회전
   const startRaysIdleLoop = () => {
     if (raysLoopRef.current) return;
     raysRotate.setValue(0);
@@ -83,7 +97,6 @@ export default function TreasureOpening({
     );
     raysLoopRef.current.start();
   };
-
   const stopRaysIdleLoop = () => {
     if (raysLoopRef.current) {
       raysLoopRef.current.stop();
@@ -91,27 +104,22 @@ export default function TreasureOpening({
     }
   };
 
-  // 🔥 흔들림 시퀀스 빌더
+  // 흔들림 시퀀스
   const buildTremble = () => {
-    // 1 사이클(좌->우->센터) 시간
-    const step = 40; // ms (짧을수록 더 부들거림)
+    const step = 40;
     const cycles = Math.max(1, Math.floor(trembleMs / (step * 3)));
     const seq = [];
-
     for (let i = 0; i < cycles; i++) {
-      // 좌
       seq.push(Animated.parallel([
-        Animated.timing(shakeX, { toValue: -trembleAmplitude, duration: step, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(shakeRotVal, { toValue: -1, duration: step, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(shakeX,      { toValue: -trembleAmplitude, duration: step, easing: Easing.out(Easing.quad),  useNativeDriver: true }),
+        Animated.timing(shakeRotVal, { toValue: -1,                duration: step, easing: Easing.out(Easing.quad),  useNativeDriver: true }),
       ]));
-      // 우
       seq.push(Animated.parallel([
-        Animated.timing(shakeX, { toValue: trembleAmplitude, duration: step, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(shakeRotVal, { toValue: 1, duration: step, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(shakeX,      { toValue:  trembleAmplitude, duration: step, easing: Easing.inOut(Easing.quad),useNativeDriver: true }),
+        Animated.timing(shakeRotVal, { toValue:  1,                duration: step, easing: Easing.inOut(Easing.quad),useNativeDriver: true }),
       ]));
-      // 센터
       seq.push(Animated.parallel([
-        Animated.timing(shakeX, { toValue: 0, duration: step, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(shakeX,      { toValue: 0, duration: step, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
         Animated.timing(shakeRotVal, { toValue: 0, duration: step, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
       ]));
     }
@@ -124,15 +132,20 @@ export default function TreasureOpening({
         startRaysIdleLoop();
         return;
       }
+      // 초기화
       stopRaysIdleLoop();
       setOpened(false);
       closedOpacity.setValue(1);
       midOpacity.setValue(0);
       openOpacity.setValue(0);
+      chestOpacity.setValue(1);
       raysOpacity.setValue(0);
       raysScale.setValue(1);
       shakeX.setValue(0);
       shakeRotVal.setValue(0);
+      charOpacity.setValue(0);
+      charScale.setValue(characterFromScale);
+      charTranslateY.setValue(characterFromY);
       return;
     }
 
@@ -148,10 +161,12 @@ export default function TreasureOpening({
       const midMs    = Math.round(duration * 0.28);
       const openMs   = Math.round(duration * 0.38);
 
-      // 초기화
+      // 초기값
       closedOpacity.setValue(1);
       midOpacity.setValue(0);
       openOpacity.setValue(0);
+      chestOpacity.setValue(1);
+
       scaleX.setValue(1);
       scaleY.setValue(1);
       translateY.setValue(0);
@@ -162,20 +177,20 @@ export default function TreasureOpening({
       raysScale.setValue(0.9);
       raysRotate.setValue(0);
 
-      // 0) 🔥 부들부들
-      const tremble = buildTremble();
+      charOpacity.setValue(0);
+      charScale.setValue(characterFromScale);
+      charTranslateY.setValue(characterFromY);
 
-      // 0.5) 🔥 잠깐 멈춤
+      // 서브 시퀀스
+      const tremble = buildTremble();
       const pause = Animated.delay(pauseMs);
 
-      // 1) 눌림
       const squash = Animated.parallel([
         Animated.timing(scaleX, { toValue: 1.05, duration: squashMs, easing: Easing.out(Easing.quad), useNativeDriver: true }),
         Animated.timing(scaleY, { toValue: 0.92, duration: squashMs, easing: Easing.out(Easing.quad), useNativeDriver: true }),
         Animated.timing(translateY, { toValue: 4, duration: squashMs, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       ]);
 
-      // 1.5) 🔥 펑! (짧고 강한 스케일 업 + 레이 순간 발광)
       const explode = Animated.parallel([
         Animated.sequence([
           Animated.timing(scaleX, { toValue: explodeScale, duration: Math.round(explodeMs * 0.55), easing: Easing.out(Easing.cubic), useNativeDriver: true }),
@@ -197,7 +212,6 @@ export default function TreasureOpening({
         ]),
       ]);
 
-      // 2) 중간으로
       const toMid = Animated.parallel([
         Animated.timing(closedOpacity, { toValue: 0, duration: settleMs, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
         Animated.timing(midOpacity,    { toValue: 1, duration: settleMs, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
@@ -206,12 +220,9 @@ export default function TreasureOpening({
         Animated.timing(translateY,    { toValue: 0, duration: settleMs, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       ]);
 
-      // 3) 열림 + 레이 등장(지속)
       const toOpen = Animated.parallel([
         Animated.timing(midOpacity,  { toValue: 0, duration: midMs, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
         Animated.timing(openOpacity, { toValue: 1, duration: midMs, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-
-        // 팝
         Animated.sequence([
           Animated.timing(scaleX, { toValue: 1.06, duration: Math.round(openMs * 0.5), easing: Easing.out(Easing.cubic), useNativeDriver: true }),
           Animated.timing(scaleX, { toValue: 1.00, duration: Math.round(openMs * 0.5), easing: Easing.out(Easing.cubic), useNativeDriver: true }),
@@ -220,8 +231,7 @@ export default function TreasureOpening({
           Animated.timing(scaleY, { toValue: 1.06, duration: Math.round(openMs * 0.5), easing: Easing.out(Easing.cubic), useNativeDriver: true }),
           Animated.timing(scaleY, { toValue: 1.00, duration: Math.round(openMs * 0.5), easing: Easing.out(Easing.cubic), useNativeDriver: true }),
         ]),
-
-        // 레이: 나타난 뒤 '지속' 상태로 settle
+        // 레이 지속 상태로
         Animated.sequence([
           Animated.parallel([
             Animated.timing(raysOpacity, { toValue: 0.95, duration: Math.round(openMs * 0.55), easing: Easing.out(Easing.cubic), useNativeDriver: true }),
@@ -235,17 +245,30 @@ export default function TreasureOpening({
       ]);
 
       Animated.sequence([
-        tremble,            // 🔥 부들부들
-        pause,              // 🔥 멈춤
-        squash,             // 눌림
-        explode,            // 🔥 펑!
-        toMid,              // 중간 프레임
-        toOpen,             // 오픈 + 레이 유지
+        tremble,
+        pause,
+        squash,
+        explode,
+        toMid,
+        toOpen,
+        // 열린 직후: 상자 감추기 + 캐릭터 등장
+        Animated.parallel([
+          hideChestAfterOpen
+            ? Animated.timing(chestOpacity, { toValue: 0, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true })
+            : Animated.delay(0),
+          Animated.sequence([
+            Animated.delay(100), // 살짝 텀 주고
+            Animated.parallel([
+              Animated.timing(charOpacity,    { toValue: 1, duration: characterEnterMs, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+              Animated.timing(charScale,      { toValue: 1, duration: characterEnterMs, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+              Animated.timing(charTranslateY, { toValue: 0, duration: characterEnterMs, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+            ]),
+          ]),
+        ]),
       ]).start(({ finished }) => {
         if (!finished || cancelled) return;
         setOpened(true);
         startRaysIdleLoop();
-
         if (loop) {
           setTimeout(() => {
             stopRaysIdleLoop();
@@ -253,7 +276,7 @@ export default function TreasureOpening({
             run();
           }, 300);
         } else {
-          onComplete && onComplete();
+          onComplete && onComplete(); // 캐릭터 등장까지 끝난 뒤 호출
         }
       });
     };
@@ -267,15 +290,14 @@ export default function TreasureOpening({
     play, loop, duration, onComplete,
     raysIdleOpacity, raysIdleRotateMs,
     trembleMs, trembleAmplitude, trembleRotateDeg,
-    pauseMs, explodeMs, explodeScale
+    pauseMs, explodeMs, explodeScale,
+    hideChestAfterOpen, characterEnterMs, characterFromScale, characterFromY,
   ]);
 
   const raysRotateDeg = raysRotate.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
   });
-
-  // 🔥 흔들림 회전( -1 ~ +1 -> deg )
   const shakeRotateDeg = shakeRotVal.interpolate({
     inputRange: [-1, 1],
     outputRange: [`-${trembleRotateDeg}deg`, `${trembleRotateDeg}deg`],
@@ -284,7 +306,6 @@ export default function TreasureOpening({
   const side = size;
   const abs = { position: "absolute", width: side, height: side };
 
-  // 레이를 상자 중앙에 정렬
   const raysW = raysSize.w || 0;
   const raysH = raysSize.h || 0;
   const raysLeft = -(raysW - side) / 2;
@@ -297,7 +318,7 @@ export default function TreasureOpening({
         style,
       ]}
     >
-      {/* 레이: 원본 크기, 열린 동안 유지 */}
+      {/* 레이 (뒤) */}
       {raysW > 0 && raysH > 0 && (
         <Animated.View
           pointerEvents="none"
@@ -319,14 +340,15 @@ export default function TreasureOpening({
         </Animated.View>
       )}
 
-      {/* 3 프레임 (흔들림/펑!이 프레임에도 적용되도록 공통 트랜스폼 래퍼 추가) */}
+      {/* 상자 프레임 (중간) */}
       <Animated.View
         style={[
           abs,
           {
+            opacity: chestOpacity, // 열린 뒤 감춤
             transform: [
-              { translateX: shakeX },       // 🔥 좌우 부들부들
-              { rotate: shakeRotateDeg },   // 🔥 살짝 회전
+              { translateX: shakeX },
+              { rotate: shakeRotateDeg },
               { scaleX }, { scaleY }, { translateY },
             ],
           },
@@ -336,6 +358,27 @@ export default function TreasureOpening({
         <Animated.Image source={MID}    resizeMode="contain" style={[abs, { opacity: midOpacity }]} />
         <Animated.Image source={OPEN}   resizeMode="contain" style={[abs, { opacity: openOpacity }]} />
       </Animated.View>
+
+      {/* 캐릭터 (앞) */}
+      {renderAfterOpen && (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            width: side,
+            height: side,
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: charOpacity,
+            transform: [
+              { translateY: charTranslateY },
+              { scale: charScale },
+            ],
+          }}
+        >
+          {renderAfterOpen(size)}
+        </Animated.View>
+      )}
     </View>
   );
 }

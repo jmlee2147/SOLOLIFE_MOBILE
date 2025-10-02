@@ -108,7 +108,7 @@ const TabsLayout = () => {
         <Tabs.Screen
           name="heart/index"
           options={{
-            tabBarLabel: "공감",
+            tabBarLabel: "가챠",
             tabBarIcon: ({ focused }) => (
                 <View
                     style={{
