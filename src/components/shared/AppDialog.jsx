@@ -5,15 +5,16 @@ import Icon from "./Icon";
 export default function AppDialog({
   visible,
   title,
-  description,              
-  showDontShow = false,     
-  dontShowChecked = false,   
-  onToggleDontShow,          
+  description,
+  showDontShow = false,
+  dontShowChecked = false,
+  onToggleDontShow,
   confirmLabel = "확인",
   cancelLabel = "닫기",
   onConfirm,
   onCancel,
-  dismissOnBackdrop = true,  // 배경 터치로 닫기 여부
+  dismissOnBackdrop = true, // 배경 터치로 닫기 여부
+  variant = "light",
 }) {
   return (
     <Modal
@@ -24,13 +25,17 @@ export default function AppDialog({
     >
       {/* Backdrop */}
       <Pressable
-        className="items-center justify-center flex-1 px-6 bg-black/50"
+        className={`items-center justify-center flex-1 px-6 ${
+          variant === "dark" ? "bg-black/80" : "bg-black/50"
+        }`}
         onPress={dismissOnBackdrop ? onCancel : undefined}
       >
         {/* 카드 */}
         <Pressable
           onPress={() => {}}
-          className="w-full max-w-[560px] rounded-[10px] bg-white"
+          className={`w-full max-w-[560px] rounded-[10px] ${
+            variant === "dark" ? "bg-[#4E5968]" : "bg-white"
+          }`}
           style={{
             paddingTop: 27,
             paddingBottom: 22,
@@ -41,15 +46,24 @@ export default function AppDialog({
           accessibilityLabel={title}
         >
           {/* 제목 */}
-          <Text className="mb-2 text-heading-1 font-pretendardSemiBold">
+          <Text
+            className={`mb-2 text-heading-1 font-pretendardSemiBold ${
+              variant === "dark" ? "text-white" : "text-black"
+            }`}
+          >
             {title}
           </Text>
 
           {/* 설명 */}
           {description ? (
-            <Text className="mb-[21px] text-body-1 text-gray700">{description}</Text>
+            <Text
+              className={`mb-[21px] text-body-1 ${
+                variant === "dark" ? "text-gray200" : "text-gray700"
+              }`}
+            >
+              {description}
+            </Text>
           ) : null}
-
           {/* 다시 보지 않기 */}
           {showDontShow ? (
             <TouchableOpacity
@@ -61,14 +75,18 @@ export default function AppDialog({
               <View
                 className={[
                   "w-[13px] h-[13px] mr-1 border-[1.5px] items-center justify-center",
-                  dontShowChecked ? "bg-black border-black" : "bg-white border-gray500",
+                  dontShowChecked
+                    ? "bg-black border-black"
+                    : "bg-transparent border-gray200",
                 ].join(" ")}
               >
                 {dontShowChecked && (
                   <Icon name="checkbox" width={10} height={9} />
                 )}
               </View>
-              <Text className="text-heading-3 font-pretendardMedium text-gray500">다시 보지 않기</Text>
+              <Text className="text-heading-3 font-pretendardMedium text-gray200">
+                다시 보지 않기
+              </Text>
             </TouchableOpacity>
           ) : null}
 
