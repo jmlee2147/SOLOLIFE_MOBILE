@@ -721,7 +721,7 @@ export default function ComposeScreen() {
         {saving && (
           <LoadingWritingOverlay
             message={isEdit ? "수정 내용을 저장하는 중이에요" : "여정기록을 저장하는 중이에요"}
-            monkeySource={Images.monkey.write3x}
+            monkeySource={Images.monkey.write}
           />
         )}
       </SafeAreaView>
