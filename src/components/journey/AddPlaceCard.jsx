@@ -1,8 +1,9 @@
+import { Images } from "@assets/images";
 import React from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import Icon from "../shared/Icon";
 
-const SAMPLE_IMAGE = require("../../assets/images/sample.png");
+const SAMPLE_IMAGE = Images.backgrounds.sample;
 
 export default function AddPlaceCard({
   image,

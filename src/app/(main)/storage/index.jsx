@@ -1,3 +1,6 @@
+import { Images } from "@assets/images";
+import SortDropdown from "@components/journey/SortDropdown";
+import Header from "@components/shared/Header";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, {
@@ -19,8 +22,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import SortDropdown from "../../../components/journey/SortDropdown";
-import Header from "../../../components/shared/Header";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const COLS = 3;
@@ -29,7 +30,7 @@ const H_PADDING = 25;
 const ITEM_W = (SCREEN_W - H_PADDING * 2 - GAP * (COLS - 1)) / COLS;
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
-const PLACEHOLDER = require("../../../assets/images/map_placeholder.png");
+const PLACEHOLDER = Images.placeholder.map;
 
 export default function StorageScreen() {
   const insets = useSafeAreaInsets();

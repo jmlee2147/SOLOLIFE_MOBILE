@@ -1,3 +1,4 @@
+import { Images } from "@assets/images";
 import React, { useState } from "react";
 import {
   Image,
@@ -15,7 +16,7 @@ const IMG_W_RATIO = 92 / 343; // 오른쪽 이미지 비율
 const BADGE = 24; // 뱃지 지름
 
 const BADGE_COLORS = ["#62974F", "#B3B56C", "#DBDCC1"];
-const MAP_PLACEHOLDER = require("../../assets/images/map_placeholder.png");
+const MAP_PLACEHOLDER = Images.placeholder.map;
 
 export default function RouteStepCard({
   step = 1,

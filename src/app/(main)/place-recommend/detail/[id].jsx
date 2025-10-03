@@ -1,3 +1,7 @@
+import Button from "@components/shared/Button";
+import Header from "@components/shared/Header";
+import Icon from "@components/shared/Icon";
+import { getOpenBadge } from "@utils/openingHours";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -13,10 +17,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Button from "../../../../components/shared/Button";
-import Header from "../../../../components/shared/Header";
-import Icon from "../../../../components/shared/Icon";
-import { getOpenBadge } from "../../../../utils/openingHours";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const HIGHLIGHT_COLOR = "#EE7A13";
@@ -122,7 +122,7 @@ export default function PlaceDetailScreen() {
   }, [initialItem, id]);
 
   // 캐러셀 이미지
-  const images = place.images?.length ? place.images : [require("../../../../assets/images/sample.png")];
+  const images = place.images?.length ? place.images : [Images.backgrounds.sample];
   const IMG_W = SCREEN_W;
   const IMG_H = 346 - insets.top;
 

@@ -1,3 +1,4 @@
+import { Images } from "@assets/images";
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, Easing, Image, View } from "react-native";
 
@@ -29,10 +30,10 @@ export default function TreasureOpening({
   characterFromY = 18,                     // 캐릭터 시작 Y오프셋(+ 아래)
   renderAfterOpen,                         // (size) => ReactNode  캐릭터 렌더 함수
 }) {
-  const CLOSED = sources?.closed || require("../../assets/images/treasure_close.png");
-  const MID    = sources?.mid    || require("../../assets/images/treasure_half.png");
-  const OPEN   = sources?.open   || require("../../assets/images/treasure_open.png");
-  const RAYS   = sources?.rays   || require("../../assets/images/treasure_rays.png");
+  const CLOSED = sources?.closed || Images.gacha.treasure.closed;
+  const MID    = sources?.mid    || Images.gacha.treasure.half;
+  const OPEN   = sources?.open   || Images.gacha.treasure.open;
+  const RAYS   = sources?.rays   || Images.gacha.treasure.rays;
 
   // 프레임 페이드
   const closedOpacity = useRef(new Animated.Value(1)).current;

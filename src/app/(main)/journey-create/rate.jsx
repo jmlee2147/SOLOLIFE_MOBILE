@@ -1,3 +1,6 @@
+import { Images } from "@assets/images";
+import Button from "@components/shared/Button";
+import Icon from "@components/shared/Icon";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -10,11 +13,9 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import Button from "../../../components/shared/Button";
-import Icon from "../../../components/shared/Icon";
 
 const H_PADDING = 25;
-const CHARACTER = require("../../../assets/images/explorer.png");
+const CHARACTER = Images.monkey.run;
 
 // Draft strorage (공용 누적 저장)
 const DRAFT_KEY = "journey_draft_places_v1";

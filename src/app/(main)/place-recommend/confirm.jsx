@@ -1,3 +1,7 @@
+import { Images } from "@assets/images";
+import MapView from "@components/map/MapView";
+import Header from "@components/shared/Header";
+import Icon from "@components/shared/Icon";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -18,16 +22,13 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import MapView from "../../../components/map/MapView";
-import Header from "../../../components/shared/Header";
-import Icon from "../../../components/shared/Icon";
 
 export default function RouteBuilderScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const MAP_PLACEHOLDER = require("../../../assets/images/map_placeholder.png");
+  const MAP_PLACEHOLDER = Images.placeholder.map;
 
   // 결과 페이지에서 건네준 값들로 일관되게 세팅
   const placeId = useMemo(

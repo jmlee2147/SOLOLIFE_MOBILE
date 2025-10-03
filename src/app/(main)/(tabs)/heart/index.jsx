@@ -1,12 +1,10 @@
+import Header from "@components/shared/Header";
 import { useRouter } from "expo-router";
 import React from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Header from "../../../../components/shared/Header";
 
-const IMG_CHEST = require("../../../../assets/images/gacha_treasure.png");
-const IMG_SCROLL = require("../../../../assets/images/gacha_scroll.png");
-const IMG_SHOP = require("../../../../assets/images/shop_halloween.png");
+import { Images } from "@assets/images";
 
 export default function GachaHubScreen() {
   const insets = useSafeAreaInsets();
@@ -27,14 +25,14 @@ export default function GachaHubScreen() {
       <View style={styles.container}>
         {/* 캐릭터 뽑기 */}
         <CapsuleCard
-          image={IMG_CHEST}
+          image={Images.gacha.widgets.treasure}
           title="캐릭터 뽑기"
           onPress={() => router.push("/(fullscreen)/gacha/character")}
         />
 
         {/* 배경 뽑기 */}
         <CapsuleCard
-          image={IMG_SCROLL}
+          image={Images.gacha.widgets.scroll}
           title="배경 뽑기"
           style={{ marginTop: 24 }}
           onPress={() => router.push("/(fullscreen)/gacha/background")}
@@ -42,7 +40,7 @@ export default function GachaHubScreen() {
 
         {/* 이벤트 배너 */}
         <EventBanner
-          image={IMG_SHOP}
+          image={Images.gacha.widgets.shop}
           lines={["~10/31", "이벤트 기간 동안에만 만날 수 있어요!"]}
           style={{ marginTop: 28 }}
           onPress={() => router.push("/(fullscreen)/shop/halloween")}

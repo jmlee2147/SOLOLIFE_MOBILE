@@ -3,23 +3,23 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useState } from "react";
 import {
-  Animated,
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
+    Animated,
+    Image,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Images, getTreasureSources } from "@assets/images";
+import { Images } from "@assets/images";
 import TreasureOpening from "@components/animation/TreasureOpening";
 import AppDialog from "@components/shared/AppDialog";
 import Header from "@components/shared/Header";
 
 const CHARACTER = require("@assets/characters/girl/summer.png");
 
-export default function CharacterScreen() {
+export default function BackgroundScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -28,10 +28,19 @@ export default function CharacterScreen() {
   const [opened, setOpened] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const confirmAnim = React.useRef(new Animated.Value(0)).current;
+  const CONFIRM_DELAY_MS = 1000;
 
   const [askConfirm, setAskConfirm] = useState(false);
   const [dontShow, setDontShow] = useState(false);
+
   const handleToggleDontShow = () => setDontShow((v) => !v);
+
+  // 확인/취소 핸들러
+  const handleConfirmGacha = () => {
+    setAskConfirm(false);
+    playOnce(); // ← 실제 뽑기 시작
+  };
+  const handleCancelGacha = () => setAskConfirm(false);
 
   const isRunningRef = React.useRef(false);
 
@@ -50,20 +59,15 @@ export default function CharacterScreen() {
     setRunKey((k) => k + 1);
   }, []);
 
-  const handleConfirmGacha = () => {
-    setAskConfirm(false);
-    playOnce();
-  };
-  const handleCancelGacha = () => setAskConfirm(false);
-
   const onCtaPress = useCallback(() => {
     if (opened) {
       resetAll();
     } else {
       if (dontShow) {
+        // 다시 보지 않기 체크되어 있으면 바로 진행
         handleConfirmGacha();
       } else {
-        setAskConfirm(true);
+        setAskConfirm(true); // 모달 노출
       }
     }
   }, [opened, resetAll, dontShow]);
@@ -101,7 +105,7 @@ export default function CharacterScreen() {
         />
 
         <Header
-          title="캐릭터 뽑기"
+          title="배경 뽑기"
           leftIcon="previous"
           onLeftPress={() => router.back()}
           backgroundColor="transparent"
@@ -121,7 +125,7 @@ export default function CharacterScreen() {
             <View style={styles.hudRow}>
               <Pill label="100000" icon={Images.common.coin} />
               <View style={styles.hudRight}>
-                <Pill label="미션" icon={Images.common.medal} />
+                <Pill label="미션" icon={Images.common.mission} />
                 <Pill label="캐릭터 도감" icon={Images.common.hat} style={{ marginTop: 6 }} />
                 <Pill label="꾸미기" icon={Images.common.check} style={{ marginTop: 6 }} />
               </View>
@@ -137,10 +141,8 @@ export default function CharacterScreen() {
               size={280}
               play={playing}
               loop={false}
-              sources={getTreasureSources()}
               hideChestAfterOpen
-              // characterDelayMs={800}
-              renderAfterOpen={() => (
+              renderAfterOpen={(s) => (
                 <View style={{ alignItems: "center" }}>
                   {/* 캐릭터 이미지 */}
                   <Image
@@ -149,23 +151,39 @@ export default function CharacterScreen() {
                     resizeMode="contain"
                   />
 
-                  {/* 이름 줄 (구분선 + 텍스트 + 구분선 반전) */}
-                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 12 }}>
+                  {/* 이름 줄 */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      marginTop: 12,
+                    }}
+                  >
+                    {/* 왼쪽 구분선 */}
                     <Image
                       source={Images.gacha.textDash}
                       style={{ width: 82, marginHorizontal: 8 }}
                       resizeMode="contain"
                     />
+
+                    {/* 텍스트 */}
                     <Text className="text-white text-heading-2 font-pretendardSemiBold">
                       여름
                     </Text>
+
+                    {/* 오른쪽 구분선 (좌우반전) */}
                     <Image
                       source={Images.gacha.textDash}
-                      style={{ width: 82, marginHorizontal: 8, transform: [{ scaleX: -1 }] }}
+                      style={{
+                        width: 82,
+                        marginHorizontal: 8,
+                        transform: [{ scaleX: -1 }], // 좌우반전
+                      }}
                       resizeMode="contain"
                     />
                   </View>
 
+                  {/* 타이틀 */}
                   <Text className="mt-1 text-yellow500 text-heading-2 font-pretendardSemiBold">
                     바캉스 탐험가
                   </Text>
@@ -179,20 +197,21 @@ export default function CharacterScreen() {
                 setShowConfirm(false);
                 setTimeout(() => {
                   setShowConfirm(true);
+                  // 페이드 인 + 위로 살짝 슬라이드
                   confirmAnim.setValue(0);
                   Animated.timing(confirmAnim, {
                     toValue: 1,
                     duration: 250,
                     useNativeDriver: true,
                   }).start();
-                }, 1000);
+                }, 1000); // ⬅️ 버튼 딜레이(ms) 원하는 값으로
               }}
             />
           ) : (
             <Image
               source={Images.gacha.treasure.static}
               resizeMode="contain"
-              style={{ width: 300, height: 300 }}
+              style={{ width: 376, height: 266 }}
             />
           )}
         </View>
@@ -210,7 +229,7 @@ export default function CharacterScreen() {
                 resizeMode="contain"
               />
               <Text className="text-white text-body-2 font-pretendardMedium">
-                배경뽑기
+                캐릭터 뽑기
               </Text>
             </Pressable>
 
@@ -234,6 +253,7 @@ export default function CharacterScreen() {
           style={[styles.footerAbs, { paddingBottom: insets.bottom }]}
           pointerEvents="box-none"
         >
+          {/* 애니 중엔 아예 렌더 안 함 */}
           {!playing &&
             (opened ? (
               showConfirm ? (
@@ -267,7 +287,7 @@ export default function CharacterScreen() {
               >
                 <View style={styles.ctaContent}>
                   <Text className="text-white text-heading-3 font-pretendardSemiBold mr-[10px]">
-                    캐릭터 뽑기
+                    배경 뽑기
                   </Text>
                   <Image
                     source={Images.common.coin}
@@ -275,17 +295,16 @@ export default function CharacterScreen() {
                     resizeMode="contain"
                   />
                   <Text className="text-white text-heading-3 font-pretendardSemiBold">
-                    100
+                    50
                   </Text>
                 </View>
               </Pressable>
             ))}
         </View>
-
-        {/* 뽑기 전 확인 모달 (다크 테마) */}
         <AppDialog
           visible={askConfirm}
-          title={"100 포인트를 사용하여\n캐릭터 뽑기를 진행할까요?"}
+          title={"50 포인트를 사용하여\n배경 뽑기를 진행할까요?"}
+          // description="100 포인트를 사용하여 캐릭터 뽑기를 진행할까요?"
           confirmLabel="확인"
           cancelLabel="취소"
           onConfirm={handleConfirmGacha}

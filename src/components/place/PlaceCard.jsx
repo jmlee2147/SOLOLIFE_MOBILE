@@ -1,9 +1,10 @@
+import { Images } from "@assets/images";
+import { hs } from "@utils/scale";
 import React, { memo, useMemo, useState } from "react";
 import { Image, Pressable, Text, View } from "react-native";
-import { hs } from "../../utils/scale";
 import Icon from "../shared/Icon";
 
-const MAP_PLACEHOLDER = require("../../assets/images/map_placeholder.png");
+const MAP_PLACEHOLDER = Images.placeholder.map;
 
 function PlaceCard({
   imageSource,

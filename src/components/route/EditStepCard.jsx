@@ -1,3 +1,4 @@
+import { Images } from "@assets/images";
 import React, { useState } from "react";
 import {
   Image,
@@ -15,7 +16,7 @@ const DEFAULT_BG = "#FFFFFF";
 const PRESSED_BG = "#FDFFFA";
 const DEFAULT_BORDER = "#D4D4D4";
 const PRESSED_BORDER = "#62974F";
-const MAP_PLACEHOLDER = require("../../assets/images/map_placeholder.png");
+const MAP_PLACEHOLDER = Images.placeholder.map;
 
 export default function EditStepCard({
   title = "",

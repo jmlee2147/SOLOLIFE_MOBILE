@@ -1,3 +1,6 @@
+import { Images } from "@assets/images";
+import { useToast } from "@providers/ToastProvider";
+import { consumePendingToast, peekPendingToast } from "@utils/toastNext";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -12,26 +15,12 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useToast } from "../../../../providers/ToastProvider";
-import { consumePendingToast, peekPendingToast } from "../../../../utils/toastNext";
 
-
-import AppDialog from "../../../../components/shared/AppDialog";
-import Icon from "../../../../components/shared/Icon";
+import AppDialog from "@components/shared/AppDialog";
+import Icon from "@components/shared/Icon";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const HEADER_HEIGHT = 44;
-
-/** 이미지 자산 **/
-const IMG_MASCOT = require("../../../../assets/images/main_background.png");
-const IMG_CARD_PLACE = require("../../../../assets/images/cta_place.png");
-const IMG_CARD_ROUTE = require("../../../../assets/images/cta_route.png");
-const IMG_SHORTCUT_CHECKIN = require("../../../../assets/images/check.png");
-const IMG_SHORTCUT_MISSION = require("../../../../assets/images/mission.png");
-const IMG_SHORTCUT_BOOKMARK = require("../../../../assets/images/bookmark.png");
-const IMG_SHORTCUT_BADGE = require("../../../../assets/images/badge.png");
-const SAMPLE1 = require("../../../../assets/images/sample.png");
-const SAMPLE2 = require("../../../../assets/images/shopping.png");
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -86,7 +75,7 @@ export default function HomeScreen() {
           </View>
 
           {/* 마스코트 */}
-          <Image source={IMG_MASCOT} style={styles.mascot} resizeMode="contain" />
+          <Image source={Images.backgrounds.main} style={styles.mascot} resizeMode="contain" />
 
           {/* 프로필 + 진행도 + 오른쪽 알약 버튼들 */}
           <View style={styles.heroBottomRow}>
@@ -100,13 +89,13 @@ export default function HomeScreen() {
 
             <View style={styles.pillsCol}>
               <Pill label="미션" 
-                    icon={IMG_SHORTCUT_MISSION}
+                    icon={Images.common.mission}
                     onPress={() => router.push("/(fullscreen)/mission")}/>
               <Pill label="저장소"
-                    icon={IMG_SHORTCUT_BOOKMARK}
+                    icon={Images.common.bookmark}
                     onPress={() => router.push("/storage")}
               />
-              <Pill label="출석체크" icon={IMG_SHORTCUT_CHECKIN}/>
+              <Pill label="출석체크" icon={Images.common.check}/>
             </View>
           </View>
 
@@ -123,7 +112,7 @@ export default function HomeScreen() {
             onPress={() => router.push("/place-recommend")}
             style={[styles.ctaCard, styles.ctaFilled]}
           >
-            <Image source={IMG_CARD_PLACE} style={styles.ctaThumb} />
+            <Image source={Images.common.ctaPlace} style={styles.ctaThumb} />
             <View style={{ flex: 1 }}>
               <Text className="text-white text-heading-1 font-pretendardSemiBold">장소 추천받기</Text>
               <Text className="text-white text-body-2 font-pretendardMedium">혼자 가기 좋은 장소를 추천해 드려요.</Text>
@@ -138,7 +127,7 @@ export default function HomeScreen() {
             onPress={() => router.push("/route-recommend")}
             style={[styles.ctaCard, styles.ctaOutline]}
           >
-            <Image source={IMG_CARD_ROUTE} style={styles.ctaThumb} />
+            <Image source={Images.common.ctaRoute} style={styles.ctaThumb} />
             <View style={{ flex: 1 }}>
               <Text className="text-black text-heading-1 font-pretendardSemiBold">루트 추천받기</Text>
               <Text className="text-black text-body-2 font-pretendardMedium">혼자 가기 좋은 루트를 추천해 드려요.</Text>
@@ -150,10 +139,10 @@ export default function HomeScreen() {
 
           {/* 바로가기 4개 */}
           <View style={styles.shortcutsRow}>
-            <Shortcut icon={IMG_SHORTCUT_CHECKIN} label="출석체크" onPress={() => {}} />
-            <Shortcut icon={IMG_SHORTCUT_MISSION} label="미션" onPress={() => {}} />
-            <Shortcut icon={IMG_SHORTCUT_BOOKMARK} label="찜/북마크" onPress={() => {}} />
-            <Shortcut icon={IMG_SHORTCUT_BADGE} label="뱃지" onPress={() => {}} />
+            <Shortcut icon={Images.common.check} label="출석체크" onPress={() => {}} />
+            <Shortcut icon={Images.common.mission} label="미션" onPress={() => {}} />
+            <Shortcut icon={Images.common.bookmark} label="찜/북마크" onPress={() => {}} />
+            <Shortcut icon={Images.common.badge} label="뱃지" onPress={() => {}} />
           </View>
 
           {/* 섹션들 */}
@@ -179,16 +168,16 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingVertical: 12 }}
             >
-              <PlaceCard title="한강공원" source={SAMPLE1} />
-              <PlaceCard title="한강공원" source={SAMPLE1} />
-              <PlaceCard title="한강공원" source={SAMPLE1} />
+              <PlaceCard title="한강공원" source={Images.backgrounds.sample} />
+              <PlaceCard title="한강공원" source={Images.backgrounds.sample} />
+              <PlaceCard title="한강공원" source={Images.backgrounds.sample} />
             </ScrollView>
           </View>
 
           <View style={{ paddingHorizontal: 20, marginTop: 8 }}>
             <Text style={styles.sectionTitle}>오늘의 테마 추천</Text>
             <View style={styles.banner}>
-              <Image source={SAMPLE2} style={styles.bannerImg} resizeMode="cover" />
+              <Image source={Images.backgrounds.sample} style={styles.bannerImg} resizeMode="cover" />
               <View style={styles.bannerOverlay}>
                 <Text style={styles.bannerTitle}>무더운 여름</Text>
                 <Text style={styles.bannerSub}>빙수 한 그릇 어떤가요?</Text>

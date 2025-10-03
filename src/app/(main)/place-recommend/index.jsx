@@ -1,3 +1,7 @@
+import CategoryCard from "@components/place/CategoryCard";
+import Header from "@components/shared/Header";
+import Icon from "@components/shared/Icon";
+import { CATEGORY } from "@config/category.config";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -9,18 +13,15 @@ import {
   Text,
   View,
 } from "react-native";
-import CategoryCard from "../../../components/place/CategoryCard";
-import Header from "../../../components/shared/Header";
-import Icon from "../../../components/shared/Icon";
-import { CATEGORY } from "../../../config/category.config";
+import { Images } from "../../../assets/images";
 
 const CARD_GAP = 16;
 
 const categories = [
-  { key: "cafe", image: require("../../../assets/images/cafe.png") },
-  { key: "activity", image: require("../../../assets/images/activity.png") },
-  { key: "shopping", image: require("../../../assets/images/shopping.png") },
-  { key: "food", image: require("../../../assets/images/eat.png") },
+  { key: "cafe", image: Images.places.cafe },
+  { key: "activity", image: Images.places.activity },
+  { key: "shopping", image: Images.places.shopping },
+  { key: "food", image: Images.places.eat },
 ];
 
 export default function PlaceRecommendScreen() {
@@ -192,7 +193,7 @@ export default function PlaceRecommendScreen() {
         <View style={{ marginTop: -12 }}>
           <CategoryCard
             title="추천받기"
-            image={require("../../../assets/images/explorer.png")}
+            image={Images.monkey.run}
             description="나만의 장소 추천"
           />
         </View>

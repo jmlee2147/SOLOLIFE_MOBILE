@@ -1,4 +1,6 @@
-// app/journey-create/compose.jsx
+import { Images } from "@assets/images";
+import Button from "@components/shared/Button";
+import Icon from "@components/shared/Icon";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -25,8 +27,6 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import Button from "../../../components/shared/Button";
-import Icon from "../../../components/shared/Icon";
 
 // ---- 기존 장소 드래프트 ----
 const DRAFT_KEY = "journey_draft_places_v1";
@@ -37,8 +37,8 @@ const POSTS_KEY = "journey_posts_v1";
 
 const DEV_STICKY_SAVING = false;
 
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL; // e.g. http://16.176.24.53:4000
-const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN; // Bearer 토큰 (.env)
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL; 
+const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN; 
 
 // http(s)만 서버로 전달
 function toHttpImageUrls(images = []) {
@@ -721,7 +721,7 @@ export default function ComposeScreen() {
         {saving && (
           <LoadingWritingOverlay
             message={isEdit ? "수정 내용을 저장하는 중이에요" : "여정기록을 저장하는 중이에요"}
-            monkeySource={require("../../../assets/images/monkey-write.png")}
+            monkeySource={Images.monkey.write3x}
           />
         )}
       </SafeAreaView>

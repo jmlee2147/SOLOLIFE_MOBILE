@@ -1,3 +1,6 @@
+import { Images } from "@assets/images";
+import Button from "@components/shared/Button";
+import Icon from "@components/shared/Icon";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -13,8 +16,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Button from "../../../components/shared/Button";
-import Icon from "../../../components/shared/Icon";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL.trim() || "";
 
@@ -56,7 +57,7 @@ export default function ReviewWriteScreen() {
   const [content, setContent] = useState("");
   const [images, setImages] = useState([]); // [{ uri, ... }]
 
-  const CHARACTER = require("../../../assets/images/explorer.png");
+  const CHARACTER = Images.monkey.write;
 
   // --- 권한 & 이미지 선택 헬퍼 ---
   const ensureCameraPermission = async () => {

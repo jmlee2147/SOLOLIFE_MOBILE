@@ -1,3 +1,7 @@
+import { Images } from "@assets/images";
+import Button from "@components/shared/Button";
+import Header from "@components/shared/Header";
+import Icon from "@components/shared/Icon";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
@@ -10,12 +14,9 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Button from "../../../../components/shared/Button";
-import Header from "../../../../components/shared/Header";
-import Icon from "../../../../components/shared/Icon";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
-const SAMPLE = require("../../../../assets/images/sample.png");
+const SAMPLE = Images.backgrounds.sample;
 
 export default function RouteDetailScreen() {
   const params = useLocalSearchParams();

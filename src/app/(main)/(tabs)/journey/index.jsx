@@ -1,3 +1,10 @@
+import { Images } from "@assets/images";
+import FloatingButton from "@components/journey/FloatingButton";
+import LogBoardCard from "@components/journey/LogBoardCard";
+import LogListCard from "@components/journey/LogListCard";
+import SortDropdown from "@components/journey/SortDropdown";
+import Icon from "@components/shared/Icon";
+import { useToast } from "@providers/ToastProvider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -21,17 +28,6 @@ import {
   Text,
   View,
 } from "react-native";
-import FloatingButton from "../../../../components/journey/FloatingButton";
-import LogBoardCard from "../../../../components/journey/LogBoardCard";
-import LogListCard from "../../../../components/journey/LogListCard";
-import SortDropdown from "../../../../components/journey/SortDropdown";
-import Icon from "../../../../components/shared/Icon";
-import { useToast } from "../../../../providers/ToastProvider";
-
-const CHARACTER = require("../../../../assets/images/monkey-write.png");
-const FALLBACK_THUMB = require("../../../../assets/images/sample.png");
-const MONKEY_PLACEHOLDER = require("../../../../assets/images/monkey-placeholder.png");
-const MONKEY_PLACEHOLDER_BOARD = require("../../../../assets/images/monkey-placeholder-board.png");
 
 // ===== ENV =====
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -153,16 +149,23 @@ export default function JourneyScreen() {
   const { showToast } = useToast();
   const [tab, setTab] = useState("mine");
   const [view, setView] = useState("list");
-  const params = router?.params || {};
 
   // 화면 포커스될 때 한 번만 처리
   useFocusEffect(
     useCallback(() => {
       if (justSaved === "created") {
-        showToast({ message: "여정기록이 저장되었어요.", type: "success", duration: 2000 });
+        showToast({
+          message: "여정기록이 저장되었어요.",
+          type: "success",
+          duration: 2000,
+        });
         router.replace("/(tabs)/journey");
       } else if (justSaved === "edited") {
-        showToast({ message: "여정기록이 수정되었어요.", type: "success", duration: 2000 });
+        showToast({
+          message: "여정기록이 수정되었어요.",
+          type: "success",
+          duration: 2000,
+        });
         router.replace("/(tabs)/journey");
       }
     }, [justSaved, showToast, router])
@@ -187,7 +190,6 @@ export default function JourneyScreen() {
       setMenuTarget(item);
       setMenuOpen(true);
 
-      // 시작값 0으로 초기화 후 애니메이션
       scaleAnim.setValue(0);
       opacityAnim.setValue(0);
       Animated.parallel([
@@ -524,6 +526,7 @@ export default function JourneyScreen() {
     [router]
   );
 
+  // 레이아웃 상수
   const { width: SCREEN_W } = Dimensions.get("window");
   const CARD_W = 129;
   const CARD_H = 194;
@@ -545,11 +548,16 @@ export default function JourneyScreen() {
     const targetId = String(menuTarget.id);
     closeMenu();
     try {
-      // 서버 성공 후에만 제거
       await apiDeleteLogbook(targetId);
       setMyLogs((prev) => prev.filter((it) => String(it.id) !== targetId));
-      showToast({ message: "여정기록이 삭제되었어요", type: "success", duration: 2000 });
-    } catch (e) {}
+      showToast({
+        message: "여정기록이 삭제되었어요",
+        type: "success",
+        duration: 2000,
+      });
+    } catch (e) {
+      // noop
+    }
   }, [menuTarget, closeMenu, setMyLogs, showToast]);
 
   return (
@@ -640,7 +648,7 @@ export default function JourneyScreen() {
         <View style={{ paddingHorizontal: 20, paddingTop: 12 }}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Image
-              source={CHARACTER}
+              source={Images.monkey.write}
               style={{ width: 46, height: 46, resizeMode: "contain" }}
             />
             <View style={{ marginLeft: 6 }}>
@@ -706,7 +714,7 @@ export default function JourneyScreen() {
             }}
           >
             <Image
-              source={CHARACTER}
+              source={Images.monkey.write}
               style={{ width: 46, height: 46, resizeMode: "contain" }}
             />
             <Text
@@ -719,7 +727,13 @@ export default function JourneyScreen() {
 
           {/* 릴스 캐러셀 (임시) */}
           <FlatList
-            data={[{ id: "r1", thumbnail: FALLBACK_THUMB, title: "기록 제목" }]}
+            data={[
+              {
+                id: "r1",
+                thumbnail: Images.backgrounds.sample,
+                title: "기록 제목",
+              },
+            ]}
             keyExtractor={(it) => it.id}
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -942,7 +956,7 @@ export default function JourneyScreen() {
                 thumbnail={
                   item.thumbnailUri ? { uri: item.thumbnailUri } : null
                 }
-                placeholderImage={MONKEY_PLACEHOLDER}
+                placeholderImage={Images.placeholder.monkeyList}
                 placeholderBg="#D9D9D9"
                 title={item.title}
                 placeText={item.placeText}
@@ -951,7 +965,7 @@ export default function JourneyScreen() {
                 commentsCount={item.commentsCount}
                 reactionsCount={item.reactionsCount}
                 liked={item.liked}
-                onPressOptions={(pos) => openMenu(item, pos)} // 좌표 전달
+                onPressOptions={(pos) => openMenu(item, pos)}
                 onPress={() => goMyDetail(item)}
               />
             ) : (
@@ -959,7 +973,7 @@ export default function JourneyScreen() {
                 thumbnail={
                   item.thumbnailUri ? { uri: item.thumbnailUri } : null
                 }
-                placeholderImage={MONKEY_PLACEHOLDER}
+                placeholderImage={Images.placeholder.monkeyList}
                 placeholderBg="#D9D9D9"
                 title={item.title}
                 placeText={item.placeText}
@@ -992,9 +1006,9 @@ export default function JourneyScreen() {
           renderItem={({ item }) => (
             <LogBoardCard
               isMine={tab === "mine"}
-              profileImage={CHARACTER}
+              profileImage={Images.monkey.run}
               authorName={tab === "mine" ? "나" : item.authorName}
-              placeholderImage={MONKEY_PLACEHOLDER_BOARD}
+              placeholderImage={Images.placeholder.monkeyBoard}
               placeholderBg="#D9D9D9"
               thumbnail={item.thumbnailUri ? { uri: item.thumbnailUri } : null}
               title={item.title}
@@ -1040,7 +1054,7 @@ export default function JourneyScreen() {
             zIndex: 50,
           }}
         >
-          {/* 배경 터치 닫힘 (투명) */}
+          {/* 배경 터치 닫힘 */}
           <Pressable
             style={{
               position: "absolute",
@@ -1057,7 +1071,6 @@ export default function JourneyScreen() {
             const SW = Dimensions.get("window").width;
             const SH = Dimensions.get("window").height;
 
-            // 아이콘의 pageX/pageY에 "메뉴의 좌상단"을 딱 맞춤
             const top = Math.max(0, Math.min(menuPos.y, SH - (menuH || 1)));
             const left = Math.max(0, Math.min(menuPos.x - MENU_W, SW - MENU_W));
 

@@ -1,3 +1,4 @@
+import { Images } from "@assets/images";
 import BottomSheet, {
   BottomSheetFlashList,
   BottomSheetScrollView,
@@ -27,9 +28,6 @@ import Icon from "../../../../components/shared/Icon";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN;
-
-// 🔹 사진 없을 때 카드 썸네일 대체 이미지
-const PLACEHOLDER = require("../../../../assets/images/map_placeholder.png");
 
 export default function MapScreen() {
   const router = useRouter();
@@ -266,7 +264,7 @@ export default function MapScreen() {
           ) : (
             <View style={[styles.smallCardImage, styles.placeholderCenter]}>
               <Image
-                source={PLACEHOLDER}
+                source={Images.map.placeholder}
                 style={{ width: 48, height: 48, resizeMode: "contain" }}
               />
             </View>
@@ -365,7 +363,7 @@ export default function MapScreen() {
               const src =
                 typeof ph === "string"
                   ? { uri: ph }
-                  : require("../../../../assets/images/sample.png");
+                  : Images.backgrounds.sample;
               return <Image key={i} source={src} style={styles.photoThumb} />;
             })}
         </View>

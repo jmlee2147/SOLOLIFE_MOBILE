@@ -1,3 +1,5 @@
+import { Images } from "@assets/images";
+import Header from "@components/shared/Header";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo } from "react";
 import {
@@ -10,7 +12,6 @@ import {
   Text,
   View,
 } from "react-native";
-import Header from "../../../../components/shared/Header";
 
 const { width } = Dimensions.get("window");
 const GAP = 20;
@@ -18,7 +19,7 @@ const H_PADDING = 25;
 const COLS = 3;
 const ITEM_W = (width - H_PADDING * 2 - GAP * (COLS - 1)) / COLS;
 
-const SAMPLE = require("../../../../assets/images/sample.png");
+const SAMPLE = Images.backgrounds.sample;
 
 // 데모: 폴더 안 사진들 (URI 배열로 바꿔 붙이면 됨)
 const MOCK_PHOTOS = Array.from({ length: 12 }, (_, i) => ({

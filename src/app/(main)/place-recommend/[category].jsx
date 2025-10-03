@@ -1,4 +1,9 @@
-// src/app/(main)/place-recommend/[category].jsx
+import { Images } from "@assets/images";
+import Header from "@components/shared/Header";
+import {
+  CATEGORY,
+  resolveCategoryKeyByLabel,
+} from "@config/category.config";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo } from "react";
 import {
@@ -8,11 +13,6 @@ import {
   Text,
   View
 } from "react-native";
-import Header from "../../../components/shared/Header";
-import {
-  CATEGORY,
-  resolveCategoryKeyByLabel,
-} from "../../../config/category.config";
 
 // (선택) 카테고리별 서브타이틀만 별도 관리하고 싶으면 여기에 둠
 const SUBTITLE = {
@@ -24,10 +24,10 @@ const SUBTITLE = {
 
 // 카테고리별 대표 이미지 매핑
 const CAT_IMAGE = {
-  cafe: require("../../../assets/images/cafe.png"),
-  activity: require("../../../assets/images/activity.png"),
-  shopping: require("../../../assets/images/shopping.png"),
-  food: require("../../../assets/images/eat.png"),
+  cafe: Images.places.cafe,
+  activity: Images.places.activity,
+  shopping: Images.places.shopping,
+  food: Images.places.eat,
 };
 
 export default function CategoryScreen() {

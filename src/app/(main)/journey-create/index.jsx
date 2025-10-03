@@ -1,4 +1,8 @@
-// app/journey-create/index.jsx
+import { Images } from "@assets/images";
+import AddPlaceCard from "@components/journey/AddPlaceCard";
+import Header from "@components/shared/Header";
+import Icon from "@components/shared/Icon";
+import SpeechBubble from "@components/shared/SpeechBubble";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -12,13 +16,9 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import AddPlaceCard from "../../../components/journey/AddPlaceCard";
-import Header from "../../../components/shared/Header";
-import Icon from "../../../components/shared/Icon";
-import SpeechBubble from "../../../components/shared/SpeechBubble";
 
 const H_PADDING = 25;
-const CHARACTER = require("../../../assets/images/explorer.png");
+const CHARACTER = Images.monkey.write;
 
 // ====== 환경변수 (백엔드 베이스) ======
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL;
