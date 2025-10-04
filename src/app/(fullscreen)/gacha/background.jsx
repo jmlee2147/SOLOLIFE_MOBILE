@@ -13,7 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Images } from "@assets/images";
-import TreasureOpening from "@components/animation/TreasureOpening";
+import ScrollOpening from "@components/animation/ScrollOpening";
 import AppDialog from "@components/shared/AppDialog";
 import Header from "@components/shared/Header";
 
@@ -126,8 +126,16 @@ export default function BackgroundScreen() {
               <Pill label="100000" icon={Images.common.coin} />
               <View style={styles.hudRight}>
                 <Pill label="미션" icon={Images.common.mission} />
-                <Pill label="캐릭터 도감" icon={Images.common.hat} style={{ marginTop: 6 }} />
-                <Pill label="꾸미기" icon={Images.common.check} style={{ marginTop: 6 }} />
+                <Pill
+                  label="캐릭터 도감"
+                  icon={Images.common.hat}
+                  style={{ marginTop: 6 }}
+                />
+                <Pill
+                  label="꾸미기"
+                  icon={Images.common.check}
+                  style={{ marginTop: 6 }}
+                />
               </View>
             </View>
           </View>
@@ -136,22 +144,35 @@ export default function BackgroundScreen() {
         {/* 중앙 */}
         <View style={styles.centerAbs}>
           {playing || opened ? (
-            <TreasureOpening
-              key={`chest-${runKey}`}
-              size={280}
+            <ScrollOpening
+              key={`scroll-${runKey}`}
+              size={320}
               play={playing}
               loop={false}
-              hideChestAfterOpen
+              hideScrollAfterOpen
+              duration={1400}
+              trembleMs={360}
+              explodeMs={260}
+              sources={{
+                f0: Images.gacha.scroll.f0,
+                f1: Images.gacha.scroll.f1,
+                f2: Images.gacha.scroll.f2,
+                f3: Images.gacha.scroll.f3,
+                f4: Images.gacha.scroll.f4,
+                f5: Images.gacha.scroll.f5,
+                f6: Images.gacha.scroll.f6,
+                f7: Images.gacha.scroll.f7,
+                // rays는 treasure에서 가져오는 게 맞음
+                rays: Images.gacha.treasure.rays,
+              }}
               renderAfterOpen={(s) => (
                 <View style={{ alignItems: "center" }}>
-                  {/* 캐릭터 이미지 */}
                   <Image
                     source={CHARACTER}
                     style={{ width: 300, height: 300 }}
                     resizeMode="contain"
                   />
-
-                  {/* 이름 줄 */}
+                  {/* 이름 줄 (구분선 + 텍스트 + 구분선 반전) */}
                   <View
                     style={{
                       flexDirection: "row",
@@ -159,33 +180,27 @@ export default function BackgroundScreen() {
                       marginTop: 12,
                     }}
                   >
-                    {/* 왼쪽 구분선 */}
                     <Image
                       source={Images.gacha.textDash}
                       style={{ width: 82, marginHorizontal: 8 }}
                       resizeMode="contain"
                     />
-
-                    {/* 텍스트 */}
                     <Text className="text-white text-heading-2 font-pretendardSemiBold">
-                      여름
+                      봄
                     </Text>
-
-                    {/* 오른쪽 구분선 (좌우반전) */}
                     <Image
                       source={Images.gacha.textDash}
                       style={{
                         width: 82,
                         marginHorizontal: 8,
-                        transform: [{ scaleX: -1 }], // 좌우반전
+                        transform: [{ scaleX: -1 }],
                       }}
                       resizeMode="contain"
                     />
                   </View>
 
-                  {/* 타이틀 */}
                   <Text className="mt-1 text-yellow500 text-heading-2 font-pretendardSemiBold">
-                    바캉스 탐험가
+                    벚꽃나무
                   </Text>
                 </View>
               )}
@@ -193,23 +208,21 @@ export default function BackgroundScreen() {
                 setPlaying(false);
                 isRunningRef.current = false;
                 setOpened(true);
-
                 setShowConfirm(false);
                 setTimeout(() => {
                   setShowConfirm(true);
-                  // 페이드 인 + 위로 살짝 슬라이드
                   confirmAnim.setValue(0);
                   Animated.timing(confirmAnim, {
                     toValue: 1,
                     duration: 250,
                     useNativeDriver: true,
                   }).start();
-                }, 1000); // ⬅️ 버튼 딜레이(ms) 원하는 값으로
+                }, 1000);
               }}
             />
           ) : (
             <Image
-              source={Images.gacha.treasure.static}
+              source={Images.gacha.scroll.static}
               resizeMode="contain"
               style={{ width: 376, height: 266 }}
             />
