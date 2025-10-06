@@ -10,12 +10,12 @@ import {
 } from "react-native";
 import Icon from "../shared/Icon";
 
-const BASE_W = 311;
-const BASE_H = 109;
+const BASE_W = 332;
+const BASE_H = 100;
 const DEFAULT_BG = "#FFFFFF";
 const PRESSED_BG = "#FDFFFA";
 const DEFAULT_BORDER = "#D4D4D4";
-const PRESSED_BORDER = "#62974F";
+const PRESSED_BORDER = "#42790E";
 const MAP_PLACEHOLDER = Images.placeholder.map;
 
 export default function EditStepCard({
@@ -27,7 +27,7 @@ export default function EditStepCard({
   onPress,
   disabled = false,
   style,
-  horizontalPadding = 25,
+  horizontalPadding = 15,
 }) {
   const { width: screenW } = useWindowDimensions();
   const cardW = Math.min(BASE_W, screenW - horizontalPadding * 2);
@@ -72,7 +72,7 @@ export default function EditStepCard({
             {/* 제목 + 평점 */}
             <View style={styles.firstRow}>
               <Text
-                className="font-pretendardSemiBold text-[#244DD3] text-heading-2"
+                className="text-black font-pretendardSemiBold text-heading-2"
                 numberOfLines={1}
               >
                 {title}
@@ -104,15 +104,6 @@ export default function EditStepCard({
               </Text>
             )}
 
-            {/* 주소 */}
-            {!!address && (
-              <Text
-                className="text-gray700 text-body-2 font-pretendardMedium"
-                numberOfLines={1}
-              >
-                {address}
-              </Text>
-            )}
           </View>
 
           {/* 오른쪽 이미지 (회색 배경 + placeholder 폴백) */}
@@ -154,7 +145,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 5,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -167,12 +158,13 @@ const styles = StyleSheet.create({
   firstRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 16,
-    marginBottom: 11,
+    paddingTop: 10,
+    marginBottom: 4,
   },
   imageWrapper: {
-    width: 92,
-    height: 92,
+    width: 80,
+    height: 80,
+    borderRadius: 5,
     marginRight: 12,
     marginLeft: 12,
     overflow: "hidden",

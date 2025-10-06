@@ -7,6 +7,7 @@ const { hs, vs, rp, fs } = scale;
 const VARIANT_STYLES = {
   primary: { backgroundColor: '#62974F', textColor: '#FFFFFF' },
   secondary: { backgroundColor: '#C9DCC1', textColor: '#62974F' },
+  secondaryWhite: { backgroundColor: '#FFFFFF', textColor: '#62974F', borderColor: '#AFAFAF', borderWidth: 1 },
   disabled: { backgroundColor: '#F4F4F4', textColor: '#6B6B6B' },
 };
 
@@ -32,7 +33,7 @@ const Button = ({
   textStyle,
   activeOpacity = 0.8,
 }) => {
-  const { backgroundColor, textColor } = VARIANT_STYLES[variant] ?? VARIANT_STYLES.primary;
+  const { backgroundColor, textColor, borderColor, borderWidth } = VARIANT_STYLES[variant] ?? VARIANT_STYLES.primary;
   const { widthPx, heightPx } = SIZE_STYLES[size] ?? SIZE_STYLES.medium;
   const isDisabled = variant === 'disabled';
 
@@ -50,6 +51,8 @@ const Button = ({
           height: vs(heightPx),
           borderRadius: 999,
           backgroundColor,
+          borderColor,
+          borderWidth,
           justifyContent: 'center',
           alignItems: 'center',
         },

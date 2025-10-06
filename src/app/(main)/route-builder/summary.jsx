@@ -1,28 +1,33 @@
+import MapView from "@components/map/MapView";
+import RouteStepCard, {
+  PIN_CENTER_X,
+  PIN_SIZE,
+} from "@components/route/RouteStepCard";
+import Button from "@components/shared/Button";
+import Icon from "@components/shared/Icon";
+import BottomSheet, {
+  BottomSheetScrollView,
+  useBottomSheetSpringConfigs,
+} from "@gorhom/bottom-sheet";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { postLocationRecommendations, postRouteNext } from "@services/api";
+import { setPendingToast } from "@utils/toastNext";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import * as React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
-  PanResponder,
+  Alert,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import MapView from "../../../components/map/MapView";
-import RouteStepCard from "../../../components/route/RouteStepCard";
-import Header from "../../../components/shared/Header";
-import { postRouteNext } from "../../../services/api";
+import Svg, { Defs, Line, LinearGradient, Stop } from "react-native-svg";
 
-/** ---- ENV ---- */
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
 const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN?.trim();
 
-/** ---- 안전 폴백 ---- */
 const FALLBACK_FIRST = {
   id: 1,
   location_id: 1,
@@ -34,6 +39,7 @@ const FALLBACK_FIRST = {
   lat: 37.248492,
   lng: 127.076754,
 };
+
 const FALLBACK_OTHERS = [
   {
     id: 2,
@@ -59,10 +65,20 @@ const FALLBACK_OTHERS = [
   },
 ];
 
-const DBG = true;
-const log = (...a) => DBG && console.log("[summary]", ...a);
+function sanitizeToken(t) {
+  return String(t || "")
+    .trim()
+    .replace(/^Bearer\s+/i, "");
+}
 
-/** 백엔드 응답 → 화면 카드로 매핑 */
+async function ensureToken() {
+  const t = sanitizeToken(TEST_TOKEN);
+  try {
+    await AsyncStorage.setItem("jwt", t);
+  } catch {}
+  return t;
+}
+
 function mapApiItemToCard(item, stepIndexBase = 2) {
   const photo = Array.isArray(item?.photos) && item.photos[0];
   const imageSource =
@@ -71,11 +87,17 @@ function mapApiItemToCard(item, stepIndexBase = 2) {
       : null;
   const lat = Number(item?.latitude ?? item?.lat);
   const lng = Number(item?.longitude ?? item?.lng);
+  const rawTitle =
+    item?.location_name ??
+    item?.title ??
+    item?.name ??
+    item?.place_name ??
+    item?.poi_name;
 
   return {
     id: item?.location_id ?? `${stepIndexBase}-${Math.random()}`,
     location_id: item?.location_id,
-    title: item?.location_name ?? "이름없음",
+    title: (typeof rawTitle === "string" ? rawTitle.trim() : "") || "이름없음",
     rating: item?.rating_avg ?? undefined,
     categories: item?.category ? [item.category] : [],
     address: item?.address ?? "",
@@ -90,9 +112,22 @@ export default function RouteSummaryScreen() {
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    log("params =", JSON.stringify(params));
-  }, [params]);
+  const [firstTop, setFirstTop] = useState(null);
+  const [lastTop, setLastTop] = useState(null);
+
+  const [saving, setSaving] = useState(false);
+
+  // RouteSummaryScreen 컴포넌트 내부
+  const categoryForRecs = useMemo(() => {
+    // 1순위: 현재 첫 장소의 카테고리
+    const fromItems = items?.[0]?.categories?.[0];
+    // 2순위: 파라미터로 넘어온 firstCategory (있으면)
+    const fromParams =
+      typeof params?.firstCategory === "string"
+        ? params.firstCategory.trim()
+        : "";
+    return (fromItems || fromParams || "").trim();
+  }, [items, params?.firstCategory]);
 
   const parsedArray = (v) => {
     if (!v) return [];
@@ -108,14 +143,8 @@ export default function RouteSummaryScreen() {
     () => parsedArray(params.prefetched),
     [params.prefetched]
   );
-
-  // 무드
   const moods = parsedArray(params.moodsKo).concat(parsedArray(params.moods));
-  useEffect(() => {
-    log("moods =", moods);
-  }, [moods]);
 
-  // 첫 장소
   const first = useMemo(() => {
     if (params.first) {
       try {
@@ -168,22 +197,17 @@ export default function RouteSummaryScreen() {
     params.firstLng,
   ]);
 
-  useEffect(() => {
-    log("first =", first);
-  }, [first]);
-
   const region =
     typeof params.region === "string" && params.region.trim()
       ? String(params.region)
       : "경기도 수원시 영통구";
 
-  // 미리 넘겨준 후보들
   const prefetchedMapped = useMemo(
     () =>
       (prefetchedItems || [])
         .slice(0, 2)
         .map((it, idx) => mapApiItemToCard(it, 2 + idx))
-        .filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng)),
+        .filter((c) => c.lat != null && c.lng != null),
     [prefetchedItems]
   );
   const hasPrefetched = prefetchedMapped.length > 0;
@@ -194,13 +218,11 @@ export default function RouteSummaryScreen() {
   const [loading, setLoading] = useState(!hasPrefetched);
   const [err, setErr] = useState("");
 
-  /** ===== (NEW) Journeys Preview: 제목/요약 ===== */
   const [previewTitle, setPreviewTitle] = useState("");
   const [previewSummary, setPreviewSummary] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewErr, setPreviewErr] = useState("");
 
-  // 토큰 가져오기 (AsyncStorage `jwt` → env TEST_TOKEN 폴백)
   const getAuthToken = useMemo(
     () => async () => {
       try {
@@ -213,31 +235,26 @@ export default function RouteSummaryScreen() {
     []
   );
 
-  // items가 확정될 때마다 /journeys/preview 호출
-  // items가 확정될 때마다 /journeys/preview 호출
+  // 프리뷰 요약
   useEffect(() => {
     let aborted = false;
     const controller = new AbortController();
 
     async function run() {
+      const locationIds = items
+        .map((p) => Number(p.location_id))
+        .filter((n) => Number.isFinite(n));
+
+      if (locationIds.length === 0 || !API_BASE_URL) {
+        setPreviewTitle(items[0]?.title ? items[0].title : "추천");
+        setPreviewSummary("");
+        return;
+      }
+
+      setPreviewLoading(true);
+      setPreviewErr("");
       try {
-        // location_id 뽑기 (최소 1개 필요)
-        const locationIds = items
-          .map((p) => Number(p.location_id))
-          .filter((n) => Number.isFinite(n));
-
-        if (locationIds.length === 0 || !API_BASE_URL) {
-          setPreviewTitle(
-            items[0]?.title ? `${items[0].title} 루트` : "추천 루트"
-          );
-          setPreviewSummary("");
-          return;
-        }
-
-        setPreviewLoading(true);
-        setPreviewErr("");
         const token = await getAuthToken();
-
         const r = await fetch(`${API_BASE_URL}/journeys/preview`, {
           method: "POST",
           signal: controller.signal,
@@ -252,42 +269,24 @@ export default function RouteSummaryScreen() {
         });
 
         const text = await r.text();
-        console.log("[preview raw]", text);
-
-        if (!r.ok) {
-          throw new Error(`Preview failed (HTTP ${r.status})`);
-        }
-
-        let data = {};
-        try {
-          data = JSON.parse(text);
-        } catch {
-          data = {};
-        }
-        console.log("[preview parsed]", data);
+        if (!r.ok) throw new Error(`Preview failed (HTTP ${r.status})`);
+        const data = JSON.parse(text || "{}");
 
         if (!aborted) {
           setPreviewTitle(
-            typeof (data?.journey_title ?? data?.title) === "string" &&
-              (data?.journey_title ?? data?.title).trim()
-              ? (data?.journey_title ?? data?.title).trim()
-              : items[0]?.title
-              ? `${items[0].title} 루트`
-              : "추천 루트"
+            (
+              data?.journey_title ||
+              data?.title ||
+              items[0]?.title ||
+              "추천"
+            ).trim()
           );
-          setPreviewSummary(
-            typeof (data?.journey_summary ?? data?.summary) === "string"
-              ? data?.journey_summary ?? data?.summary
-              : ""
-          );
+          setPreviewSummary(data?.journey_summary || data?.summary || "");
         }
       } catch (e) {
         if (!aborted) {
-          console.warn("[preview error]", e);
-          setPreviewErr(e?.message || "요약 생성에 실패했어요.");
-          setPreviewTitle(
-            items[0]?.title ? `${items[0].title} 루트` : "추천 루트"
-          );
+          setPreviewErr("요약 생성에 실패했어요.");
+          setPreviewTitle(items[0]?.title ? items[0].title : "추천");
           setPreviewSummary("");
         }
       } finally {
@@ -295,28 +294,26 @@ export default function RouteSummaryScreen() {
       }
     }
 
-    // items가 바뀔 때마다 재요청
     if (items?.length) run();
-
     return () => {
       aborted = true;
       controller.abort();
     };
   }, [items, getAuthToken]);
 
-  // API 호출 (후보 추천)
+  // 최초 다음 후보(뒤 2칸) 채우기
   const didRunRef = useRef(false);
   useEffect(() => {
+    if (didRunRef.current) return;
+    didRunRef.current = true;
+
     if (hasPrefetched) {
-      didRunRef.current = true;
       setItems((prev) =>
         prev.length >= 3 ? prev : [first, ...prefetchedMapped]
       );
       setLoading(false);
       return;
     }
-    if (didRunRef.current) return;
-    didRunRef.current = true;
 
     let canceled = false;
 
@@ -349,7 +346,6 @@ export default function RouteSummaryScreen() {
         } catch {}
       }
 
-      // 중복 제거
       const uniq = [];
       const seen = new Set();
       for (const it of merged) {
@@ -370,7 +366,7 @@ export default function RouteSummaryScreen() {
         const mapped =
           (apiItems || [])
             .map((it, idx) => mapApiItemToCard(it, 2 + idx))
-            .filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng)) ??
+            .filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng)) ||
           [];
 
         let next = [first, ...mapped];
@@ -380,7 +376,7 @@ export default function RouteSummaryScreen() {
         }
         setItems(next);
       } catch (e) {
-        setErr(e?.message || "추천을 불러오지 못했어요.");
+        setErr("추천을 불러오지 못했어요.");
         setItems([first, ...FALLBACK_OTHERS]);
       } finally {
         !canceled && setLoading(false);
@@ -392,363 +388,471 @@ export default function RouteSummaryScreen() {
     };
   }, [hasPrefetched, first, prefetchedMapped, moods, region]);
 
-  /** 지도 마커 */
-  const markers = useMemo(() => {
-    return items
-      .map((p, i) => ({
-        id: String(p.location_id ?? i),
-        lat: Number(p.lat),
-        lng: Number(p.lng),
-        name: p.title,
-      }))
-      .filter(
-        (m) =>
-          Number.isFinite(m.lat) &&
-          Number.isFinite(m.lng) &&
-          !(m.lat === 0 && m.lng === 0)
-      );
-  }, [items]);
+  // 지도 마커
+  const markers = useMemo(
+    () =>
+      items
+        .map((p, i) => ({
+          id: String(p.location_id ?? i),
+          lat: Number(p.lat),
+          lng: Number(p.lng),
+          name: p.title,
+        }))
+        .filter(
+          (m) =>
+            Number.isFinite(m.lat) &&
+            Number.isFinite(m.lng) &&
+            !(m.lat === 0 && m.lng === 0)
+        ),
+    [items]
+  );
 
   const numberedMarkers = useMemo(
     () => markers.map((m, idx) => ({ ...m, label: String(idx + 1) })),
     [markers]
   );
-  const markersKey = useMemo(
-    () => JSON.stringify(numberedMarkers.map((m) => [m.lat, m.lng, m.label])),
-    [numberedMarkers]
+
+  // bottom sheet
+  const bottomSheetRef = useRef(null);
+  const snapPoints = useMemo(() => ["42%", "62%"], []);
+  const animationConfigs = useBottomSheetSpringConfigs({
+    damping: 100,
+    overshootClamping: true,
+    stiffness: 500,
+  });
+
+  // 변경된 제목 반영
+  const incomingTitle =
+    typeof params?.routeTitle === "string" && params.routeTitle.trim()
+      ? params.routeTitle.trim()
+      : "";
+  const currentTitle = useMemo(
+    () => (incomingTitle || previewTitle || items[0]?.title || "추천").trim(),
+    [incomingTitle, previewTitle, items]
   );
 
-  const locationIds = useMemo(() => {
-    const arr = items
+  const LINE_X = 25 + (typeof PIN_CENTER_X === "number" ? PIN_CENTER_X : 10);
+
+  async function handleSave() {
+    const title = (currentTitle || "").trim();
+    const ids = items
       .map((p) => Number(p.location_id))
       .filter((n) => Number.isFinite(n));
-    return Array.from(new Set(arr));
-  }, [items]);
 
-  /** 바텀시트 **/
-  const SHEET_HANDLE_H = 26; // 핸들/헤더 높이
-  const [sheetH, setSheetH] = useState(0);
-  const [containerH, setContainerH] = useState(0);
+    if (!title) {
+      Alert.alert("루트 저장", "루트 이름을 입력해 주세요.");
+      return;
+    }
+    if (!ids.length) {
+      Alert.alert("루트 저장", "선택된 장소가 없습니다.");
+      return;
+    }
 
-  // collapsed 피크 높이: 버튼 포함 영역 + 여유
-  const PEEK_EXTRA = 12 + insets.bottom; //46
-  const peekHeight = 200 + PEEK_EXTRA; // 카드 1개 일부 + 버튼이 보이도록
+    try {
+      setSaving(true);
+      const token = await ensureToken();
+      const body = {
+        journey_title: title,
+        locations: ids.map((id, idx) => ({
+          location_id: Number(id),
+          sequence_number: idx + 1,
+        })),
+      };
 
-  // 시트의 Y(아래로 양수) : 0(완전 펼침) ~ maxY(피크)
-  const maxY = Math.max(0, sheetH - peekHeight);
-  const sheetY = useRef(new Animated.Value(0)).current;
-
-  // sheetH/peekHeight 계산이 끝나면(=maxY 갱신되면) 즉시 접힘 위치로 이동
-  useEffect(() => {
-    sheetY.stopAnimation();
-    sheetY.setValue(maxY); // 애니메이션 없이 바로 접힘
-  }, [maxY, sheetY]);
-
-  // 스냅
-  const snapTo = (y) => {
-    Animated.spring(sheetY, {
-      toValue: Math.min(Math.max(y, 0), maxY),
-      useNativeDriver: true,
-      stiffness: 220,
-      damping: 28,
-      mass: 0.9,
-    }).start();
-  };
-
-  // 드래그
-  const dragStart = useRef(0);
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 4,
-        onPanResponderGrant: () => {
-          sheetY.stopAnimation((v) => (dragStart.current = v));
+      const res = await fetch(`${API_BASE_URL}/journeys`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sanitizeToken(token)}`,
         },
-        onPanResponderMove: (_e, g) => {
-          const next = Math.min(Math.max(dragStart.current + g.dy, 0), maxY);
-          sheetY.setValue(next);
-        },
-        onPanResponderRelease: (_e, g) => {
-          const end = dragStart.current + g.dy + g.vy * 120;
-          const mid = maxY / 2;
-          const target = end > mid ? maxY : 0;
-          snapTo(target);
-        },
-      }),
-    [maxY, sheetY]
-  );
+        body: JSON.stringify(body),
+      });
 
-  /** ====== UI ====== */
-  const displayTitle =
-    previewLoading && !previewTitle
-      ? "오늘의 탐험 루트"
-      : previewTitle || `${items[0]?.title ?? "추천"} 루트`;
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (
+          res.status === 401 ||
+          String(data?.error).toLowerCase().includes("invalid token")
+        ) {
+          await AsyncStorage.removeItem("jwt");
+          throw new Error("로그인이 필요합니다. (토큰 무효)");
+        }
+        const msg =
+          data?.error ||
+          (res.status === 401
+            ? "로그인이 필요합니다."
+            : `저장에 실패했어요. (HTTP ${res.status})`);
+        throw new Error(msg);
+      }
 
-  const displaySummary =
-    previewLoading && !previewSummary
-      ? "AI가 여정 요약을 준비하고 있어요..."
-      : previewSummary || "AI가 여정을 구성하고 있어요.";
+      const journeyId = String(data?.journey_id);
+      if (!journeyId) throw new Error("서버 응답에 journey_id가 없습니다.");
+
+      const meta = {
+        thumbs: items
+          .slice(0, 3)
+          .map((c) => c?.imageSource?.uri)
+          .filter(Boolean),
+        placeSummary: items
+          .slice(0, 3)
+          .map((c) => c.title)
+          .join("-"),
+        title,
+      };
+      try {
+        await AsyncStorage.setItem(
+          `journey_meta_${journeyId}`,
+          JSON.stringify(meta)
+        );
+      } catch (e) {
+        console.warn("[summary save] set journey_meta failed:", e?.message);
+      }
+
+      await setPendingToast({
+        type: "success",
+        message: "루트 저장 완료!",
+        subText: "저장소에 추가됨",
+        duration: 3000,
+        targetRoute: "/home",
+      });
+
+      router.replace("/home");
+    } catch (e) {
+      Alert.alert(
+        "루트 저장 실패",
+        e?.message || "알 수 없는 오류가 발생했어요."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
-      <Header
-        title="루트 추천받기"
-        leftIcon="previous"
-        onLeftPress={() => router.back()}
-        rightIcon="home_header"
-        onRightPress={() => router.push("/home")}
-      />
-
-      <View style={{ paddingHorizontal: 25, marginBottom: 5 }}>
-        <Text className="text-title-1 font-pretendardExtraBold mb-[6px]">
-          {displayTitle}
-        </Text>
-        <Text className="text-heading-3 font-pretendardSemiBold text-gray700">
-          {displaySummary}
-        </Text>
-        {!!previewErr && (
-          <Text style={{ color: "#DC2626", marginTop: 6, fontSize: 12 }}>
-            {previewErr}
-          </Text>
-        )}
+    <View style={{ flex: 1, backgroundColor: "#fff" }}>
+      <View style={{ height: 600 }}>
+        <MapView markers={numberedMarkers} />
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="이전 화면으로"
+          hitSlop={10}
+          style={{
+            position: "absolute",
+            left: 14,
+            top: Math.max(12, insets.top + 8), // 노치/상단바 피하기
+            zIndex: 20,
+            elevation: 20,
+            backgroundColor: "transparent",
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon name="previous" width={22} height={22} color="#000" />
+        </Pressable>
       </View>
 
-      {/* 전체 컨테이너 높이 측정 */}
-      <View
-        style={{ flex: 1 }}
-        onLayout={(e) => setContainerH(e.nativeEvent.layout.height)}
+      <BottomSheet
+        ref={bottomSheetRef}
+        index={0}
+        snapPoints={snapPoints}
+        animationConfigs={animationConfigs}
+        enableDynamicSizing={false}
+        enableOverDrag={false}
+        enableContentPanningGesture={true}
+        backgroundStyle={{
+          backgroundColor: "#FFF",
+          borderTopLeftRadius: 30,
+          borderTopRightRadius: 30,
+          elevation: 8,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+        }}
+        handleIndicatorStyle={{
+          backgroundColor: "#D9D9D9",
+          width: 78,
+          height: 3,
+          borderRadius: 50,
+        }}
       >
-        {/* 지도 */}
-        <View style={{ height: 380, marginBottom: 0 }}>
-          <MapView key={markersKey} markers={numberedMarkers} />
-        </View>
-
-        {/* 바텀시트 */}
-        <Animated.View
-          style={[
-            styles.sheetWrap,
-            {
-              transform: [{ translateY: sheetY }],
-            },
-          ]}
-          pointerEvents="box-none"
-          {...panResponder.panHandlers}
-          onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}
+        <BottomSheetScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 25,
+            paddingTop: 18,
+            paddingBottom: 24 + insets.bottom,
+          }}
         >
-          <View style={styles.sheetCard}>
-            {/* 핸들/헤더 */}
-            <View style={styles.handleWrap}>
-              <View style={styles.handleBar} />
-            </View>
-            {/* 하단 버튼 바(시트 안) */}
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "flex-end",
-                paddingHorizontal: 25,
-                backgroundColor: "#fff",
-              }}
-            >
-              <SecondarySmallButton
-                title="루트 수정하기"
-                onPress={() =>
-                  router.push({
-                    pathname: "/route-builder/edit",
-                    params: {
-                      routeItems: JSON.stringify(
-                        items.map((c) => {
-                          if (c.raw) return c.raw;
-                          const photoUri = c?.imageSource?.uri
-                            ? [c.imageSource.uri]
-                            : [];
-                          return {
-                            location_id: c.location_id,
-                            location_name: c.title,
-                            category: c.categories?.[0] || "",
-                            address: c.address || "",
-                            latitude: c.lat,
-                            longitude: c.lng,
-                            photos: photoUri,
-                            rating_avg: c.rating ?? null,
-                          };
-                        })
-                      ),
-                      center: JSON.stringify({
-                        lat: items[0]?.lat,
-                        lng: items[0]?.lng,
-                      }),
-                      region: params?.region || "",
-                    },
-                  })
+          {/* 다시 추천받기: ResultsScreen과 동일한 postLocationRecommendations 사용 */}
+          <Pressable
+            onPress={async () => {
+              try {
+                if (!categoryForRecs) {
+                  Alert.alert(
+                    "다시 추천받기",
+                    "카테고리를 알 수 없어요. 처음 장소의 카테고리를 확인해 주세요."
+                  );
+                  return;
                 }
-              />
+                setLoading(true);
+                setErr("");
 
-              <PrimaryMediumButton
-                title="루트 저장하기"
-                onPress={() =>
-                  router.push({
-                    pathname: "/route-builder/save",
-                    params: {
-                      locationIds: JSON.stringify(
-                        Array.from(
-                          new Set(
-                            items
-                              .map((p) => Number(p.location_id))
-                              .filter((n) => Number.isFinite(n))
-                          )
-                        )
-                      ),
-                      defaultName:
-                        (previewTitle && previewTitle.trim()) ||
-                        `${items[0]?.title ?? "무명"} 루트`,
-                      thumbs: JSON.stringify(
-                        items
-                          .slice(0, 3)
-                          .map((c) => c?.imageSource?.uri)
-                          .filter(Boolean)
-                      ),
-                      placeSummary: items
-                        .slice(0, 3)
-                        .map((c) => c.title)
-                        .join("-"),
-                    },
-                  })
+                const res = await postLocationRecommendations({
+                  category: categoryForRecs, // ← 필수 추가
+                  keywords: [],
+                  moods,
+                  center: { lat: items[0]?.lat, lng: items[0]?.lng },
+                  radius_km: 3,
+                });
+
+                const arr = Array.isArray(res?.items) ? res.items : [];
+                const uniq = [];
+                const seen = new Set([String(items[0]?.location_id)]);
+                for (const it of arr) {
+                  const id = String(it?.location_id ?? "");
+                  if (!id || seen.has(id)) continue;
+                  seen.add(id);
+                  uniq.push(it);
+                  if (uniq.length >= 2) break;
                 }
-              />
-            </View>
 
-            {/* 콘텐츠 */}
-            {loading ? (
-              <View style={{ padding: 25, alignItems: "center" }}>
-                <ActivityIndicator />
-                {!!err && (
-                  <Text style={{ marginTop: 8, color: "#999" }}>{err}</Text>
-                )}
-              </View>
-            ) : (
-              <>
+                const mapped = uniq
+                  .map((it, idx) => mapApiItemToCard(it, 2 + idx))
+                  .filter(
+                    (c) => Number.isFinite(c.lat) && Number.isFinite(c.lng)
+                  );
+
+                let next = [items[0], ...mapped];
+                if (next.length < 3) {
+                  const need = 3 - next.length;
+                  next = [...next, ...FALLBACK_OTHERS.slice(0, need)];
+                }
+                setItems(next);
+              } catch (e) {
+                setErr("추천을 불러오지 못했어요.");
+              } finally {
+                setLoading(false);
+              }
+            }}
+            hitSlop={8}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: 20,
+            }}
+          >
+            <Icon name="refresh" width={18} height={18} />
+            <Text className="ml-[4px] text-body-2 font-pretendardMedium">
+              다시 추천받기
+            </Text>
+          </Pressable>
+
+          <View style={styles.sheetHeaderRow}>
+            <Text className="text-title-3 font-pretendardSemiBold">
+              {previewLoading && !previewTitle
+                ? "여정 준비 중..."
+                : currentTitle}
+            </Text>
+          </View>
+
+          {!!(previewLoading || previewSummary || previewErr) && (
+            <Text className="text-body-1 font-pretendardMedium text-gray700 mt-[6px] mb-9">
+              {previewLoading && !previewSummary
+                ? "AI가 여정 요약을 준비하고 있어요..."
+                : previewSummary ||
+                  (previewErr ? "" : "AI가 여정을 구성하고 있어요.")}
+            </Text>
+          )}
+          {!!previewErr && (
+            <Text style={{ color: "#DC2626", marginTop: 4, fontSize: 12 }}>
+              {previewErr}
+            </Text>
+          )}
+
+          {loading ? (
+            <View style={{ paddingVertical: 20, alignItems: "center" }}>
+              <ActivityIndicator />
+              {!!err && (
+                <Text style={{ marginTop: 8, color: "#999" }}>{err}</Text>
+              )}
+            </View>
+          ) : (
+            <View style={{ position: "relative" }}>
+              {/* 배경 점선 */}
+              {firstTop !== null && lastTop !== null && lastTop > firstTop && (
                 <View
-                  style={{ maxHeight: containerH - SHEET_HANDLE_H }}
-                  contentContainerStyle={{
-                    paddingBottom: 16 + 56 + insets.bottom,
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    left: 9.5,
+                    top: firstTop + PIN_SIZE,
+                    height: Math.max(0, lastTop - firstTop - PIN_SIZE / 2),
+                    zIndex: 0,
+                    elevation: 0,
+                    width: 2,
                   }}
-                  showsVerticalScrollIndicator={false}
                 >
-                  {items.map((place, i) => (
+                  <Svg
+                    width="100%"
+                    height="100%"
+                    style={{ position: "absolute", left: 0, top: 0 }}
+                  >
+                    <Defs>
+                      <LinearGradient
+                        id="routeDottedGradient"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="100%"
+                        gradientUnits="userSpaceOnUse"
+                      >
+                        <Stop offset="0%" stopColor="#91B684" stopOpacity="1" />
+                        <Stop
+                          offset="100%"
+                          stopColor="#4D5E97"
+                          stopOpacity="1"
+                        />
+                      </LinearGradient>
+                    </Defs>
+                    <Line
+                      x1="1"
+                      y1="0"
+                      x2="1"
+                      y2="100%"
+                      stroke="url(#routeDottedGradient)"
+                      strokeWidth={2}
+                      strokeDasharray="1 6"
+                      strokeLinecap="round"
+                    />
+                  </Svg>
+                </View>
+              )}
+
+              {/* 카드 목록 */}
+              <View style={{ zIndex: 1, elevation: 1 }}>
+                {items.map((place, i) => {
+                  const isFirst = i === 0;
+                  const isLast = i === items.length - 1;
+
+                  return (
                     <View
                       key={`${place.id}-${i}`}
-                      style={{ paddingHorizontal: 25 }}
+                      style={{ marginBottom: isLast ? 0 : 18 }}
+                      onLayout={(e) => {
+                        const { y } = e.nativeEvent.layout;
+                        if (isFirst && firstTop === null) setFirstTop(y);
+                        if (isLast) setLastTop(y);
+                      }}
                     >
-                      <View style={{ paddingTop: 16, paddingBottom: 18 }}>
-                        <RouteStepCard
-                          step={i + 1}
-                          title={place.title}
-                          rating={place.rating}
-                          categories={place.categories}
-                          address={place.address}
-                          imageSource={place.imageSource}
-                        />
-                      </View>
-
-                      {i < items.length - 1 && (
-                        <View
-                          style={{
-                            height: 1,
-                            backgroundColor: "#D4D4D4",
-                            marginHorizontal: -25, // 전폭 분리선
-                          }}
-                        />
-                      )}
+                      <RouteStepCard
+                        step={i + 1}
+                        title={place.title}
+                        rating={place.rating}
+                        categories={place.categories}
+                        address={place.address}
+                        imageSource={place.imageSource}
+                      />
                     </View>
-                  ))}
-                </View>
-              </>
-            )}
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* 푸터 버튼 */}
+          <View style={styles.footerBar}>
+            <Button
+              title="루트 수정하기"
+              variant="secondaryWhite"
+              size="small"
+              onPress={() =>
+                router.push({
+                  pathname: "/route-builder/edit",
+                  params: {
+                    routeItems: JSON.stringify(
+                      items.map((c) => {
+                        if (c.raw) return c.raw;
+                        const photoUri = c?.imageSource?.uri
+                          ? [c.imageSource.uri]
+                          : [];
+                        return {
+                          location_id: c.location_id,
+                          location_name: c.title,
+                          category: c.categories?.[0] || "",
+                          address: c.address || "",
+                          latitude: c.lat,
+                          longitude: c.lng,
+                          photos: photoUri,
+                          rating_avg: c.rating ?? null,
+                        };
+                      })
+                    ),
+                    center: JSON.stringify({
+                      lat: items[0]?.lat,
+                      lng: items[0]?.lng,
+                    }),
+                    region: params?.region || "",
+                    routeTitle: currentTitle,
+                  },
+                })
+              }
+            />
+
+            <Button
+              title={saving ? "저장 중..." : "루트 저장하기"}
+              variant={saving ? "disabled" : "primary"}
+              size="medium"
+              disabled={saving}
+              onPress={() => {
+                if (saving) return;
+                handleSave();
+              }}
+            />
           </View>
-        </Animated.View>
-      </View>
-    </SafeAreaView>
+        </BottomSheetScrollView>
+      </BottomSheet>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  sheetWrap: {
+  sheetHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  footerBar: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
+    paddingTop: 10,
+    paddingHorizontal: 25,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
   },
-  sheetCard: {
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    backgroundColor: "#FFFFFF",
-    // 그림자
-    shadowColor: "#000",
-    shadowOpacity: 0.14,
-    shadowRadius: 13.5,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 12,
-  },
-  handleWrap: {
-    height: 35,
+  footerSecondary: {
+    flex: 1,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#D4D4D4",
+    backgroundColor: "#C9DCC1",
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 12,
   },
-  handleBar: {
-    width: 78,
-    height: 3,
-    borderRadius: 50,
-    backgroundColor: "#D9D9D9",
+  footerPrimary: {
+    flex: 1,
+    borderRadius: 999,
+    backgroundColor: "#62974F",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
   },
 });
-
-// 로컬 버튼: small + secondary
-function SecondarySmallButton({ title, onPress }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: "#D4D4D4",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#C9DCC1",
-        marginRight: 9,
-      }}
-      android_ripple={{ color: "rgba(0,0,0,0.06)", borderless: false }}
-      accessibilityRole="button"
-      accessibilityLabel={title}
-    >
-      <Text className="text-heading-3 font-pretendardSemiBold text-green500">
-        {title}
-      </Text>
-    </Pressable>
-  );
-}
-
-// 로컬 버튼: medium + primary
-function PrimaryMediumButton({ title, onPress }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 999,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#62974F",
-      }}
-      android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }}
-      accessibilityRole="button"
-      accessibilityLabel={title}
-    >
-      <Text className="text-white text-heading-3 font-pretendardSemiBold">
-        {title}
-      </Text>
-    </Pressable>
-  );
-}
