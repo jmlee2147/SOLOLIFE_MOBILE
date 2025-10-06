@@ -1,3 +1,7 @@
+import PlaceCard from "@components/place/PlaceCard";
+import Button from "@components/shared/Button";
+import Header from "@components/shared/Header";
+import Icon from "@components/shared/Icon";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, {
@@ -10,14 +14,13 @@ import React, {
 import {
   ActivityIndicator,
   Animated,
+  Easing,
+  Pressable,
   SafeAreaView,
   Text,
   View,
   useWindowDimensions,
 } from "react-native";
-import PlaceCard from "../../../components/place/PlaceCard";
-import Button from "../../../components/shared/Button";
-import Header from "../../../components/shared/Header";
 import { CATEGORY } from "../../../config/category.config";
 import {
   postLocationRecommendations,
@@ -129,6 +132,21 @@ export default function ResultsScreen() {
   const { category, subcategory, keywordsKo, moodsKo, center, lat, lng } =
     useLocalSearchParams();
 
+  const { mainCatLabel, subCatLabel, categoryChipText } = useMemo(() => {
+    const catKey = String(category || "");
+    const subKey = String(subcategory || "");
+    const cat = CATEGORY?.[catKey];
+
+    const main = cat?.label ?? catKey;
+    const sub = cat?.subcategories?.[subKey]?.label ?? "";
+
+    return {
+      mainCatLabel: main,
+      subCatLabel: sub,
+      categoryChipText: sub ? `${main} | ${sub}` : main,
+    };
+  }, [category, subcategory]);
+
   const parseJsonArr = (v) => {
     try {
       const a = JSON.parse(String(v));
@@ -236,6 +254,18 @@ export default function ResultsScreen() {
   const rafRef = useRef(null);
   const snapSize = CARD_W + ITEM_GAP;
 
+  const [listBox, setListBox] = useState({ top: 0, bottom: 0 });
+  const [footerTop, setFooterTop] = useState(0);
+
+  const dotsY = useMemo(() => {
+    if (!listBox.bottom || !footerTop) return null;
+    // 리스트 하단과 푸터 상단의 정확한 중앙
+    return listBox.bottom + (footerTop - listBox.bottom) / 2;
+  }, [listBox, footerTop]);
+
+  // 점 컨테이너 예상 높이(대략). 중앙 정렬 위해 절반만 빼줄 것
+  const DOT_CONTAINER_H = 12;
+
   // 좋아요 토글 (낙관적 업데이트)
   const handleToggleLike = useCallback(
     async (place) => {
@@ -323,7 +353,9 @@ export default function ResultsScreen() {
         ...(Array.isArray(item?.keywords) ? item.keywords : []),
         ...(Array.isArray(item?.features_flat) ? item.features_flat : []),
       ];
-      const { openNow, hoursText, hasHours } = getOpenBadge(item?.opening_hours || null);
+      const { openNow, hoursText, hasHours } = getOpenBadge(
+        item?.opening_hours || null
+      );
 
       const cardContent = (
         <PlaceCard
@@ -409,13 +441,56 @@ export default function ResultsScreen() {
 
   const currentItem = items[currentIndex];
 
+  // 새로고침 버튼 전용 상태 & 애니메이션
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshSpin = useRef(new Animated.Value(0)).current;
+  const refreshAnimRef = useRef(null);
+
+  useEffect(() => {
+    if (refreshing) {
+      refreshSpin.setValue(0);
+      const anim = Animated.loop(
+        Animated.timing(refreshSpin, {
+          toValue: 1,
+          duration: 1600,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      );
+      refreshAnimRef.current = anim;
+      anim.start();
+    } else {
+      if (refreshAnimRef.current) {
+        refreshAnimRef.current.stop();
+        refreshAnimRef.current = null;
+      }
+      refreshSpin.stopAnimation();
+      refreshSpin.setValue(0);
+    }
+  }, [refreshing, refreshSpin]);
+
+  const refreshRotate = refreshSpin.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
+  // 버튼 클릭 핸들러(버튼으로 재추천할 때만 refreshing=true)
+  const onRefreshPress = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await fetchRecs();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchRecs, refreshing]);
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <Header
-        title="장소 추천받기"
         leftIcon="previous"
         onLeftPress={() => router.back()}
-        rightIcon="home_header"
+        rightIcon="close"
         onRightPress={() => router.push("/home")}
       />
 
@@ -430,18 +505,50 @@ export default function ResultsScreen() {
         <Text className="text-title-1 font-pretendardExtraBold">
           포슬감자님 여긴 어때요?
         </Text>
-        <View className="flex-row flex-wrap mt-[3px] mb-[31px]">
+
+        {/* 카테고리 칩 + 다시 추천받기 */}
+        <View className="flex-row items-center justify-between mt-[7px] mb-[5px]">
+          {/* 카테고리 칩 */}
+          <View className="px-[11px] py-[2px] rounded-full bg-[#62974F]">
+            <Text className="text-white text-body-1 font-pretendardMedium">
+              {categoryChipText}
+            </Text>
+          </View>
+
+          {/* 다시 추천받기 버튼 */}
+          <Pressable
+            onPress={onRefreshPress}
+            className="flex-row items-center"
+            accessibilityRole="button"
+            accessibilityLabel="다시 추천받기"
+            disabled={refreshing}
+            style={{ opacity: refreshing ? 0.7 : 1 }}
+          >
+            <Animated.View
+              style={{ transform: [{ rotate: refreshRotate }], marginRight: 4 }}
+            >
+              <Icon name="refresh" width={18} height={18} />
+            </Animated.View>
+            <Text className="text-black text-body-2 font-pretendardMedium">
+              다시 추천받기
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* 기존 선택 뱃지들 */}
+        <View className="flex-row flex-wrap mb-[25px]">
           {[...selectedMoods, ...selectedKeywords].slice(0, 3).map((k) => (
             <View
               key={k}
-              className="px-[11px] py-[3px] mr-2 rounded-full border border-gray200"
+              className="px-[11px] py-[2px] mr-2 rounded-full border border-gray200"
             >
-              <Text className="text-gray700 text-heading-3 font-pretendardSemiBold">
+              <Text className="text-gray500 text-body-1 font-pretendardMedium">
                 {k}
               </Text>
             </View>
           ))}
         </View>
+
         {usedMock && (
           <Text style={{ color: "#9CA3AF", marginTop: -28, marginBottom: 16 }}>
             네트워크 문제로 임시 결과를 보여드려요.
@@ -465,7 +572,7 @@ export default function ResultsScreen() {
             flex: 1,
             alignItems: "center",
             justifyContent: "center",
-            paddingHorizontal: 24,
+            paddingHorizontal: 25,
           }}
         >
           <Text style={{ color: "#6B7280", marginBottom: 12 }}>
@@ -479,25 +586,33 @@ export default function ResultsScreen() {
           />
         </View>
       ) : (
-        <Animated.FlatList
-          ref={listRef}
-          horizontal
-          data={items}
-          keyExtractor={(it, idx) => `${it.location_id}-${idx}`}
-          renderItem={renderItem}
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={CARD_W + ITEM_GAP}
-          decelerationRate="fast"
-          snapToAlignment="start"
-          contentContainerStyle={contentPadding}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-            { useNativeDriver: true, listener: onScrollFast }
-          )}
-          scrollEventThrottle={16}
-          onMomentumScrollEnd={onScrollFast}
-          extraData={[liked, currentIndex]}
-        />
+        <View
+          onLayout={(e) => {
+            const { y, height } = e.nativeEvent.layout;
+            setListBox({ top: y, bottom: y + height });
+          }}
+        >
+          <Animated.FlatList
+            ref={listRef}
+            horizontal
+            data={items}
+            keyExtractor={(it, idx) => `${it.location_id}-${idx}`}
+            renderItem={renderItem}
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={CARD_W + ITEM_GAP}
+            decelerationRate="fast"
+            snapToAlignment="start"
+            contentContainerStyle={[contentPadding, { paddingBottom: vs(56) }]}
+            removeClippedSubviews={false}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+              { useNativeDriver: true, listener: onScrollFast }
+            )}
+            scrollEventThrottle={16}
+            onMomentumScrollEnd={onScrollFast}
+            extraData={[liked, currentIndex]}
+          />
+        </View>
       )}
 
       {/* 페이지네이션 점 */}
@@ -507,8 +622,11 @@ export default function ResultsScreen() {
             position: "absolute",
             left: 0,
             right: 0,
-            bottom: 85,
+            top: dotsY - 30, // 중앙 정렬 보정
             alignItems: "center",
+            height: DOT_CONTAINER_H,
+            zIndex: 10,
+            elevation: 10,
           }}
         >
           <View style={{ flexDirection: "row", justifyContent: "center" }}>
@@ -522,7 +640,7 @@ export default function ResultsScreen() {
                     height: 5,
                     borderRadius: 3,
                     marginHorizontal: 5,
-                    backgroundColor: active ? "#62974F" : "#D9D9D9",
+                    backgroundColor: active ? "#62974F" : "#AFAFAF",
                     opacity: active ? 1 : 0.7,
                   }}
                 />
@@ -536,16 +654,14 @@ export default function ResultsScreen() {
       <View
         className="flex-row items-center justify-between px-[25px]"
         style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
+        onLayout={(e) => {
+          const { y } = e.nativeEvent.layout;
+          setFooterTop(y);
+        }}
       >
         <Button
-          title="다시 추천받기"
-          size="small"
-          variant="secondary"
-          onPress={fetchRecs}
-        />
-        <Button
-          title="여기 갈래요"
-          size="medium"
+          title="장소 선택하기"
+          size="large"
           variant="primary"
           onPress={() => {
             if (!currentItem) return;

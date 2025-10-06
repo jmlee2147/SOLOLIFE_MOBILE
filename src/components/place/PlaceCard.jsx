@@ -17,7 +17,6 @@ function PlaceCard({
   liked = false,
   onToggleLike = () => {},
   onPressTitle = () => {},
-  // 영업 상태/시간
   openNow = null, // true | false | null(모름)
   hoursText = "아직 정보가 없어요.",
 }) {
@@ -28,7 +27,6 @@ function PlaceCard({
     [highlightedTags]
   );
 
-  // "~" 포맷이 들어와도 안전하게 "-"로 통일
   const displayHours = useMemo(
     () => String(hoursText || "아직 정보가 없어요.").replace(/\s*~\s*/g, " - "),
     [hoursText]
@@ -42,6 +40,8 @@ function PlaceCard({
         height: 479,
         borderWidth: 1,
         borderColor: "#D4D4D4",
+        // ✅ 이 한 줄만 추가해서 그림자 안 잘리게
+        overflow: "visible",
       }}
     >
       {/* 이미지 영역 */}
@@ -178,7 +178,7 @@ function PlaceCard({
                   key={`${label}-${i}`}
                   className="text-body-2 font-pretendardMedium"
                   style={{
-                    color: isHL ? "#EE7A13" : "#6B6B6B",
+                    color: isHL ? "#62974F" : "#6B6B6B",
                     marginRight: 5,
                   }}
                 >

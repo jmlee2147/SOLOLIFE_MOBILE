@@ -106,17 +106,17 @@ export default function KeywordsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       <Header
-        title="장소 추천받기"
         leftIcon="previous"
         onLeftPress={() => router.back()}
-        rightIcon="home_header"
+        rightIcon="close"
         onRightPress={() => router.push("/home")}
       />
 
       <View style={{ flex: 1, paddingHorizontal: 25, paddingTop: 5 }}>
         {/* 타이틀 */}
         <Text className="text-title-1 mb-[6px] font-pretendardExtraBold">
-          {title}
+          <Text className="text-green500">{subLabel || categoryLabel}</Text>
+          <Text> 장소를 찾으시는군요!</Text>
         </Text>
         <Text className="mb-12 leading-6 text-heading-3 text-gray700 font-pretendardMedium">
           선호하는 키워드를 선택해주세요.
@@ -152,11 +152,6 @@ export default function KeywordsScreen() {
                 >
                   {k}
                 </Text>
-
-                {/* 선택 표시 점 */}
-                {active && (
-                  <View className="absolute w-3 h-3 rounded-full bg-yellow900 -top-1.5 -right-1.5" />
-                )}
               </Pressable>
             );
           })}

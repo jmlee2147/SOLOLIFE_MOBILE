@@ -1118,6 +1118,33 @@ const icons = {
       />
     </Svg>
   ),
+  edit: ({ width = 24, height = 24, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
+      <G clipPath="url(#a)">
+        <Path
+          fill="#000"
+          d="m2.83 13.047 3.987 3.987L16.44 7.41l-3.987-3.987zM12.75 3.14l3.91 3.91 1.132-1.132-3.91-3.91zM6.535 17.315l-3.91-3.91-.592 4.503 4.502-.593Z"
+        />
+        <Path
+          stroke="#000"
+          strokeLinecap="square"
+          strokeWidth={2}
+          d="M3 20h18"
+        />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M0 0h24v24H0z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
 };
 
 const Icon = ({ name, width, height, style, ...props }) => {

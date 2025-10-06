@@ -2,7 +2,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { SafeAreaView, Text, View } from "react-native";
 import MonkeyLoadingVideo from "../../../components/animation/MonkeyLoading"; // ⬅️ 추가
-import Header from "../../../components/shared/Header";
 import { postRouteNext } from "../../../services/api";
 
 const parseJsonArray = (v) => {
@@ -117,13 +116,6 @@ export default function LoadingRouteScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <Header
-        title="루트 추천받기"
-        leftIcon="previous"
-        onLeftPress={() => router.back()}
-        rightIcon="home_header"
-        onRightPress={() => router.push("/home")}
-      />
       <View style={{ flex: 1, alignItems: "center", paddingTop: 143 }}>
         <Text className="text-title-1 font-pretendardExtraBold">
           루트 생성 중이에요.

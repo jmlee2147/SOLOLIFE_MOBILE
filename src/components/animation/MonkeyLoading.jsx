@@ -1,4 +1,3 @@
-// components/anim/MonkeyLoadingVideo.jsx
 import { Video } from "expo-av";
 import React, { useEffect, useRef } from "react";
 import { View } from "react-native";

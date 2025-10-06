@@ -37,10 +37,10 @@ export default function MoodSelectScreen() {
 
       <View style={{ flex: 1, paddingHorizontal: 25, paddingTop: 5 }}>
         <Text className="text-title-1 mb-[6px] font-pretendardExtraBold">
-          어떤 곳을 좋아하세요?
+          루트를 찾고 계시는군요!
         </Text>
         <Text className="mb-12 leading-6 text-heading-3 text-gray700 font-pretendardMedium">
-          키워드를 선택해주세요.
+          선호하는 키워드를 선택해주세요.
         </Text>
 
         <View className="flex-row flex-wrap mt-5">
@@ -72,11 +72,6 @@ export default function MoodSelectScreen() {
                 >
                   {k}
                 </Text>
-
-                {/* 선택 표시 점 */}
-                {active && (
-                  <View className="absolute w-3 h-3 rounded-full bg-yellow900 -top-1.5 -right-1.5" />
-                )}
               </Pressable>
             );
           })}
