@@ -1,3 +1,4 @@
+import { LikeSheetProvider } from "@components/shared/LikeSheet";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
@@ -16,22 +17,24 @@ export default function MainLayout() {
     "Pretendard-ExtraBold": require("../assets/fonts/Pretendard-ExtraBold.ttf"),
   });
 
-  if (!loaded) return null; // 로딩 중에는 화면 렌더 안 함
+  if (!loaded) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <BottomSheetModalProvider>
         <ToastProvider>
-          <StatusBar style="dark" translucent={true} />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              presentation: "card", // 모달/풀스크린 금지
-              animation: "slide_from_right", // iOS 기본 슬라이드
-              gestureEnabled: true,
-              contentStyle: { backgroundColor: "transparent" },
-            }}
-          ></Stack>
+          <LikeSheetProvider>
+            <StatusBar style="dark" translucent={true} />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                presentation: "card",
+                animation: "slide_from_right",
+                gestureEnabled: true,
+                contentStyle: { backgroundColor: "transparent" },
+              }}
+            />
+          </LikeSheetProvider>
         </ToastProvider>
       </BottomSheetModalProvider>
     </GestureHandlerRootView>

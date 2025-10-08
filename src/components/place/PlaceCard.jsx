@@ -7,6 +7,9 @@ import Icon from "../shared/Icon";
 const MAP_PLACEHOLDER = Images.placeholder.map;
 
 function PlaceCard({
+  // ✨ 추가: locationId, thumbs
+  locationId,
+  thumbs = [],
   imageSource,
   title,
   rating,
@@ -19,6 +22,7 @@ function PlaceCard({
   onPressTitle = () => {},
   openNow = null, // true | false | null(모름)
   hoursText = "아직 정보가 없어요.",
+  onOpenLikeSheet, // 바텀시트 오픈 핸들러
 }) {
   const [imageError, setImageError] = useState(false);
   const normalize = (v) => String(v).replace(/^#/, "").trim().toLowerCase();
@@ -40,7 +44,6 @@ function PlaceCard({
         height: 479,
         borderWidth: 1,
         borderColor: "#D4D4D4",
-        // ✅ 이 한 줄만 추가해서 그림자 안 잘리게
         overflow: "visible",
       }}
     >
@@ -103,11 +106,31 @@ function PlaceCard({
             </View>
           </Pressable>
 
-          <Pressable onPress={onToggleLike} hitSlop={8} className="ml-2">
+          <Pressable
+            onPress={() => {
+              console.log("❤️ 좋아요 클릭됨:", title, locationId);
+              if (typeof onOpenLikeSheet === "function") {
+                // ✨ 필요한 payload를 넘겨준다!
+                onOpenLikeSheet({
+                  locationId,
+                  title,
+                  thumbs,
+                });
+              } else {
+                // 폴백: 기존 토글만
+                onToggleLike();
+              }
+            }}
+            hitSlop={8}
+            className="ml-2"
+            accessibilityRole="button"
+            accessibilityLabel="좋아요"
+          >
             <Icon
               name={liked ? "heart" : "heart_outline"}
               width={24}
               height={24}
+              color={liked ? "#EE7A13" : "#6B6B6B"}
             />
           </Pressable>
         </View>
