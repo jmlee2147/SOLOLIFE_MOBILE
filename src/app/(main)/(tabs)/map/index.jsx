@@ -264,7 +264,7 @@ export default function MapScreen() {
           ) : (
             <View style={[styles.smallCardImage, styles.placeholderCenter]}>
               <Image
-                source={Images.map.placeholder}
+                source={Images.placeholder.map}
                 style={{ width: 48, height: 48, resizeMode: "contain" }}
               />
             </View>

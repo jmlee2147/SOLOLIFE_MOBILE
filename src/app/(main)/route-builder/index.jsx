@@ -7,7 +7,8 @@ import { MOODS } from "../../../config/category.config";
 
 export default function MoodSelectScreen() {
   const router = useRouter();
-  const paramsFromPrev = useLocalSearchParams(); // confirm.jsx에서 온 first/region 등 유지용
+  const paramsFromPrev = useLocalSearchParams(); // confirm.jsx나 route-recommend에서 전달된 파라미터
+  const { mode } = paramsFromPrev; // ✅ mode 값 추출 ("random"이면 랜덤 추천 모드)
   const [selected, setSelected] = useState([]);
 
   const toggle = (k) =>
@@ -20,7 +21,8 @@ export default function MoodSelectScreen() {
       pathname: "/route-builder/loading",
       params: {
         ...paramsFromPrev, // 기존 파라미터 그대로 전달
-        moodsKo: JSON.stringify(selected), // 이번 화면에서 고른 무드 전달
+        moodsKo: JSON.stringify(selected),
+        mode, // ✅ 다음 화면에서도 mode 유지 (랜덤 여부)
       },
     });
   };
@@ -54,12 +56,10 @@ export default function MoodSelectScreen() {
                   active ? "bg-[#FCFFFA]" : "bg-gray50",
                 ].join(" ")}
                 android_ripple={{ color: "rgba(0,0,0,0.06)", borderless: true }}
-                style={[
-                  {
-                    borderWidth: active ? 1.5 : 1.5,
-                    borderColor: active ? "#42790E" : "transparent",
-                  },
-                ]}
+                style={{
+                  borderWidth: 1.5,
+                  borderColor: active ? "#42790E" : "transparent",
+                }}
                 accessibilityRole="button"
                 accessibilityLabel={k}
               >

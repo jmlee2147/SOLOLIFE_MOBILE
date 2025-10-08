@@ -117,18 +117,7 @@ export default function RouteSummaryScreen() {
 
   const [saving, setSaving] = useState(false);
 
-  // RouteSummaryScreen 컴포넌트 내부
-  const categoryForRecs = useMemo(() => {
-    // 1순위: 현재 첫 장소의 카테고리
-    const fromItems = items?.[0]?.categories?.[0];
-    // 2순위: 파라미터로 넘어온 firstCategory (있으면)
-    const fromParams =
-      typeof params?.firstCategory === "string"
-        ? params.firstCategory.trim()
-        : "";
-    return (fromItems || fromParams || "").trim();
-  }, [items, params?.firstCategory]);
-
+  // ---------- 파라미터 파싱 ----------
   const parsedArray = (v) => {
     if (!v) return [];
     try {
@@ -139,10 +128,17 @@ export default function RouteSummaryScreen() {
     }
   };
 
-  const prefetchedItems = useMemo(
-    () => parsedArray(params.prefetched),
-    [params.prefetched]
-  );
+  const prefetchedItems = useMemo(() => {
+    if (!params.prefetched) return [];
+    try {
+      const decoded = decodeURIComponent(String(params.prefetched));
+      const parsed = JSON.parse(decoded);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, [params.prefetched]);
+
   const moods = parsedArray(params.moodsKo).concat(parsedArray(params.moods));
 
   const first = useMemo(() => {
@@ -207,11 +203,13 @@ export default function RouteSummaryScreen() {
       (prefetchedItems || [])
         .slice(0, 2)
         .map((it, idx) => mapApiItemToCard(it, 2 + idx))
-        .filter((c) => c.lat != null && c.lng != null),
+        .filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng)),
     [prefetchedItems]
   );
+
   const hasPrefetched = prefetchedMapped.length > 0;
 
+  // ---------- 상태 ----------
   const [items, setItems] = useState(
     hasPrefetched ? [first, ...prefetchedMapped] : [first]
   );
@@ -223,6 +221,124 @@ export default function RouteSummaryScreen() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewErr, setPreviewErr] = useState("");
 
+  // ---------- 추천 카테고리 ----------
+  const categoryForRecs = useMemo(() => {
+    const fromItems = items?.[0]?.categories?.[0];
+    const fromParams =
+      typeof params?.firstCategory === "string"
+        ? params.firstCategory.trim()
+        : "";
+    return (fromItems || fromParams || "").trim();
+  }, [items, params?.firstCategory]);
+
+  // ---------- 초기 로딩: 1회만 실행 ----------
+  // 배열/객체 의존성으로 인한 반복 실행을 막기 위해 ref로 동결
+  const initRanRef = useRef(false);
+  const frozenFirstRef = useRef(first);
+  const frozenPrefetchedRef = useRef(prefetchedMapped);
+  const frozenHasPrefetchedRef = useRef(hasPrefetched);
+  const frozenMoodsRef = useRef(moods);
+  const frozenRegionRef = useRef(region);
+
+  useEffect(() => {
+    if (initRanRef.current) return;
+    initRanRef.current = true;
+
+    const frozenFirst = frozenFirstRef.current;
+    const frozenPrefetched = frozenPrefetchedRef.current;
+    const frozenHasPrefetched = frozenHasPrefetchedRef.current;
+    const frozenMoods = frozenMoodsRef.current;
+    const frozenRegion = frozenRegionRef.current;
+
+    let canceled = false;
+
+    const applyPrefetched = () => {
+      setItems([frozenFirst, ...frozenPrefetched]);
+      setLoading(false);
+      console.log("✅ Prefetched 적용(초기 1회)");
+    };
+
+    const fetchNext = async () => {
+      try {
+        setLoading(true);
+        setErr("");
+
+        const baseReq = {
+          moods: frozenMoods,
+          exclude_location_ids: frozenFirst.location_id
+            ? [frozenFirst.location_id]
+            : [],
+          exclude_categories:
+            Array.isArray(frozenFirst.categories) &&
+            frozenFirst.categories.length
+              ? [frozenFirst.categories[0]]
+              : [],
+          center: { lat: frozenFirst.lat, lng: frozenFirst.lng },
+        };
+
+        const tries = [
+          { ...baseReq, region: frozenRegion, radius_km: 3 },
+          { ...baseReq, region: frozenRegion, radius_km: 5 },
+          { ...baseReq, region: frozenRegion, radius_km: 8, exclude_categories: [] },
+          { ...baseReq, radius_km: 8, exclude_categories: [] }, // region 없이
+        ];
+
+        let merged = [];
+        for (const t of tries) {
+          if (canceled) break;
+          try {
+            const res = await postRouteNext(t);
+            const arr = Array.isArray(res?.items) ? res.items : [];
+            merged = merged.concat(arr);
+            if (merged.length >= 2) break;
+          } catch {}
+        }
+
+        const uniq = [];
+        const seen = new Set();
+        for (const it of merged) {
+          const id = it?.location_id ?? `${it?.location_name}-${it?.category}`;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          uniq.push(it);
+          if (uniq.length >= 2) break;
+        }
+
+        const mapped =
+          (uniq || [])
+            .map((it, idx) => mapApiItemToCard(it, 2 + idx))
+            .filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng)) ||
+          [];
+
+        let next = [frozenFirst, ...mapped];
+        if (next.length < 3) {
+          const need = 3 - next.length;
+          next = [...next, ...FALLBACK_OTHERS.slice(0, need)];
+        }
+        if (!canceled) setItems(next);
+      } catch (e) {
+        if (!canceled) {
+          setErr("추천을 불러오지 못했어요.");
+          setItems([frozenFirst, ...FALLBACK_OTHERS]);
+        }
+      } finally {
+        if (!canceled) setLoading(false);
+      }
+    };
+
+    if (frozenHasPrefetched) {
+      applyPrefetched();
+    } else {
+      console.log("❗ Prefetched 없음 → API 재요청(초기 1회)");
+      fetchNext();
+    }
+
+    return () => {
+      canceled = true;
+    };
+  }, []); // ← 의존성 제거, 초기 1회만
+
+  // ---------- 프리뷰 요약 ----------
   const getAuthToken = useMemo(
     () => async () => {
       try {
@@ -235,7 +351,6 @@ export default function RouteSummaryScreen() {
     []
   );
 
-  // 프리뷰 요약
   useEffect(() => {
     let aborted = false;
     const controller = new AbortController();
@@ -300,93 +415,6 @@ export default function RouteSummaryScreen() {
       controller.abort();
     };
   }, [items, getAuthToken]);
-
-  // 최초 다음 후보(뒤 2칸) 채우기
-  const didRunRef = useRef(false);
-  useEffect(() => {
-    if (didRunRef.current) return;
-    didRunRef.current = true;
-
-    if (hasPrefetched) {
-      setItems((prev) =>
-        prev.length >= 3 ? prev : [first, ...prefetchedMapped]
-      );
-      setLoading(false);
-      return;
-    }
-
-    let canceled = false;
-
-    async function fetchNextCandidates() {
-      const baseReq = {
-        moods,
-        exclude_location_ids: first.location_id ? [first.location_id] : [],
-        exclude_categories:
-          Array.isArray(first.categories) && first.categories.length
-            ? [first.categories[0]]
-            : [],
-        center: { lat: first.lat, lng: first.lng },
-      };
-
-      const tries = [
-        { ...baseReq, region, radius_km: 3 },
-        { ...baseReq, region, radius_km: 5 },
-        { ...baseReq, region, radius_km: 8, exclude_categories: [] },
-        { ...baseReq, radius_km: 8, exclude_categories: [] },
-      ];
-
-      let merged = [];
-      for (const t of tries) {
-        if (canceled) break;
-        try {
-          const res = await postRouteNext(t);
-          const arr = Array.isArray(res?.items) ? res.items : [];
-          merged = merged.concat(arr);
-          if (merged.length >= 2) break;
-        } catch {}
-      }
-
-      const uniq = [];
-      const seen = new Set();
-      for (const it of merged) {
-        const id = it?.location_id ?? `${it?.location_name}-${it?.category}`;
-        if (seen.has(id)) continue;
-        seen.add(id);
-        uniq.push(it);
-        if (uniq.length >= 2) break;
-      }
-      return uniq;
-    }
-
-    (async () => {
-      setLoading(true);
-      setErr("");
-      try {
-        const apiItems = await fetchNextCandidates();
-        const mapped =
-          (apiItems || [])
-            .map((it, idx) => mapApiItemToCard(it, 2 + idx))
-            .filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng)) ||
-          [];
-
-        let next = [first, ...mapped];
-        if (next.length < 3) {
-          const need = 3 - next.length;
-          next = [...next, ...FALLBACK_OTHERS.slice(0, need)];
-        }
-        setItems(next);
-      } catch (e) {
-        setErr("추천을 불러오지 못했어요.");
-        setItems([first, ...FALLBACK_OTHERS]);
-      } finally {
-        !canceled && setLoading(false);
-      }
-    })();
-
-    return () => {
-      canceled = true;
-    };
-  }, [hasPrefetched, first, prefetchedMapped, moods, region]);
 
   // 지도 마커
   const markers = useMemo(
@@ -539,7 +567,7 @@ export default function RouteSummaryScreen() {
           style={{
             position: "absolute",
             left: 14,
-            top: Math.max(12, insets.top + 8), // 노치/상단바 피하기
+            top: Math.max(12, insets.top + 8),
             zIndex: 20,
             elevation: 20,
             backgroundColor: "transparent",
@@ -587,7 +615,7 @@ export default function RouteSummaryScreen() {
             paddingBottom: 24 + insets.bottom,
           }}
         >
-          {/* 다시 추천받기: ResultsScreen과 동일한 postLocationRecommendations 사용 */}
+          {/* 다시 추천받기 */}
           <Pressable
             onPress={async () => {
               try {
@@ -602,7 +630,7 @@ export default function RouteSummaryScreen() {
                 setErr("");
 
                 const res = await postLocationRecommendations({
-                  category: categoryForRecs, // ← 필수 추가
+                  category: categoryForRecs,
                   keywords: [],
                   moods,
                   center: { lat: items[0]?.lat, lng: items[0]?.lng },

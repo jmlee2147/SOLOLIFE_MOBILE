@@ -198,6 +198,19 @@ export async function postReplaceOne(input) {
   });
 }
 
+export async function postRandomRecommendations(body) {
+  const res = await fetch(`${BASE_URL}/recommendations/random`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(`랜덤 추천 실패 (${res.status}): ${msg}`);
+  }
+  return await res.json();
+}
+
 // ========================
 // ❤️ 장소 좋아요 관련
 // ========================
