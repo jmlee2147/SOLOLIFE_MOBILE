@@ -10,6 +10,9 @@ export const Images = {
     hat: require("./common/hat.png"),
     medal: require("./common/medal.png"),
     mission: require("./common/mission.png"),
+    thumbs: require("./common/thumbs.png"),
+    map: require("./common/map.png"),
+    bubble: require("./common/bubble.png"),
   },
 
   backgrounds: {
