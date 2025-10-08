@@ -2,7 +2,17 @@ import PlaceCard from "@components/place/PlaceCard";
 import Button from "@components/shared/Button";
 import Header from "@components/shared/Header";
 import Icon from "@components/shared/Icon";
+import { useLikeSheet } from "@components/shared/LikeSheet"; // ✅ 통일된 훅 import
+import { CATEGORY } from "@config/category.config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  getFolderLocations,
+  getLikeFolders,
+  postLocationRecommendations,
+  toggleLocationLike,
+} from "@services/api";
+import { getOpenBadge } from "@utils/openingHours";
+import { vs } from "@utils/scale";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, {
   useCallback,
@@ -21,13 +31,6 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { CATEGORY } from "../../../config/category.config";
-import {
-  postLocationRecommendations,
-  toggleLocationLike,
-} from "../../../services/api";
-import { getOpenBadge } from "../../../utils/openingHours";
-import { vs } from "../../../utils/scale";
 
 const MOCK_ITEMS = [
   {
@@ -71,33 +74,26 @@ const MOCK_ITEMS = [
 function keyToLabel(catKey = "", subKey = "") {
   const cat = CATEGORY?.[catKey];
   if (!cat) return catKey;
-  if (subKey && cat.subcategories?.[subKey]?.label)
-    return cat.subcategories[subKey].label;
+  if (subKey && cat.subcategories?.[subKey]?.label) return cat.subcategories[subKey].label;
   return cat.label;
 }
 
-// 최대 3장 썸네일 뽑아 {uri} 형태로 정규화
+// 최대 3장 썸네일 정규화
 function getThumbsFromPlace(place) {
   const arr = Array.isArray(place?.photos) ? place.photos : [];
-  return arr
-    .slice(0, 3)
-    .map((u) => (u ? { uri: u } : null))
-    .filter(Boolean);
+  return arr.slice(0, 3).map((u) => (u ? { uri: u } : null)).filter(Boolean);
 }
 
-// 저장소(장소) 구조: [{id, title, count, thumbs}]
+// AsyncStorage: 즐겨찾기 로컬 캐시
 async function upsertFavoritePlace(place) {
   const key = "favorites";
   const raw = await AsyncStorage.getItem(key);
   const list = raw ? JSON.parse(raw) : [];
-
   const id = String(place.location_id);
   const title = place.location_name || "모든장소";
   const thumbs = getThumbsFromPlace(place);
-
   const idx = list.findIndex((x) => String(x.id) === id);
   if (idx >= 0) {
-    // 업데이트: 썸네일 갱신(비어있으면 유지), count는 임의 규칙(필요시 서버쪽 count로 교체)
     const prev = list[idx];
     list[idx] = {
       ...prev,
@@ -106,14 +102,8 @@ async function upsertFavoritePlace(place) {
       count: typeof prev.count === "number" ? prev.count : 1,
     };
   } else {
-    list.push({
-      id,
-      title,
-      count: 1, // 기본 1개로 시작
-      thumbs: thumbs.length ? thumbs : [], // 없으면 빈 배열
-    });
+    list.push({ id, title, count: 1, thumbs: thumbs.length ? thumbs : [] });
   }
-
   await AsyncStorage.setItem(key, JSON.stringify(list));
 }
 
@@ -129,17 +119,14 @@ async function removeFavoritePlace(place) {
 export default function ResultsScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { category, subcategory, keywordsKo, moodsKo, center, lat, lng } =
-    useLocalSearchParams();
+  const { category, subcategory, keywordsKo, moodsKo, center, lat, lng } = useLocalSearchParams();
 
   const { mainCatLabel, subCatLabel, categoryChipText } = useMemo(() => {
     const catKey = String(category || "");
     const subKey = String(subcategory || "");
     const cat = CATEGORY?.[catKey];
-
     const main = cat?.label ?? catKey;
     const sub = cat?.subcategories?.[subKey]?.label ?? "";
-
     return {
       mainCatLabel: main,
       subCatLabel: sub,
@@ -164,10 +151,7 @@ export default function ResultsScreen() {
     }
   };
 
-  const selectedKeywords = useMemo(
-    () => parseJsonArr(keywordsKo),
-    [keywordsKo]
-  );
+  const selectedKeywords = useMemo(() => parseJsonArr(keywordsKo), [keywordsKo]);
   const selectedMoods = useMemo(() => parseJsonArr(moodsKo), [moodsKo]);
 
   const categoryLabel = useMemo(
@@ -177,11 +161,8 @@ export default function ResultsScreen() {
 
   const centerFromJson = useMemo(() => parseJsonObj(center), [center]);
   const centerFromLatLng = useMemo(() => {
-    const nlat = Number(lat),
-      nlng = Number(lng);
-    return Number.isFinite(nlat) && Number.isFinite(nlng)
-      ? { lat: nlat, lng: nlng }
-      : null;
+    const nlat = Number(lat), nlng = Number(lng);
+    return Number.isFinite(nlat) && Number.isFinite(nlng) ? { lat: nlat, lng: nlng } : null;
   }, [lat, lng]);
 
   const centerForAPI = useMemo(
@@ -207,22 +188,10 @@ export default function ResultsScreen() {
         radius_km: 3,
       });
       const arr = Array.isArray(res?.items) ? res.items : [];
-      console.log("[API] total items:", arr.length);
-
-      arr.forEach((p, i) => {
-        console.log(
-          `[API] item ${i} (${p.location_name}) photos length:`,
-          Array.isArray(p?.photos) ? p.photos.length : 0
-        );
-      });
-
-      if (arr.length) {
-        console.log("[API] raw item 0:", JSON.stringify(arr[0], null, 2));
-      }
       setItems(arr.length ? arr : MOCK_ITEMS);
       setUsedMock(!arr.length);
     } catch (e) {
-      console.warn("[recommendations] error:", e?.message);
+      console.warn("[recommendations] error:", e?.message || e);
       setItems(MOCK_ITEMS);
       setUsedMock(true);
     } finally {
@@ -234,6 +203,48 @@ export default function ResultsScreen() {
     fetchRecs();
   }, [fetchRecs]);
 
+  // 추천 items가 세팅된 뒤, 폴더에 담긴 장소들로 하트 상태 초기화
+  const [liked, setLiked] = useState({});
+  useEffect(() => {
+    if (!items?.length) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const folders = await getLikeFolders();
+        if (!Array.isArray(folders) || folders.length === 0) return;
+
+        const results = await Promise.allSettled(
+          folders.map((f) => getFolderLocations(f.folder_id, 1, 200))
+        );
+        const likedSet = new Set();
+        results.forEach((r) => {
+          if (r.status === "fulfilled") {
+            const arr = Array.isArray(r.value?.items) ? r.value.items : [];
+            arr.forEach((p) => {
+              if (p?.location_id != null) likedSet.add(p.location_id);
+            });
+          }
+        });
+        if (cancelled) return;
+
+        setLiked((prev) => {
+          const next = { ...prev };
+          for (const it of items) {
+            if (likedSet.has(it.location_id)) {
+              next[it.location_id] = true;
+            }
+          }
+          return next;
+        });
+      } catch (e) {
+        console.warn("[init liked] 실패:", e?.message || e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [items]);
+
+  const { open } = useLikeSheet();
+
   // 카드/스크롤
   const CARD_W = 317;
   const ITEM_GAP = 0;
@@ -244,62 +255,60 @@ export default function ResultsScreen() {
   );
 
   const listRef = useRef(null);
-  const [liked, setLiked] = useState({});
   const scrollX = useRef(new Animated.Value(0)).current;
-  const dotIndex = useMemo(
-    () => Animated.divide(scrollX, CARD_W + ITEM_GAP),
-    [scrollX, CARD_W, ITEM_GAP]
-  ); // (미사용이지만 남김)
+  const dotIndex = useMemo(() => Animated.divide(scrollX, CARD_W + ITEM_GAP), [scrollX, CARD_W, ITEM_GAP]); // 남겨둠
   const [currentIndex, setCurrentIndex] = useState(0);
   const rafRef = useRef(null);
   const snapSize = CARD_W + ITEM_GAP;
 
   const [listBox, setListBox] = useState({ top: 0, bottom: 0 });
   const [footerTop, setFooterTop] = useState(0);
-
   const dotsY = useMemo(() => {
     if (!listBox.bottom || !footerTop) return null;
-    // 리스트 하단과 푸터 상단의 정확한 중앙
     return listBox.bottom + (footerTop - listBox.bottom) / 2;
   }, [listBox, footerTop]);
-
-  // 점 컨테이너 예상 높이(대략). 중앙 정렬 위해 절반만 빼줄 것
   const DOT_CONTAINER_H = 12;
 
-  // 좋아요 토글 (낙관적 업데이트)
+  // 좋아요 토글 (낙관적)
   const handleToggleLike = useCallback(
     async (place) => {
       const id = place.location_id;
       const prev = !!liked[id];
 
-      // 1) UI 먼저 토글
+      // 1) UI 우선
       setLiked((p) => ({ ...p, [id]: !prev }));
 
       try {
         // 2) 서버 토글
         const res = await toggleLocationLike(id); // { liked: boolean }
         const nowLiked = !!res?.liked;
-
         setLiked((p) => ({ ...p, [id]: nowLiked }));
 
-        // 3) 로컬 저장소 동기화 (사진 포함)
+        // 3) 로컬 및 폴더 시트
         if (nowLiked) {
           await upsertFavoritePlace(place);
+          open({
+            locationId: place.location_id,
+            title: place.location_name,
+            thumbs: getThumbsFromPlace(place),
+            onConfirm: ({ locationId, inFolder }) => {
+              // 폴더 저장 결과에 맞춰 하트 유지/해제
+              setLiked((p) => ({ ...p, [locationId]: !!inFolder }));
+            },
+          });
         } else {
           await removeFavoritePlace(place);
         }
       } catch (e) {
-        console.warn("[like] toggle error:", e?.message);
-        // 실패 → 롤백
+        console.warn("[like] toggle error:", e?.message || e);
+        // 실패 롤백
         setLiked((p) => ({ ...p, [id]: prev }));
-        // 실패했어도 최소한 로컬에는 반영하고 싶다면 아래 줄을 켜도 됨 (권장 X)
-        // if (!prev) await upsertFavoritePlace(place); else await removeFavoritePlace(place);
       }
     },
-    [liked]
+    [liked, open]
   );
 
-  // 스크롤 중 인덱스 추적(rAF 디바운스)
+  // 스크롤 인덱스 추적
   const onScrollFast = useCallback(
     (e) => {
       const x = e?.nativeEvent?.contentOffset?.x ?? 0;
@@ -353,12 +362,12 @@ export default function ResultsScreen() {
         ...(Array.isArray(item?.keywords) ? item.keywords : []),
         ...(Array.isArray(item?.features_flat) ? item.features_flat : []),
       ];
-      const { openNow, hoursText, hasHours } = getOpenBadge(
-        item?.opening_hours || null
-      );
+      const { openNow, hoursText, hasHours } = getOpenBadge(item?.opening_hours || null);
 
       const cardContent = (
         <PlaceCard
+          locationId={item.location_id}
+          thumbs={getThumbsFromPlace(item)}
           imageSource={imageSource}
           title={title}
           rating={rating}
@@ -370,9 +379,18 @@ export default function ResultsScreen() {
           hoursText={hoursText}
           hasHours={hasHours}
           liked={!!liked[item.location_id]}
-          onToggleLike={() => handleToggleLike(item)} // API 연동 호출
+          onToggleLike={() => handleToggleLike(item)}
+          onOpenLikeSheet={(payload) =>
+            open({
+              locationId: payload.locationId,
+              title: payload.title,
+              thumbs: payload.thumbs,
+              onConfirm: ({ locationId, inFolder }) => {
+                setLiked((p) => ({ ...p, [locationId]: !!inFolder }));
+              },
+            })
+          }
           onPressTitle={() => {
-            const payload = JSON.stringify(item);
             const thumbs = getThumbsFromPlace(item);
             if (index !== currentIndex) {
               scrollToIndex(index);
@@ -381,9 +399,7 @@ export default function ResultsScreen() {
                 pathname: "/place-recommend/detail/[id]",
                 params: {
                   id: String(item.location_id),
-                  initial: encodeURIComponent(
-                    JSON.stringify({ ...item, __thumbs__: thumbs })
-                  ),
+                  initial: encodeURIComponent(JSON.stringify({ ...item, __thumbs__: thumbs })),
                   moodsKo: JSON.stringify(selectedMoods),
                   keywordsKo: JSON.stringify(selectedKeywords),
                 },
@@ -441,7 +457,7 @@ export default function ResultsScreen() {
 
   const currentItem = items[currentIndex];
 
-  // 새로고침 버튼 전용 상태 & 애니메이션
+  // 새로고침 버튼 상태 & 애니메이션
   const [refreshing, setRefreshing] = useState(false);
   const refreshSpin = useRef(new Animated.Value(0)).current;
   const refreshAnimRef = useRef(null);
@@ -474,7 +490,6 @@ export default function ResultsScreen() {
     outputRange: ["0deg", "360deg"],
   });
 
-  // 버튼 클릭 핸들러(버튼으로 재추천할 때만 refreshing=true)
   const onRefreshPress = useCallback(async () => {
     if (refreshing) return;
     setRefreshing(true);
@@ -495,27 +510,17 @@ export default function ResultsScreen() {
       />
 
       {/* 타이틀 + 선택 뱃지 */}
-      <View
-        style={{
-          paddingHorizontal: 25,
-          paddingTop: 5,
-          backgroundColor: "#FFFFFF",
-        }}
-      >
-        <Text className="text-title-1 font-pretendardExtraBold">
-          포슬감자님 여긴 어때요?
-        </Text>
+      <View style={{ paddingHorizontal: 25, paddingTop: 5, backgroundColor: "#FFFFFF" }}>
+        <Text className="text-title-1 font-pretendardExtraBold">포슬감자님 여긴 어때요?</Text>
 
         {/* 카테고리 칩 + 다시 추천받기 */}
         <View className="flex-row items-center justify-between mt-[7px] mb-[5px]">
-          {/* 카테고리 칩 */}
           <View className="px-[11px] py-[2px] rounded-full bg-[#62974F]">
             <Text className="text-white text-body-1 font-pretendardMedium">
               {categoryChipText}
             </Text>
           </View>
 
-          {/* 다시 추천받기 버튼 */}
           <Pressable
             onPress={onRefreshPress}
             className="flex-row items-center"
@@ -524,27 +529,18 @@ export default function ResultsScreen() {
             disabled={refreshing}
             style={{ opacity: refreshing ? 0.7 : 1 }}
           >
-            <Animated.View
-              style={{ transform: [{ rotate: refreshRotate }], marginRight: 4 }}
-            >
+            <Animated.View style={{ transform: [{ rotate: refreshRotate }], marginRight: 4 }}>
               <Icon name="refresh" width={18} height={18} />
             </Animated.View>
-            <Text className="text-black text-body-2 font-pretendardMedium">
-              다시 추천받기
-            </Text>
+            <Text className="text-black text-body-2 font-pretendardMedium">다시 추천받기</Text>
           </Pressable>
         </View>
 
         {/* 기존 선택 뱃지들 */}
         <View className="flex-row flex-wrap mb-[25px]">
           {[...selectedMoods, ...selectedKeywords].slice(0, 3).map((k) => (
-            <View
-              key={k}
-              className="px-[11px] py-[2px] mr-2 rounded-full border border-gray200"
-            >
-              <Text className="text-gray500 text-body-1 font-pretendardMedium">
-                {k}
-              </Text>
+            <View key={k} className="px-[11px] py-[2px] mr-2 rounded-full border border-gray200">
+              <Text className="text-gray500 text-body-1 font-pretendardMedium">{k}</Text>
             </View>
           ))}
         </View>
@@ -558,32 +554,14 @@ export default function ResultsScreen() {
 
       {/* 본문 */}
       {loading ? (
-        <View
-          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-        >
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
           <ActivityIndicator />
-          <Text style={{ marginTop: 8, color: "#6B7280" }}>
-            추천을 불러오는 중이에요…
-          </Text>
+          <Text style={{ marginTop: 8, color: "#6B7280" }}>추천을 불러오는 중이에요…</Text>
         </View>
       ) : items.length === 0 ? (
-        <View
-          style={{
-            flex: 1,
-            alignItems: "center",
-            justifyContent: "center",
-            paddingHorizontal: 25,
-          }}
-        >
-          <Text style={{ color: "#6B7280", marginBottom: 12 }}>
-            조건에 맞는 장소를 찾지 못했어요.
-          </Text>
-          <Button
-            title="조건 바꾸기"
-            size="small"
-            variant="secondary"
-            onPress={() => router.back()}
-          />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 25 }}>
+          <Text style={{ color: "#6B7280", marginBottom: 12 }}>조건에 맞는 장소를 찾지 못했어요.</Text>
+          <Button title="조건 바꾸기" size="small" variant="secondary" onPress={() => router.back()} />
         </View>
       ) : (
         <View
@@ -622,7 +600,7 @@ export default function ResultsScreen() {
             position: "absolute",
             left: 0,
             right: 0,
-            top: dotsY - 30, // 중앙 정렬 보정
+            top: (dotsY ?? 0) - 30,
             alignItems: "center",
             height: DOT_CONTAINER_H,
             zIndex: 10,
@@ -664,6 +642,7 @@ export default function ResultsScreen() {
           size="large"
           variant="primary"
           onPress={() => {
+            const currentItem = items[currentIndex];
             if (!currentItem) return;
             router.push({
               pathname: "/place-recommend/confirm",
@@ -677,9 +656,7 @@ export default function ResultsScreen() {
                 moodsKo: JSON.stringify(selectedMoods),
                 keywordsKo: JSON.stringify(selectedKeywords),
                 center: JSON.stringify(centerForAPI),
-                photos: encodeURIComponent(
-                  JSON.stringify(currentItem.photos || [])
-                ),
+                photos: encodeURIComponent(JSON.stringify(currentItem.photos || [])),
               },
             });
           }}

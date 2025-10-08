@@ -115,11 +115,11 @@ const icons = {
       </Defs>
     </Svg>
   ),
-  heart: ({ width = 24, height = 24, ...props }) => (
+  heart: ({ width = 24, height = 24, color = "#62974F", ...props }) => (
     <Svg width={24} height={24} fill="none" {...props}>
       <G clipPath="url(#a)">
         <Path
-          fill="#62974F"
+          fill={color}
           d="m12 21-1.45-1.295C5.4 15.125 2 12.093 2 8.395 2 5.364 4.42 3 7.5 3c1.74 0 3.41.795 4.5 2.04A6.062 6.062 0 0 1 16.5 3C19.58 3 22 5.364 22 8.395c0 3.698-3.4 6.73-8.55 11.31L12 21Z"
         />
       </G>
@@ -1143,6 +1143,73 @@ const icons = {
           <Path fill="#fff" d="M0 0h24v24H0z" />
         </ClipPath>
       </Defs>
+    </Svg>
+  ),
+  check_active: ({ width = 23, height = 23, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 23 23"
+      fill="none"
+      {...props}
+    >
+      <G strokeWidth={2.444} clipPath="url(#a)">
+        <Path
+          fill="#62974F"
+          stroke="#62974F"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M11.5 19.75a8.25 8.25 0 1 0 0-16.5 8.25 8.25 0 0 0 0 16.5Z"
+        />
+        <Path stroke="#FFF" d="m7.834 10.194 3.103 3.14 4.23-4.584" />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M.5.5h22v22H.5z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  check_inactive: ({ width = 23, height = 23, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 23 23"
+      fill="none"
+      {...props}
+    >
+      <G strokeWidth={2.444} clipPath="url(#a)">
+        <Path
+          fill="#fff"
+          stroke="#fff"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M11.5 19.75a8.25 8.25 0 1 0 0-16.5 8.25 8.25 0 0 0 0 16.5Z"
+        />
+        <Path stroke="#D4D4D4" d="m7.834 10.194 3.103 3.14 4.23-4.584" />
+      </G>
+      <Defs>
+        <ClipPath id="a">
+          <Path fill="#fff" d="M.5.5h22v22H.5z" />
+        </ClipPath>
+      </Defs>
+    </Svg>
+  ),
+  plus_circle: ({ width = 24, height = 24, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
+      <Path stroke="#AFAFAF" d="M11.933 6.6v10.666M17.266 11.933H6.6" />
+      <Path
+        stroke="#AFAFAF"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M6 18A8.485 8.485 0 1 0 18 6 8.485 8.485 0 0 0 6 18Z"
+      />
     </Svg>
   ),
 };
