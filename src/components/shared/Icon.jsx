@@ -390,9 +390,15 @@ const icons = {
       />
     </Svg>
   ),
-  circle_check: ({ width = 24, height = 24, ...props }) => (
-    <Svg width={24} height={24} fill="none" {...props}>
-      <G stroke="#000" strokeWidth={2} clipPath="url(#a)">
+  circle_check: ({ width = 24, height = 24, color="#000", ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
+      <G stroke={color} strokeWidth={2} clipPath="url(#a)">
         <Path
           strokeLinecap="round"
           strokeLinejoin="round"

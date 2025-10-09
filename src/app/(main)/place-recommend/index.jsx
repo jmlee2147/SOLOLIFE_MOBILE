@@ -7,6 +7,7 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   DeviceEventEmitter,
+  ImageBackground,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -175,6 +176,32 @@ export default function PlaceRecommendScreen() {
           </View>
         </Pressable>
 
+        {/* 보조 힌트 */}
+        <Pressable
+          style={{ alignSelf: "flex-start", marginTop: 0, marginBottom: 24 }}
+        >
+          <ImageBackground
+            source={Images.common.bubble} // ← 네가 주는 PNG 경로
+            resizeMode="stretch"
+            style={{
+              justifyContent: "center",
+              alignItems: "center",
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              minWidth: 107, // 필요 시 조정
+              minHeight: 28, // 필요 시 조정
+            }}
+          >
+            <View style={{ transform: [{ translateY: 3 }] }}>
+              <Text
+                className="text-body-2 font-pretendardMedium text-green500"
+              >
+                탐험 장소가 맞나요?
+              </Text>
+            </View>
+          </ImageBackground>
+        </Pressable>
+
         <View style={styles.grid}>
           {categories.map(({ key, image }) => (
             <CategoryCard
@@ -208,7 +235,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F4F4F4",
     paddingHorizontal: 18,
     paddingVertical: 9,
-    marginBottom: 32,
+    marginBottom: 0,
   },
 
   grid: {
