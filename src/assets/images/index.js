@@ -13,6 +13,8 @@ export const Images = {
     thumbs: require("./common/thumbs.png"),
     map: require("./common/map.png"),
     bubble: require("./common/bubble.png"),
+    collection: require("./common/collection.png"),
+    point: require("./common/point.png"),
   },
 
   backgrounds: {
