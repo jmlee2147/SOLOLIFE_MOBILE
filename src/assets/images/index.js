@@ -81,6 +81,10 @@ export const Images = {
     cafe: require("./places/cafe.png"),
     eat: require("./places/eat.png"),
     shopping: require("./places/shopping.png"),
+    mapActivity: require("./places/map_activity.png"),
+    mapCafe: require("./places/map_cafe.png"),
+    mapEat: require("./places/map_eat.png"),
+    mapShopping: require("./places/map_shopping.png"),
   },
 };
 
