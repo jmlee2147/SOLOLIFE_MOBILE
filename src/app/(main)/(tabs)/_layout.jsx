@@ -120,9 +120,9 @@ const TabsLayout = () => {
                     }}
                 >
                     {focused ? (
-                    <Icon name="heart" width={24} height={24} />
+                    <Icon name="gacha" width={24} height={24} />
                     ) : (
-                    <Icon name="heart_inactive" width={24} height={24} />
+                    <Icon name="gacha_inactive" width={24} height={24} />
                     )}
                 </View>
             ),
