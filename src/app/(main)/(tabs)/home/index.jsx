@@ -240,7 +240,7 @@ export default function HomeScreen() {
             <Shortcut
               icon={Images.common.collection}
               label="캐릭터 도감"
-              onPress={() => {}}
+              onPress={() => router.push("/character-book")}
             />
             <Shortcut
               icon={Images.places.activity}

@@ -17,7 +17,7 @@ import TreasureOpening from "@components/animation/TreasureOpening";
 import AppDialog from "@components/shared/AppDialog";
 import Header from "@components/shared/Header";
 
-const CHARACTER = require("@assets/characters/girl/summer.png");
+const CHARACTER = require("@assets/characters/photo_explorer_female.png");
 
 export default function CharacterScreen() {
   const insets = useSafeAreaInsets();

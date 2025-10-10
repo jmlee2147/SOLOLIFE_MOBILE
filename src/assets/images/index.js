@@ -1,4 +1,6 @@
 // 공통 집계
+import { characters } from "../characters";
+
 export const Images = {
   common: {
     badge: require("./common/badge.png"),
@@ -25,6 +27,7 @@ export const Images = {
   gacha: {
     jewels: require("./gacha/jewels.png"),
     textDash: require("./gacha/text_dash.png"),
+    textDashGreen: require("./gacha/text_dash_green.png"),
 
     treasure: {
       closed: require("./gacha/treasure/treasure_close.png"),
@@ -88,6 +91,8 @@ export const Images = {
     mapEat: require("./places/map_eat.png"),
     mapShopping: require("./places/map_shopping.png"),
   },
+
+  characters,
 };
 
 // ---------- 헬퍼 ----------

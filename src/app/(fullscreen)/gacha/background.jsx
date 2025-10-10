@@ -3,12 +3,12 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useState } from "react";
 import {
-    Animated,
-    Image,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  Animated,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -17,7 +17,7 @@ import ScrollOpening from "@components/animation/ScrollOpening";
 import AppDialog from "@components/shared/AppDialog";
 import Header from "@components/shared/Header";
 
-const CHARACTER = require("@assets/characters/girl/summer.png");
+const CHARACTER = require("@assets/characters/reading_explorer_female.png");
 
 export default function BackgroundScreen() {
   const insets = useSafeAreaInsets();
