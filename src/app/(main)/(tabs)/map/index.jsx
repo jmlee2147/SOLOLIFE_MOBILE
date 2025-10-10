@@ -1,5 +1,7 @@
 import { Images } from "@assets/images";
 import SortDropdown from "@components/journey/SortDropdown";
+import MapView from "@components/map/MapView";
+import Icon from "@components/shared/Icon";
 import BottomSheet, {
   BottomSheetScrollView,
   BottomSheetView,
@@ -29,8 +31,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView from "../../../../components/map/MapView";
-import Icon from "../../../../components/shared/Icon";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
 const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN?.trim();
@@ -715,7 +715,7 @@ export default function MapScreen() {
           styles.fabBase,
           {
             bottom: fabBottom,
-            width: sheetMode === SHEET_MODE.STORAGE ? 72 : 120,
+            width: sheetMode === SHEET_MODE.STORAGE ? 64 : 93,
             backgroundColor: "rgba(98, 151, 79, 0.8)",
           },
         ]}
@@ -1481,7 +1481,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
   },
   fabText: {
     color: "#fff",

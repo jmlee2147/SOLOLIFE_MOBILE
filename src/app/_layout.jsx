@@ -7,6 +7,7 @@ import "react-native-gesture-handler";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import "../../global.css";
+import { ThemeProvider } from "../providers/ThemeProvider";
 import { ToastProvider } from "../providers/ToastProvider";
 
 export default function MainLayout() {
@@ -22,20 +23,22 @@ export default function MainLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <BottomSheetModalProvider>
-        <ToastProvider>
-          <LikeSheetProvider>
-            <StatusBar style="dark" translucent={true} />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                presentation: "card",
-                animation: "slide_from_right",
-                gestureEnabled: true,
-                contentStyle: { backgroundColor: "transparent" },
-              }}
-            />
-          </LikeSheetProvider>
-        </ToastProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            <LikeSheetProvider>
+              <StatusBar style="dark" translucent={true} />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  presentation: "card",
+                  animation: "slide_from_right",
+                  gestureEnabled: true,
+                  contentStyle: { backgroundColor: "transparent" },
+                }}
+              />
+            </LikeSheetProvider>
+          </ToastProvider>
+        </ThemeProvider>
       </BottomSheetModalProvider>
     </GestureHandlerRootView>
   );

@@ -17,9 +17,19 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  pickColors,
+  pickEffects
+} from "../../../../theme/phase";
 
 import AppDialog from "@components/shared/AppDialog";
 import Icon from "@components/shared/Icon";
+
+// 🔹 테마 + 이펙트
+import Rain from "@components/effects/Rain";
+import Snow from "@components/effects/Snow";
+import Stars from "@components/effects/Stars";
+import { useThemeX } from "@providers/ThemeProvider";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const HEADER_HEIGHT = 44;
@@ -34,6 +44,33 @@ export default function HomeScreen() {
 
   const bottomSheetRef = useRef(null);
   const snapPoints = React.useMemo(() => ["31%", "82%"], []);
+
+  // 🔹 테마 상태 (백엔드 /weather/brief + 로컬 시간대 분기)
+  const theme = useThemeX(); // { condition, subphase, colors, effects, provider, updatedAt }
+
+  // 🔹 테스트용 강제 오버라이드 (야매)
+  const DEV_OVERRIDE = true; // true로 바꾸면 테스트 모드
+  if (DEV_OVERRIDE) {
+    // ① 날씨 상태 고르기
+    const cond = "SUNNY"; // SUNNY | CLOUDY | RAIN | SNOW
+    // ② 시간대 직접 지정
+    // SUNNY → morning | day | night
+    // CLOUDY → am | pm
+    // RAIN → all
+    // SNOW → am | pm
+    const sub = "night";
+
+    theme.condition = cond;
+    theme.subphase = sub;
+    theme.colors = pickColors(cond, sub); // 팔레트 자동
+    theme.effects = pickEffects(cond, sub); // 이펙트 자동
+  }
+
+  const isDarkBG =
+    theme?.condition === "SUNNY" ||
+    theme?.condition === "RAIN" ||
+    (theme?.condition === "CLOUDY" && theme?.subphase === "pm") ||
+    (theme?.condition === "SNOW" && theme?.subphase === "pm");
 
   useFocusEffect(
     React.useCallback(() => {
@@ -53,14 +90,28 @@ export default function HomeScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#B9E09D" }}>
-      <StatusBar style="dark" translucent backgroundColor="transparent" />
-
-      {/* 상단 히어로 영역 (고정) */}
+    <View style={{ flex: 1 }}>
+      {/* 🔹 전역 배경 그라데이션 */}
       <LinearGradient
-        colors={["#B9E09D", "#419833"]}
+        colors={theme?.colors ?? ["#B9E09D", "#419833"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
+        style={{ position: "absolute", inset: 0 }}
+      />
+
+      {/* 🔹 날씨 이펙트 */}
+      {theme?.effects?.showStars ? <Stars count={40} /> : null}
+      {theme?.effects?.showRain ? <Rain count={96} /> : null}
+      {theme?.effects?.showSnow ? <Snow count={48} /> : null}
+
+      <StatusBar
+        style={isDarkBG ? "light" : "dark"}
+        translucent
+        backgroundColor="transparent"
+      />
+
+      {/* 상단 히어로 영역 (고정) */}
+      <View
         style={[
           styles.hero,
           {
@@ -86,12 +137,17 @@ export default function HomeScreen() {
         />
 
         {/* 프로필/진행도/오른쪽 알약 버튼 */}
-        {/* 프로필 + 진행도 + 알약 버튼들 (세로 정렬) */}
         <View style={styles.heroBottomCol}>
-          <Text className="text-white text-title-2 font-pretendardExtraBold">
+          <Text
+            style={{ color: isDarkBG ? "#FFFFFF" : "#6B6B6B" }}
+            className="text-title-2 font-pretendardExtraBold"
+          >
             포슬감자
           </Text>
-          <Text className="text-white text-body-1 font-pretendardMedium">
+          <Text
+            style={{ color: isDarkBG ? "#FFFFFF" : "#6B6B6B" }}
+            className="text-body-1 font-pretendardMedium"
+          >
             LV 3 용감한 탐험가
           </Text>
 
@@ -115,7 +171,7 @@ export default function HomeScreen() {
             />
           </View>
         </View>
-      </LinearGradient>
+      </View>
 
       {/* 진짜 BottomSheet */}
       <BottomSheet
@@ -287,10 +343,14 @@ export default function HomeScreen() {
           </View>
           {/* ───────── /미션 모아보기 섹션 ───────── */}
 
-          <View style={{ height: 1, backgroundColor: "#F4F4F4",  marginTop: 53 }} />
+          <View
+            style={{ height: 1, backgroundColor: "#F4F4F4", marginTop: 53 }}
+          />
 
           <View style={{ paddingHorizontal: 25, marginTop: 48 }}>
-            <Text className="text-heading-1 font-pretendardSemiBold">다른 탐험가들의 선택</Text>
+            <Text className="text-heading-1 font-pretendardSemiBold">
+              다른 탐험가들의 선택
+            </Text>
             <ScrollView
               horizontal
               nestedScrollEnabled
@@ -304,7 +364,9 @@ export default function HomeScreen() {
           </View>
 
           <View style={{ paddingHorizontal: 25, marginTop: 64 }}>
-            <Text className="text-heading-1 font-pretendardSemiBold">오늘의 테마 추천</Text>
+            <Text className="text-heading-1 font-pretendardSemiBold">
+              오늘의 테마 추천
+            </Text>
             <View style={styles.banner}>
               <Image
                 source={Images.backgrounds.sample}
@@ -312,8 +374,12 @@ export default function HomeScreen() {
                 resizeMode="cover"
               />
               <View style={styles.bannerOverlay}>
-                <Text className="text-white text-heading-2 font-pretendardSemiBold">무더운 여름,{"\n"}빙수 한 그릇 어떤가요?</Text>
-                <Text className="text-white text-body-3 font-pretendardMedium">혼밥, 혼카, 혼빙까지! </Text>
+                <Text className="text-white text-heading-2 font-pretendardSemiBold">
+                  무더운 여름,{"\n"}빙수 한 그릇 어떤가요?
+                </Text>
+                <Text className="text-white text-body-3 font-pretendardMedium">
+                  혼밥, 혼카, 혼빙까지!{" "}
+                </Text>
               </View>
             </View>
           </View>
