@@ -25,7 +25,7 @@ import {
 import AppDialog from "@components/shared/AppDialog";
 import Icon from "@components/shared/Icon";
 
-// 🔹 테마 + 이펙트
+// 테마 + 이펙트
 import Rain from "@components/effects/Rain";
 import Snow from "@components/effects/Snow";
 import Stars from "@components/effects/Stars";
@@ -245,7 +245,7 @@ export default function HomeScreen() {
             <Shortcut
               icon={Images.places.activity}
               label="꾸미기"
-              onPress={() => {}}
+              onPress={() => router.push("/customize")}
             />
           </View>
 
