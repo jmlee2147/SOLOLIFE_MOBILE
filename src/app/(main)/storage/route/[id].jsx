@@ -161,11 +161,8 @@ export default function RouteDetailScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <Header
-        title="루트 저장소"
         leftIcon="previous"
         onLeftPress={() => router.back()}
-        rightIcon="home_header"
-        onRightPress={() => router.push("/home")}
       />
 
       {/* 타이틀/날짜/요약 */}
