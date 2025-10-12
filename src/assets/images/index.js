@@ -22,6 +22,7 @@ export const Images = {
   backgrounds: {
     main: require("./backgrounds/main_background.png"),
     sample: require("./backgrounds/sample.png"),
+    fallback: require("./backgrounds/fallback.jpg"),
   },
 
   gacha: {
