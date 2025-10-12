@@ -1,9 +1,12 @@
 import { Images } from "@assets/images";
+import AppDialog from "@components/shared/AppDialog";
+import Icon from "@components/shared/Icon";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { useToast } from "@providers/ToastProvider";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { consumePendingToast, peekPendingToast } from "@utils/toastNext";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Location from "expo-location";
 import { router, useFocusEffect, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useRef, useState } from "react";
@@ -17,13 +20,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  pickColors,
-  pickEffects
-} from "../../../../theme/phase";
-
-import AppDialog from "@components/shared/AppDialog";
-import Icon from "@components/shared/Icon";
+import { pickColors, pickEffects } from "../../../../theme/phase";
 
 // 테마 + 이펙트
 import Rain from "@components/effects/Rain";
@@ -31,8 +28,102 @@ import Snow from "@components/effects/Snow";
 import Stars from "@components/effects/Stars";
 import { useThemeX } from "@providers/ThemeProvider";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN?.trim();
+
 const { width: SCREEN_W } = Dimensions.get("window");
 const HEADER_HEIGHT = 44;
+
+function useTodayTheme() {
+  const [data, setData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(null);
+
+  React.useEffect(() => {
+    let alive = true;
+    const ctrl = new AbortController();
+
+    async function run() {
+      if (!API_BASE_URL) {
+        console.warn("[today] ❌ API_BASE_URL missing");
+        setError(new Error("API_BASE_URL missing"));
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // ✅ 위치 권한 요청
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          throw new Error("Location permission denied");
+        }
+
+        // ✅ 현재 위치 얻기
+        const { coords } = await Location.getCurrentPositionAsync({});
+        let lat = coords.latitude;
+        let lng = coords.longitude;
+        console.log("[today] 📍 User coords:", lat, lng);
+
+        if (lat === 37.785834 && lng === -122.406417) {
+          console.log("[today] ⚙️ Expo mock detected → override to Suwon");
+          lat = 37.2636;
+          lng = 127.0286;
+        }
+
+        // ✅ 토큰 우선순위: TEST_TOKEN > AsyncStorage("jwt")
+        let token = TEST_TOKEN;
+        if (!token) {
+          try {
+            token = await AsyncStorage.getItem("jwt");
+          } catch (e) {
+            console.warn("[today] AsyncStorage getItem error:", e);
+          }
+        }
+
+        const url = `${API_BASE_URL}/today?lat=${lat}&lng=${lng}`;
+        console.log("[today] ▶️ Fetch start:", url);
+
+        const r = await fetch(url, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          signal: ctrl.signal,
+        });
+
+        console.log("[today] 📡 Status:", r.status);
+        const json = await r.json().catch(() => ({}));
+        console.log("[today] 📦 Response JSON:", json);
+
+        if (!r.ok) {
+          if (r.status === 401) throw new Error("Unauthorized");
+          console.warn("[today] ⚠️ Non-OK response:", r.status);
+        }
+
+        if (alive) {
+          setData(json || null);
+          setLoading(false);
+        }
+      } catch (e) {
+        console.error("[today] ❗ Error during fetch:", e);
+        if (alive) {
+          setError(e);
+          setLoading(false);
+        }
+      }
+    }
+
+    run();
+    return () => {
+      alive = false;
+      ctrl.abort();
+    };
+  }, []);
+
+  return { data, loading, error };
+}
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -44,6 +135,12 @@ export default function HomeScreen() {
 
   const bottomSheetRef = useRef(null);
   const snapPoints = React.useMemo(() => ["31%", "82%"], []);
+
+  const {
+    data: today,
+    loading: todayLoading,
+    error: todayError,
+  } = useTodayTheme();
 
   // 🔹 테마 상태 (백엔드 /weather/brief + 로컬 시간대 분기)
   const theme = useThemeX(); // { condition, subphase, colors, effects, provider, updatedAt }
@@ -347,6 +444,93 @@ export default function HomeScreen() {
             style={{ height: 1, backgroundColor: "#F4F4F4", marginTop: 53 }}
           />
 
+          <View style={{ paddingHorizontal: 25, marginTop: 64 }}>
+            <Text className="text-heading-1 font-pretendardSemiBold">
+              오늘의 테마 추천
+            </Text>
+            <Pressable
+              disabled={!today?.location}
+              onPress={() => {
+                const loc = today?.location;
+                if (!loc) return;
+                router.push({
+                  pathname: "/(main)/place-recommend/detail/[id]",
+                  params: {
+                    id: String(loc.location_id),
+                    // 상세 화면에서 초기 데이터로 활용 가능하면 아래 전달
+                    initial: encodeURIComponent(
+                      JSON.stringify({
+                        location_id: Number(loc.location_id),
+                        location_name: loc.location_name,
+                        address: loc.address ?? "",
+                        category: loc.category ?? "",
+                        photos: loc.thumbnail_url ? [loc.thumbnail_url] : [],
+                      })
+                    ),
+                  },
+                });
+              }}
+              style={styles.banner}
+            >
+              {/* 배너 이미지: location.thumbnail_url 없거나 로딩이면 placeholder */}
+              <Image
+                source={
+                  todayLoading
+                    ? Images.backgrounds.fallback
+                    : today?.location?.thumbnail_url
+                    ? { uri: today.location.thumbnail_url }
+                    : Images.backgrounds.fallback
+                }
+                style={styles.bannerImg}
+                resizeMode="cover"
+              />
+
+              <View style={styles.bannerOverlay}>
+                <View style={{ width: "90%", flexShrink: 1 }}>
+                  <Text
+                    style={{
+                      color: "#fff",
+                      fontFamily: "Pretendard-SemiBold",
+                      fontSize: 20,
+                      lineHeight: 26,
+                      flexWrap: "wrap",
+                    }}
+                    numberOfLines={3}
+                    ellipsizeMode="tail"
+                  >
+                    {todayLoading
+                      ? "오늘의 분위기를 불러오는 중..."
+                      : today?.theme_phrase ||
+                        "오늘은 나를 위한 특별한 시간을 가져보는 건 어떠세요?"}
+                  </Text>
+                </View>
+                {!!today?.location && (
+                  <Text
+                    className="text-white text-body-3 font-pretendardMedium"
+                    numberOfLines={1}
+                  >
+                    {today.location.location_name}
+                    {today.location.category
+                      ? ` · ${today.location.category}`
+                      : ""}
+                    {Array.isArray(today.location.keywords) &&
+                    today.location.keywords.length > 0
+                      ? ` · #${today.location.keywords.slice(0, 2).join(" #")}`
+                      : ""}
+                  </Text>
+                )}
+                {todayError && (
+                  <Text
+                    className="text-white text-caption font-pretendardRegular"
+                    numberOfLines={1}
+                  >
+                    네트워크가 불안정해요. 나중에 다시 시도해주세요.
+                  </Text>
+                )}
+              </View>
+            </Pressable>
+          </View>
+
           <View style={{ paddingHorizontal: 25, marginTop: 48 }}>
             <Text className="text-heading-1 font-pretendardSemiBold">
               다른 탐험가들의 선택
@@ -361,27 +545,6 @@ export default function HomeScreen() {
               <PlaceCard title="한강공원" source={Images.backgrounds.sample} />
               <PlaceCard title="한강공원" source={Images.backgrounds.sample} />
             </ScrollView>
-          </View>
-
-          <View style={{ paddingHorizontal: 25, marginTop: 64 }}>
-            <Text className="text-heading-1 font-pretendardSemiBold">
-              오늘의 테마 추천
-            </Text>
-            <View style={styles.banner}>
-              <Image
-                source={Images.backgrounds.sample}
-                style={styles.bannerImg}
-                resizeMode="cover"
-              />
-              <View style={styles.bannerOverlay}>
-                <Text className="text-white text-heading-2 font-pretendardSemiBold">
-                  무더운 여름,{"\n"}빙수 한 그릇 어떤가요?
-                </Text>
-                <Text className="text-white text-body-3 font-pretendardMedium">
-                  혼밥, 혼카, 혼빙까지!{" "}
-                </Text>
-              </View>
-            </View>
           </View>
         </BottomSheetScrollView>
       </BottomSheet>
