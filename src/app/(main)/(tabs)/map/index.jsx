@@ -9,6 +9,7 @@ import BottomSheet, {
 } from "@gorhom/bottom-sheet";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React, {
   useCallback,
   useEffect,
@@ -25,12 +26,15 @@ import {
   Image,
   Platform,
   Pressable,
-  StatusBar,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
 const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN?.trim();
@@ -105,7 +109,244 @@ const popularMock = [
   },
 ];
 
+// ==== 저장소(찜 장소, 루트) 목업 ====
+const likedMock = [
+  {
+    id: "fav_1",
+    title: "루프탑 커피",
+    thumbs: [
+      { uri: "https://picsum.photos/seed/fav1/300" },
+      { uri: "https://picsum.photos/seed/fav2/300" },
+      { uri: "https://picsum.photos/seed/fav3/300" },
+    ],
+    count: 5,
+  },
+  {
+    id: "fav_2",
+    title: "브루잉랩 영통",
+    thumbs: [
+      { uri: "https://picsum.photos/seed/fav4/300" },
+      { uri: "https://picsum.photos/seed/fav5/300" },
+    ],
+    count: 3,
+  },
+  {
+    id: "fav_3",
+    title: "마장동김씨 청주동남지구점",
+    thumbs: [
+      { uri: "https://picsum.photos/seed/fav6/300" },
+      { uri: "https://picsum.photos/seed/fav7/300" },
+      { uri: "https://picsum.photos/seed/fav8/300" },
+    ],
+    count: 7,
+  },
+  {
+    id: "fav_4",
+    title: "한입버거",
+    thumbs: [
+      { uri: "https://picsum.photos/seed/fav9/300" },
+      { uri: "https://picsum.photos/seed/fav10/300" },
+    ],
+    count: 2,
+  },
+];
+
+const routeMock = [
+  {
+    id: "route_1",
+    title: "수원 카페 투어 루트 ☕️",
+    date: "2025-10-10",
+    placeSummary: "브루잉랩 - 루프탑 커피 - 마장동김씨",
+    thumbs: [
+      { uri: "https://picsum.photos/seed/route1/400" },
+      { uri: "https://picsum.photos/seed/route2/400" },
+      { uri: "https://picsum.photos/seed/route3/400" },
+    ],
+  },
+  {
+    id: "route_2",
+    title: "청주 맛집 원정대 🍴",
+    date: "2025-09-28",
+    placeSummary: "마장동김씨 - 버거조인트 - 더스테이크",
+    thumbs: [
+      { uri: "https://picsum.photos/seed/route4/400" },
+      { uri: "https://picsum.photos/seed/route5/400" },
+      { uri: "https://picsum.photos/seed/route6/400" },
+    ],
+  },
+];
+
+// 검색 목업
+const MOCK_PLACES = {
+  카페: [
+    {
+      id: "mock_cafe_1",
+      name: "브루잉랩 영통",
+      address: "경기 수원시 영통구 영통로 123",
+      category: "카페",
+      rating: 4.7,
+      reviews: 86,
+      tags: ["핸드드립", "조용함", "원두굿", "스터디"],
+      photos: [
+        Images.backgrounds.sample,
+        Images.backgrounds.sample,
+        Images.backgrounds.sample,
+      ],
+      lat: 37.2489,
+      lng: 127.0785,
+    },
+    {
+      id: "mock_cafe_2",
+      name: "루프탑 커피",
+      address: "수원시 영통구 봉영로 55",
+      category: "카페, 디저트",
+      rating: 4.4,
+      reviews: 52,
+      tags: ["뷰맛집", "크루아상", "편한좌석"],
+      photos: [
+        Images.backgrounds.sample,
+        Images.backgrounds.sample,
+        Images.backgrounds.sample,
+      ],
+      lat: 37.2441,
+      lng: 127.0733,
+    },
+    {
+      id: "mock_cafe_3",
+      name: "55데시벨",
+      address: "경기 수원시 영통구 대학로 12",
+      category: "카페",
+      rating: 4.5,
+      reviews: 120,
+      tags: ["조용함", "플랫화이트", "노트북"],
+      photos: [
+        Images.backgrounds.sample,
+        Images.backgrounds.sample,
+        Images.backgrounds.sample,
+      ],
+      lat: 37.24849,
+      lng: 127.07675,
+    },
+  ],
+  활동: [
+    {
+      id: "mock_act_1",
+      name: "엔터 아케이드",
+      address: "수원시 영통구 망포로 20",
+      category: "활동",
+      rating: 4.3,
+      reviews: 33,
+      tags: ["리듬게임", "레트로", "비오는날"],
+      photos: [Images.backgrounds.sample, Images.backgrounds.sample],
+      lat: 37.2421,
+      lng: 127.0702,
+    },
+    {
+      id: "mock_act_2",
+      name: "클라임업",
+      address: "수원시 영통구 대학로 70",
+      category: "클라이밍, 활동",
+      rating: 4.6,
+      reviews: 41,
+      tags: ["운동", "초보환영", "체험"],
+      photos: [Images.backgrounds.sample],
+      lat: 37.2465,
+      lng: 127.0799,
+    },
+  ],
+  쇼핑: [
+    {
+      id: "mock_shop_1",
+      name: "문구덕후",
+      address: "수원시 영통구 매탄로 101",
+      category: "쇼핑",
+      rating: 4.5,
+      reviews: 28,
+      tags: ["플래너", "스티커", "포스트잇"],
+      photos: [Images.backgrounds.sample],
+      lat: 37.2507,
+      lng: 127.0691,
+    },
+    {
+      id: "mock_shop_2",
+      name: "빈티지 스퀘어",
+      address: "수원시 영통구 대학로 8",
+      category: "쇼핑, 빈티지",
+      rating: 4.2,
+      reviews: 19,
+      tags: ["레트로", "가성비", "희귀템"],
+      photos: [Images.backgrounds.sample, Images.backgrounds.sample],
+      lat: 37.2472,
+      lng: 127.0742,
+    },
+  ],
+  먹거리: [
+    {
+      id: "mock_food_1",
+      name: "한입버거",
+      address: "수원시 영통구 매탄로 77",
+      category: "버거, 패스트푸드",
+      rating: 4.2,
+      reviews: 51,
+      tags: ["가성비", "빠른제공"],
+      photos: [Images.backgrounds.sample, Images.backgrounds.sample],
+      lat: 37.2456,
+      lng: 127.0725,
+    },
+    {
+      id: "mock_food_2",
+      name: "마장동김씨",
+      address: "청주시 상당구 남일면...",
+      category: "고기, 식당",
+      rating: 4.5,
+      reviews: 10,
+      tags: ["루센트브라운", "샌디크림빵", "크로칸슈"], // 농담 반 😆
+      photos: [Images.backgrounds.sample],
+      lat: 36.6267,
+      lng: 127.4897,
+    },
+  ],
+};
+
+// 카테고리 외 임의 검색어에도 적당히 섞어서 반환
+function buildMockResults(query) {
+  const q = String(query || "").trim();
+  const catKeys = Object.keys(MOCK_PLACES);
+  const matchedKey = catKeys.find((k) => q.includes(k)) || null;
+
+  let pool = [];
+  if (matchedKey) {
+    pool = MOCK_PLACES[matchedKey];
+  } else {
+    // 키워드 검색이면 전 카테고리에서 일부 섞기
+    pool = [
+      ...MOCK_PLACES["카페"].slice(0, 2),
+      ...MOCK_PLACES["활동"].slice(0, 1),
+      ...MOCK_PLACES["쇼핑"].slice(0, 1),
+      ...MOCK_PLACES["먹거리"].slice(0, 1),
+    ];
+  }
+
+  // 구조를 실제 searchResults 아이템 형태로 맞춰줌
+  return pool.map((it) => ({
+    id: it.id,
+    name: it.name,
+    address: it.address,
+    lat: it.lat,
+    lng: it.lng,
+    category: it.category,
+    rating: it.rating,
+    reviews: it.reviews,
+    tags: it.tags,
+    photos: it.photos,
+    opening_hours: null,
+    liked: false,
+    price_level: null,
+  }));
+}
+
 export default function MapScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
 
   // 검색화면에서 넘겨주는 쿼리 q (returnTo=map)
@@ -207,7 +448,7 @@ export default function MapScreen() {
     }
   };
 
-  // 🔹 장소 상세에서 사진 최대 3장 가져오기 (문자열 배열 반환)
+  // 장소 상세에서 사진 최대 3장 가져오기 (문자열 배열 반환)
   const fetchLocationDetailPhotos = useCallback(async (id) => {
     if (!id || !API_BASE_URL) return [];
     try {
@@ -277,7 +518,9 @@ export default function MapScreen() {
     fetchLikes();
   }, [fetchLocationDetailPhotos]);
 
-  // ==== 검색 실행 (라이트 + 디테일 보강) ====
+  // 검색(API 연동)
+  {
+    /* 
   const handleSearch = useCallback(
     async (query) => {
       if (!query?.trim() || !API_BASE_URL) return;
@@ -362,6 +605,117 @@ export default function MapScreen() {
     },
     [likedIds]
   );
+  */
+  }
+
+  // 검색 목업 폴백
+  const handleSearch = useCallback(
+    async (query) => {
+      const fallbackToMock = () => {
+        const mock = buildMockResults(query);
+        setSheetMode(SHEET_MODE.SEARCH);
+        setSearchResults(mock);
+        setLastQuery(query);
+        bottomSheetRef.current?.snapToIndex(1);
+      };
+
+      if (!query?.trim()) {
+        fallbackToMock();
+        return;
+      }
+
+      // API가 있어도 결과가 비거나 에러면 목업으로
+      try {
+        if (!API_BASE_URL) {
+          fallbackToMock();
+          return;
+        }
+
+        setSheetMode(SHEET_MODE.SEARCH);
+
+        // 1) 라이트
+        const res = await fetch(
+          `${API_BASE_URL}/search/locations?q=${encodeURIComponent(
+            query
+          )}&limit=20`
+        );
+        const data = await res.json().catch(() => ({}));
+        const items = Array.isArray(data?.items) ? data.items : [];
+
+        // 2) 디테일 보강
+        const detailed = await Promise.all(
+          items.map(async (it) => {
+            const id = it.location_id;
+            try {
+              const dRes = await fetch(`${API_BASE_URL}/locations/${id}`);
+              const det = await dRes.json();
+
+              const photos =
+                Array.isArray(det.photos) && det.photos.length
+                  ? det.photos.slice(0, 3)
+                  : det.fallback_photo_url
+                  ? [
+                      det.fallback_photo_url,
+                      det.fallback_photo_url,
+                      det.fallback_photo_url,
+                    ].slice(0, 3)
+                  : [];
+
+              return {
+                id: String(id),
+                name: det.location_name ?? it.title ?? "",
+                address: det.address ?? it.address ?? "",
+                lat: Number(det.latitude),
+                lng: Number(det.longitude),
+                category: det.category ?? "",
+                rating: det.rating_avg ?? null,
+                reviews: det.review_count ?? null,
+                tags: Array.from(
+                  new Set([
+                    ...(det.keywords || []),
+                    ...(det.features_flat || []),
+                  ])
+                ),
+                photos,
+                opening_hours: det.opening_hours || null,
+                liked: likedIds.has(id),
+                price_level: det.price_level ?? null,
+              };
+            } catch {
+              return {
+                id: String(id),
+                name: it.title ?? "",
+                address: it.address ?? "",
+                lat: null,
+                lng: null,
+                category: "",
+                rating: null,
+                reviews: null,
+                tags: [],
+                photos: [],
+                opening_hours: null,
+                liked: likedIds.has(id),
+              };
+            }
+          })
+        );
+
+        if (detailed.length === 0) {
+          // ✅ 결과가 없을 때 목업
+          fallbackToMock();
+          return;
+        }
+
+        setSearchResults(detailed);
+        setLastQuery(query);
+        bottomSheetRef.current?.snapToIndex(1);
+      } catch (err) {
+        console.error("검색 실패, 목업으로 대체:", err);
+        fallbackToMock();
+      }
+    },
+    [likedIds]
+  );
 
   // 검색화면에서 돌아오면 자동검색
   useFocusEffect(
@@ -369,6 +723,12 @@ export default function MapScreen() {
       if (qFromRoute) handleSearch(qFromRoute);
     }, [qFromRoute, handleSearch])
   );
+
+  // 🔸 서버 대신 목업 데이터로 대체(API 연동후 삭제할 것)
+  useEffect(() => {
+    setFavoritePlaces(likedMock);
+    setRoutes(routeMock);
+  }, []);
 
   // 지도 마커: 검색 중엔 검색 결과만, 아니면 좋아요만
   const markers = useMemo(() => {
@@ -650,14 +1010,7 @@ export default function MapScreen() {
   // ==== UI ====
   return (
     <View style={{ flex: 1 }}>
-      {/* Android status bar 투명 */}
-      {Platform.OS === "android" && (
-        <StatusBar
-          translucent
-          backgroundColor="transparent"
-          barStyle="dark-content"
-        />
-      )}
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
 
       {/* 지도 (배경 전면) */}
       <View style={[StyleSheet.absoluteFill, { zIndex: 0 }]}>
@@ -711,6 +1064,7 @@ export default function MapScreen() {
 
       {/* 플로팅 ‘찜/저장’ 버튼 (바텀시트 위) */}
       <Animated.View
+        pointerEvents="box-none"
         style={[
           styles.fabBase,
           {
@@ -741,19 +1095,7 @@ export default function MapScreen() {
         enableContentPanningGesture={false}
         enableHandlePanningGesture={true}
         onChange={(index) => {
-          if (sheetMode === SHEET_MODE.RECO) {
-            animateFabPosition(index === 0 ? SCREEN_H * 0.32 : SCREEN_H * 0.54);
-            return;
-          }
-
-          // RECO 외의 경우에는 기존처럼 모드 전환
-          if (index === 0) {
-            setSheetMode(SHEET_MODE.RECO);
-            animateFabPosition(SCREEN_H * 0.32);
-          } else if (index === 1) {
-            setSheetMode(SHEET_MODE.STORAGE);
-            animateFabPosition(SCREEN_H * 0.54);
-          }
+          animateFabPosition(index === 0 ? SCREEN_H * 0.32 : SCREEN_H * 0.54);
         }}
         backgroundStyle={{
           backgroundColor: "#FFF",
@@ -801,19 +1143,21 @@ export default function MapScreen() {
               style={{
                 position: "relative",
                 paddingHorizontal: 25,
-                paddingTop: 20,
+                paddingTop: 10,
               }}
             >
-              <Text className="text-heading-2 font-pretendardSemiBold mb-[11px]">
-                {sheetTitle}
-              </Text>
+              {sheetMode !== SHEET_MODE.STORAGE && (
+                <Text className="text-heading-2 font-pretendardSemiBold mb-[11px]">
+                  {sheetTitle}
+                </Text>
+              )}
 
               <View style={{ position: "relative", paddingTop: 8 }}>
                 <View
                   style={{
                     position: "absolute",
-                    left: 0,
-                    right: 0,
+                    left: -25,
+                    right: -25,
                     bottom: 0,
                     height: 1,
                     backgroundColor: "#D4D4D4",
@@ -841,7 +1185,7 @@ export default function MapScreen() {
                         style={{
                           position: "absolute",
                           bottom: -1,
-                          height: 2,
+                          height: 3,
                           width: SCREEN_W / 2 - 25,
                           backgroundColor: "#000",
                         }}
@@ -870,7 +1214,7 @@ export default function MapScreen() {
                         style={{
                           position: "absolute",
                           bottom: -1,
-                          height: 2,
+                          height: 3,
                           width: SCREEN_W / 2 - 25,
                           backgroundColor: "#000",
                         }}
@@ -887,11 +1231,35 @@ export default function MapScreen() {
                   onChange={(v) => setSortKey(v)}
                   options={latestOptions}
                 />
-                <Pressable style={styles.editBtn} onPress={() => {}}>
-                  <Text className="text-body-2 font-pretendardMedium">
-                    편집
-                  </Text>
-                </Pressable>
+
+                {tab === "place" ? (
+                  <Pressable
+                    style={{
+                      flexDirection: "row",
+                      gap: 4,
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                    onPress={() => {
+                      // TODO: 새 리스트 추가 로직 넣기 (모달 or 페이지 이동)
+                      console.log("새 리스트 추가 버튼 클릭됨");
+                    }}
+                  >
+                    <Icon name="plus_circle" width={24} height={24} />
+                    <Text className="text-body-2 font-pretendardMedium text-gray700">
+                      새 리스트 만들기
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    style={styles.editBtn}
+                    onPress={() => console.log("편집 버튼 클릭됨")}
+                  >
+                    <Text className="text-body-2 font-pretendardMedium text-gray700">
+                      편집
+                    </Text>
+                  </Pressable>
+                )}
               </View>
             </View>
 
@@ -905,7 +1273,7 @@ export default function MapScreen() {
                 contentContainerStyle={{
                   paddingHorizontal: H_PADDING,
                   paddingTop: 8,
-                  paddingBottom: 24,
+                  paddingBottom: insets.bottom + 120,
                 }}
                 columnWrapperStyle={{ gap: GAP }}
                 renderItem={({ item }) => (
@@ -958,7 +1326,7 @@ export default function MapScreen() {
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={{
                   paddingHorizontal: 25,
-                  paddingBottom: 24,
+                  paddingBottom: 2120,
                 }}
                 ItemSeparatorComponent={() => <View style={{ height: 15 }} />}
                 renderItem={({ item }) => (
@@ -997,7 +1365,7 @@ export default function MapScreen() {
                 onEndReached={loadMoreRoutes}
                 ListFooterComponent={
                   routeLoading && routes.length > 0 ? (
-                    <View style={{ paddingVertical: 12 }}>
+                    <View style={{ height: insets.bottom + 40 }}>
                       <ActivityIndicator />
                     </View>
                   ) : null
@@ -1020,11 +1388,15 @@ export default function MapScreen() {
             <Text className="text-heading-2 font-pretendardSemiBold mb-[11px]">
               {sheetTitle}
             </Text>
-            {popularMock.map((item) => (
-              <View key={item.id}>
-                <SearchResultCard item={item} onPress={goToDetail(router)} />
-              </View>
-            ))}
+            <View style={{ gap: 16 }}>
+              {popularMock.map((item) => (
+                <PopularCard
+                  key={item.id}
+                  item={item}
+                  onPress={goToDetail(router)}
+                />
+              ))}
+            </View>
           </BottomSheetScrollView>
         )}
       </BottomSheet>
@@ -1047,17 +1419,23 @@ function CollectionCard({ title, thumbs = null, count, onPress }) {
   return (
     <Pressable onPress={onPress} style={{ width: ITEM_W }}>
       <StackThumb thumbs={thumbs} />
-      <Text
-        className="text-heading-3 font-pretendardSemiBold mb-[22px]"
-        numberOfLines={1}
+
+      <View
+        style={{ flexDirection: "row", alignItems: "center", marginBottom: 22 }}
       >
-        {title}
-      </Text>
-      {typeof count === "number" && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{count}</Text>
-        </View>
-      )}
+        <Text
+          className="text-body-2 font-pretendardMedium"
+          numberOfLines={1}
+          style={{ flexShrink: 1 }}
+        >
+          {title}
+        </Text>
+        {typeof count === "number" && (
+          <Text className="text-body-2 font-pretendardMedium ml-[2px]">
+            ({count})
+          </Text>
+        )}
+      </View>
     </Pressable>
   );
 }
@@ -1162,7 +1540,7 @@ function RouteRow({ title, placeSummary, date, thumbs = [], onPress }) {
             <Image
               key={i}
               source={src}
-              style={{ flex: 1, height: 110 }}
+              style={{ flex: 1, height: 110, borderRadius: 5 }}
               resizeMode="cover"
             />
           ) : (
@@ -1189,7 +1567,7 @@ function RouteRow({ title, placeSummary, date, thumbs = [], onPress }) {
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
-          marginTop: 5,
+          marginTop: 8,
         }}
       >
         <Text className="text-heading-1 font-pretendardSemiBold">{title}</Text>
@@ -1198,15 +1576,22 @@ function RouteRow({ title, placeSummary, date, thumbs = [], onPress }) {
         </Text>
       </View>
       {!!placeSummary && (
-        <Text numberOfLines={1} className="text-body-3 font-pretendardRegular">
-          {placeSummary}
-        </Text>
+        <View style={styles.routeSummaryRow}>
+          <Icon name="location" width={16} height={16} />
+          <Text
+            numberOfLines={1}
+            className="text-body-3 font-pretendardRegular"
+          >
+            {placeSummary}
+          </Text>
+        </View>
       )}
       <View
         style={{
           height: 1,
           backgroundColor: "#D4D4D4",
-          marginTop: 15,
+          marginTop: 20,
+          marginBottom: 10,
           marginHorizontal: -25,
         }}
       />
@@ -1215,27 +1600,39 @@ function RouteRow({ title, placeSummary, date, thumbs = [], onPress }) {
 }
 
 // 검색 결과 카드
+// ===== 검색 결과 카드 (스샷 동일 스타일) =====
 const SearchResultCard = React.memo(function SearchResultCardBase({
   item,
   onPress,
 }) {
+  const photos =
+    Array.isArray(item.photos) && item.photos.length > 0 ? item.photos : [];
+  const openNow = item?.is_open ?? true;
+  const openText =
+    item?.today_hours ??
+    item?.opening_hours?.today_text ??
+    "영업 시간(오늘 영업시간 표시)";
+
   return (
     <View style={styles.resultCard}>
+      {/* 제목 + 액션 버튼 */}
       <View style={styles.resultHeaderRow}>
         <Pressable
           onPress={() => onPress?.(item)}
           hitSlop={8}
           accessibilityRole="button"
+          style={{ flexShrink: 1 }}
         >
           <Text
-            className="text-heading-2 font-pretendardSemiBold text-[#244DD3]"
             numberOfLines={1}
+            className="text-heading-1 font-pretendardSemiBold text-[#244DD3]"
           >
             {item.name}
           </Text>
         </Pressable>
+
         <View style={styles.resultHeaderIcons}>
-          <Pressable hitSlop={10} style={{ marginRight: 10 }}>
+          <Pressable hitSlop={10} style={{ marginRight: 12 }}>
             <Icon name="share2" width={25} height={25} />
           </Pressable>
           <Pressable hitSlop={10}>
@@ -1244,63 +1641,173 @@ const SearchResultCard = React.memo(function SearchResultCardBase({
         </View>
       </View>
 
-      {!!item.category && (
-        <Text
-          className="text-body-3 font-pretendardRegular text-gray700"
-          numberOfLines={1}
-        >
-          {item.category}
-        </Text>
-      )}
-      {!!item.address && (
-        <Text
-          className="text-body-3 font-pretendardRegular text-gray700"
-          numberOfLines={1}
-        >
-          {item.address}
-        </Text>
-      )}
-
+      {/* 별점 · 카테고리 */}
       {(item.rating ?? null) !== null && (
         <View style={styles.resultRatingRow}>
-          <Icon name="star" width={18} height={18} />
-          <Text style={styles.resultRatingText}>
+          <Icon name="star" width={16} height={16} />
+          <Text className="text-body-2 font-pretendardMedium text-yellow900">
             {Number(item.rating).toFixed(1)}
           </Text>
           {item.reviews ? (
-            <Text style={styles.resultReviewCount}>({item.reviews})</Text>
-          ) : null}
-        </View>
-      )}
-
-      {Array.isArray(item.tags) && item.tags.length > 0 && (
-        <View style={styles.tagsRow}>
-          {item.tags.slice(0, 4).map((t, idx) => (
-            <Text
-              key={idx}
-              className="text-caption font-pretendardRegular text-gray700"
-              numberOfLines={1}
-            >
-              #{String(t)}
+            <Text className="text-body-3 font-pretendardRegular text-gray700 ml-[2px]">
+              ({item.reviews})
             </Text>
-          ))}
+          ) : null}
+          {!!item.category && (
+            <Text style={styles.resultCategory}>· {item.category}</Text>
+          )}
         </View>
       )}
 
-      <View style={styles.photoRow}>
-        {(item.photos?.length ? item.photos : [1, 2, 3])
-          .slice(0, 3)
-          .map((ph, i) => {
-            const src =
-              typeof ph === "string" ? { uri: ph } : Images.backgrounds.sample;
-            return <Image key={i} source={src} style={styles.photoThumb} />;
-          })}
+      {/* 영업시간 */}
+      <View
+        style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}
+      >
+        <Text className="text-body-2 font-pretendardMedium">
+          {openNow ? "영업중" : "영업종료"}
+        </Text>
+        <Text className="text-body-2 font-pretendardMedium text-gray700">
+          {" · " + openText}
+        </Text>
       </View>
+
+      {/* 사진 4장 */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ marginTop: 11, gap: 7 }}
+      >
+        {(photos.length ? photos : [1, 2, 3, 4]).slice(0, 4).map((ph, i) => {
+          const src =
+            typeof ph === "string" ? { uri: ph } : Images.backgrounds.sample;
+          return (
+            <Image
+              key={i}
+              source={src}
+              style={{
+                width: 100,
+                height: 100,
+                borderRadius: 5,
+                backgroundColor: "#EEE",
+              }}
+            />
+          );
+        })}
+      </ScrollView>
 
       <View style={styles.fullDivider} />
     </View>
   );
 });
+// 추천 전용 카드 (현재 위치에서 많이 찾는 장소용) =====
+function PopularCard({ item, onPress }) {
+  const thumb =
+    Array.isArray(item.photos) && item.photos[0]
+      ? typeof item.photos[0] === "string"
+        ? { uri: item.photos[0] }
+        : item.photos[0]
+      : Images.backgrounds.sample;
+
+  // 간단한 영업 상태 표시 (데이터 없으면 "영업중"으로 표시)
+  const isOpenNow = item?.is_open ?? true;
+  const openText =
+    item?.today_hours ??
+    item?.opening_hours?.today_text ??
+    "영업 시간(오늘 영업시간 표시)";
+
+  return (
+    <Pressable onPress={() => onPress?.(item)} style={styles.popLineWrap}>
+      {/* 썸네일 */}
+      <Image source={thumb} style={styles.popLineThumb} resizeMode="cover" />
+
+      {/* 텍스트 블록 */}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        {/* 제목 + 하트 */}
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Pressable
+            onPress={() => onPress?.(item)}
+            hitSlop={8}
+            accessibilityRole="button"
+            style={{ flexShrink: 1, flexGrow: 1, minWidth: 0 }}
+          >
+            <Text
+              numberOfLines={1}
+              className="text-heading-2 font-pretendardSemiBold"
+              style={{ color: "#244DD3" }}
+            >
+              {item.name}
+            </Text>
+          </Pressable>
+
+          <Pressable hitSlop={10}>
+            <Icon name="heart_outline" width={25} height={25} />
+          </Pressable>
+        </View>
+
+        {/* 별점 · 카테고리 */}
+        <View
+          style={{ flexDirection: "row", alignItems: "center", marginTop: 3 }}
+        >
+          <Icon name="star" width={16} height={16} />
+          <Text className="text-body-2 font-pretendardMedium text-yellow900">
+            {Number(item.rating ?? 0).toFixed(1)}
+          </Text>
+          {item.reviews ? (
+            <Text className="text-body-3 font-pretendardRegular text-gray700 ml-[2px]">
+              ({item.reviews})
+            </Text>
+          ) : null}
+          <Text style={styles.dotSep}>·</Text>
+          {!!item.category && (
+            <Text
+              numberOfLines={1}
+              className="text-body-2 font-pretendardMedium text-gray700"
+            >
+              {item.category}
+            </Text>
+          )}
+        </View>
+
+        {/* 영업중 · 오늘 영업시간 */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 4,
+            marginLeft: -2,
+          }}
+        >
+          <Icon name="time" width={20} height={20} />
+          <Text className="text-body-2 font-pretendardMedium ml-[-8px]">
+            {isOpenNow ? "  영업중" : "  영업종료"}
+          </Text>
+          <Text style={styles.dotSep}>·</Text>
+          <Text
+            numberOfLines={1}
+            className="text-body-2 font-pretendardMedium text-gray700"
+          >
+            {openText}
+          </Text>
+        </View>
+
+        {/* 태그 */}
+        {Array.isArray(item.tags) && item.tags.length > 0 && (
+          <View style={styles.popLineTagsRow}>
+            {item.tags.slice(0, 4).map((t, i) => (
+              <Text
+                key={i}
+                numberOfLines={1}
+                className="text-caption font-pretendardRegular text-gray700"
+              >
+                #{String(t)}
+              </Text>
+            ))}
+          </View>
+        )}
+      </View>
+    </Pressable>
+  );
+}
 
 // 상세로 이동 콜백
 const goToDetail = (router) => (item) => {
@@ -1384,23 +1891,29 @@ const styles = StyleSheet.create({
   toolbarRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: 25,
-    paddingVertical: 10,
-    backgroundColor: "#F4F4F4",
-    marginTop: 8,
-    marginBottom: 10,
+    paddingHorizontal: 0,
+    paddingVertical: 15,
+    backgroundColor: "#FFF",
+    marginTop: 0,
+    marginBottom: 23,
   },
   editBtn: {
     height: 30,
     paddingHorizontal: 16,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#000",
-    backgroundColor: "#FFF",
+    backgroundColor: "#F4F4F4",
     alignItems: "center",
     justifyContent: "center",
   },
-
+  routeSummaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 5,
+    gap: 2,
+  },
+  routeSummaryText: {
+    color: "#4A4A4A",
+  },
   // 장소 썸네일 스택
   stackWrap: {
     width: ITEM_W,
@@ -1487,5 +2000,96 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "600",
+  },
+
+  // ===== 썸네일 리스트형 추천 카드 =====
+  popLineWrap: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingVertical: 10,
+  },
+  popLineThumb: {
+    width: 100,
+    height: 100,
+    borderRadius: 5,
+    backgroundColor: "#EEE",
+  },
+  dotSep: { color: "#6B6B6B", marginHorizontal: 4 },
+  popLineCategory: {
+    color: "#6F6F6F",
+    fontSize: 14,
+  },
+  popLineOpenStrong: {
+    color: "#111",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  popLineOpenLight: {
+    color: "#6F6F6F",
+    fontSize: 14,
+  },
+  popLineTagsRow: {
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    gap: 6,
+    marginTop: 6,
+  },
+  popLineTag: {
+    color: "#6F6F6F",
+    fontSize: 12,
+  },
+
+  // ===== 검색 결과 카드 (스샷 동일) =====
+  resultCard: {
+    paddingBottom: 10,
+    marginBottom: 10,
+  },
+  resultHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  resultHeaderIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  resultRatingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  resultRatingText: {
+    marginLeft: 4,
+    color: "#EE7A13",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  resultReviewCount: {
+    marginLeft: 3,
+    color: "#666",
+    fontSize: 13,
+  },
+  resultCategory: {
+    marginLeft: 3,
+    color: "#666",
+    fontSize: 14,
+  },
+  tagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 6,
+  },
+  resultTag: {
+    color: "#6F6F6F",
+    fontSize: 12,
+  },
+  fullDivider: {
+    height: 1,
+    backgroundColor: "#D4D4D4",
+    marginTop: 16,
+    marginHorizontal: -25,
+    alignSelf: "stretch",
   },
 });
