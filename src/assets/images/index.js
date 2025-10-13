@@ -31,6 +31,7 @@ export const Images = {
     textDashGreen: require("./gacha/text_dash_green.png"),
     character: require("./gacha/character.png"),
     background: require("./gacha/background.png"),
+    points: require("./gacha/points.png"),
 
     treasure: {
       closed: require("./gacha/treasure/treasure_close.png"),

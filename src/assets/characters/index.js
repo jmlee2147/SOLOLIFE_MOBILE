@@ -1,3 +1,5 @@
+import { CHARACTERS, getCharacterImageKey } from "./CHARACTERS";
+
 export const characters = {
   // 🧭 기본형
   base_explorer_female: require("./base_explorer_female.png"),
@@ -72,3 +74,19 @@ export const characters = {
   rudolph_explorer_male: require("./rudolph_explorer_male.png"),
   rudolph_explorer_male_gray: require("./rudolph_explorer_male_gray.png"),
 };
+
+// id -> meta(파일키 등) 빠르게 찾기
+export const CHARACTER_INDEX = CHARACTERS.reduce((acc, c) => {
+  acc[c.id] = c; // { id, file, ... }
+  return acc;
+}, {});
+
+// API의 character_id로 바로 require() 소스 얻기
+export function getCharacterSpriteById(charId, owned = true) {
+  const meta = CHARACTER_INDEX[charId];
+  if (!meta) return null;
+  const key = getCharacterImageKey(meta.file, owned); // e.g. "spring_explorer_female" or "..._gray"
+  return characters[key] || null;
+}
+
+export { CHARACTERS, THEME_LABELS, getCharacterImageKey } from "./CHARACTERS";

@@ -6,6 +6,7 @@ import { Image } from "react-native";
 export const GACHA_MODES = {
   character: {
     id: "character",
+    key: "character",
     title: "캐릭터 뽑기",
     cta: "캐릭터 뽑기",
     cost: 100,
@@ -39,6 +40,7 @@ export const GACHA_MODES = {
 
   background: {
     id: "background",
+    key: "asset",
     title: "배경 뽑기",
     cta: "배경 뽑기",
     cost: 50,
@@ -72,6 +74,7 @@ export const GACHA_MODES = {
 
   halloween: {
     id: "halloween",
+    key: "event",
     title: "할로윈 이벤트",
     cta: "뽑기",
     cost: 100,
