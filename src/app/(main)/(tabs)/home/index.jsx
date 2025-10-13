@@ -20,7 +20,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { pickColors, pickEffects } from "../../../../theme/phase";
 
 // 테마 + 이펙트
 import Rain from "@components/effects/Rain";
@@ -107,7 +106,11 @@ function useTodayTheme() {
           setLoading(false);
         }
       } catch (e) {
-        console.error("[today] ❗ Error during fetch:", e);
+        if (e.name === "AbortError") {
+          console.log("[today] ⏹️ Fetch aborted (unmounted)");
+        } else {
+          console.error("[today] ❗ Error during fetch:", e);
+        }
         if (alive) {
           setError(e);
           setLoading(false);
@@ -145,8 +148,9 @@ export default function HomeScreen() {
   // 🔹 테마 상태 (백엔드 /weather/brief + 로컬 시간대 분기)
   const theme = useThemeX(); // { condition, subphase, colors, effects, provider, updatedAt }
 
-  // 🔹 테스트용 강제 오버라이드 (야매)
-  const DEV_OVERRIDE = true; // true로 바꾸면 테스트 모드
+  // 🔹 테스트용 강제 오버라이드
+  {/*
+  const DEV_OVERRIDE = false; // true로 바꾸면 테스트 모드
   if (DEV_OVERRIDE) {
     // ① 날씨 상태 고르기
     const cond = "SUNNY"; // SUNNY | CLOUDY | RAIN | SNOW
@@ -162,6 +166,7 @@ export default function HomeScreen() {
     theme.colors = pickColors(cond, sub); // 팔레트 자동
     theme.effects = pickEffects(cond, sub); // 이펙트 자동
   }
+  */}
 
   const isDarkBG =
     theme?.condition === "SUNNY" ||
