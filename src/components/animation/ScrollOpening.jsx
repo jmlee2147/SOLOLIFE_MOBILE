@@ -1,99 +1,83 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Images } from "@assets/images";
+import React, { useEffect, useRef, useState } from "react";
 import { Animated, Easing, Image, View } from "react-native";
 
 export default function ScrollOpening({
-  size = 220,
+  size = 260,
   play = true,
   loop = false,
-  duration = 1000,      // 펼침 속도
-  trembleMs = 320,      // 펼침 중 잔진동
-  explodeMs = 320,      // 레이 소프트 인
-  hideScrollAfterOpen = true,
-  holdOpenMs = 500,     // 펼친 뒤 대기
-  renderAfterOpen,      // (size)=>ReactNode
+  duration = 700,
+  onComplete,
   sources,
   style,
+  renderAfterOpen,
+
+  // 연출 파라미터(필요시 조정)
+  pauseMs = 160,
+  openMsRatio = 0.45, // mid→open 비중
+  hideScrollAfterOpen = true,
   raysIdleOpacity = 0.55,
-  raysIdleRotateMs = 7000,
-  onComplete,
+  raysIdleRotateMs = 6000,
 
-  // --- 추가 파라미터 ---
-  preShakeMs = 420,     // 부들부들(프리-쉐이크) 시간
-  settleMs = 140,       // 프리-쉐이크 후 "잠깐 멈춤" 시간
-  shakeAmp = 4,         // 프리-쉐이크 좌우(px)
-  shakeRotDeg = 1.6,    // 프리-쉐이크 회전(deg)
+  // 디버그: 프레임 항상 보이게
+  debugShowFrames = false,
 }) {
-  const frames = useMemo(() => {
-    const arr = [sources?.f0, sources?.f1, sources?.f2, sources?.f3, sources?.f4, sources?.f5, sources?.f6, sources?.f7].filter(Boolean);
-    return arr;
-  }, [sources]);
-  const RAYS = sources?.rays;
-
-  // ---- Animated Values ----
-  const p = useRef(new Animated.Value(0)).current;              // 진행도(프레임 선택)
-  const wobble = useRef(new Animated.Value(0)).current;         // 펼침 중 잔진동
-  const shake = useRef(new Animated.Value(0)).current;          // 프리-쉐이크
-  const raysOpacity = useRef(new Animated.Value(0)).current;
-  const raysRotate = useRef(new Animated.Value(0)).current;
-  const scrollOpacity = useRef(new Animated.Value(1)).current;
-
-  const afterOpacity = useRef(new Animated.Value(0)).current;
-  const afterScale = useRef(new Animated.Value(0.9)).current;
-  const afterTranslateY = useRef(new Animated.Value(12)).current;
+  // 소스 fallback (TreasureOpening과 동일 패턴)
+  const CLOSED = sources?.closed || Images.gacha.scroll.closed;
+  const MID = sources?.mid || Images.gacha.scroll.half;
+  const OPEN = sources?.open || Images.gacha.scroll.open;
+  const RAYS = sources?.rays || Images.gacha.scroll.rays;
 
   const [opened, setOpened] = useState(false);
-  const [frameIdx, setFrameIdx] = useState(0);
 
-  const frameRef = useRef(0);
+  // 프레임 페이드
+  const closedOpacity = useRef(new Animated.Value(1)).current;
+  const midOpacity = useRef(new Animated.Value(0)).current;
+  const openOpacity = useRef(new Animated.Value(0)).current;
+  const scrollOpacity = useRef(new Animated.Value(1)).current;
+
+  // 팝/이동
+  const scale = useRef(new Animated.Value(1)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  // 레이
+  const raysOpacity = useRef(new Animated.Value(0)).current;
+  const raysScale = useRef(new Animated.Value(1)).current;
+  const raysRotate = useRef(new Animated.Value(0)).current;
+  const [raysSize, setRaysSize] = useState({ w: null, h: null });
   const raysLoopRef = useRef(null);
-  const completedRef = useRef(false);
 
-  // ---- Frame index based on p ----
+  // 캐릭터/콘텐츠 영역(필요하면 사용)
+  const childOpacity = useRef(new Animated.Value(0)).current;
+  const childScale = useRef(new Animated.Value(0.92)).current;
+  const childTranslateY = useRef(new Animated.Value(16)).current;
+
+  // 레이 원본 사이즈 추론 (숫자 require 안전 처리)
   useEffect(() => {
-    const id = p.addListener(({ value }) => {
-      const eased = 1 - Math.pow(1 - value, 3); // cubic-out
-      const n = Math.max(1, frames.length);
-      const idx = Math.min(n - 1, Math.round(eased * (n - 1)));
-      if (idx !== frameRef.current) {
-        frameRef.current = idx;
-        setFrameIdx(idx);
-      }
-    });
-    return () => p.removeListener(id);
-  }, [p, frames.length]);
+    const src = RAYS;
+    if (typeof src === "number") {
+      const r = Image.resolveAssetSource(src);
+      if (r?.width && r?.height)
+        setRaysSize({ w: r.width / 3, h: r.height / 3 });
+      else setRaysSize({ w: size * 2, h: size * 2 });
+    } else if (src?.uri) {
+      Image.getSize(
+        src.uri,
+        (w, h) => setRaysSize({ w, h }),
+        () => setRaysSize({ w: size * 2, h: size * 2 })
+      );
+    } else {
+      setRaysSize({ w: size * 2, h: size * 2 });
+    }
+  }, [RAYS, size]);
 
-  // ---- transforms ----
-  const allScale = wobble.interpolate({
-    inputRange: [-1, 0, 1],
-    outputRange: [0.995, 1, 0.995],
-  });
-  const unfoldScaleY = p.interpolate({
-    inputRange: [0, 0.45, 0.8, 0.9, 1],
-    outputRange: [0.92, 1.06, 1.04, 0.995, 1.0],
-  });
-  // 프리-쉐이크(좌우+회전)
-  const shakeTranslateX = shake.interpolate({
-    inputRange: [-1, -0.5, 0, 0.5, 1],
-    outputRange: [-shakeAmp, -shakeAmp * 0.5, 0, shakeAmp * 0.5, shakeAmp],
-  });
-  const shakeRotateDeg = shake.interpolate({
-    inputRange: [-1, 0, 1],
-    outputRange: [`-${shakeRotDeg}deg`, "0deg", `${shakeRotDeg}deg`],
-  });
-
-  const raysRotateDeg = raysRotate.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
-
-  // ---- Infinite Rays Rotation ----
   const startRaysIdleLoop = () => {
-    if (!RAYS || raysLoopRef.current) return;
+    if (raysLoopRef.current) return;
     raysRotate.setValue(0);
     raysLoopRef.current = Animated.loop(
       Animated.timing(raysRotate, {
         toValue: 1,
-        duration: Math.max(1500, raysIdleRotateMs),
+        duration: Math.max(1200, raysIdleRotateMs),
         easing: Easing.linear,
         useNativeDriver: true,
       })
@@ -106,100 +90,160 @@ export default function ScrollOpening({
       raysLoopRef.current = null;
     }
   };
-  useEffect(() => {
-    startRaysIdleLoop();
-    return () => stopRaysIdleLoop();
-  }, [RAYS, raysIdleRotateMs]);
 
-  // ---- Main animation ----
   useEffect(() => {
+    if (!play) {
+      if (opened) {
+        startRaysIdleLoop();
+        return;
+      }
+      // 초기화
+      stopRaysIdleLoop();
+      setOpened(false);
+
+      closedOpacity.setValue(1);
+      midOpacity.setValue(0);
+      openOpacity.setValue(0);
+      scrollOpacity.setValue(1);
+
+      scale.setValue(1);
+      translateY.setValue(0);
+
+      raysOpacity.setValue(0);
+      raysScale.setValue(1);
+
+      childOpacity.setValue(0);
+      childScale.setValue(0.92);
+      childTranslateY.setValue(16);
+      return;
+    }
+
     let cancelled = false;
+    stopRaysIdleLoop();
+    setOpened(false);
 
     const run = () => {
       if (cancelled) return;
 
-      setOpened(false);
-      completedRef.current = false;
+      // 구간 비율
+      const midMs = Math.round(duration * (1 - openMsRatio));
+      const openMs = Math.round(duration * openMsRatio);
 
-      // reset
-      p.setValue(0);
-      wobble.setValue(0);
-      shake.setValue(0);
-      raysOpacity.setValue(0);
+      // 초기값
+      closedOpacity.setValue(1);
+      midOpacity.setValue(0);
+      openOpacity.setValue(0);
       scrollOpacity.setValue(1);
-      afterOpacity.setValue(0);
-      afterScale.setValue(0.9);
-      afterTranslateY.setValue(12);
-      setFrameIdx(0);
-      frameRef.current = 0;
 
-      // 1) 프리-쉐이크: 좌/우/좌/우 → 중앙
-      const steps = Math.max(6, Math.round(preShakeMs / 70));
-      const seg = Math.max(40, Math.round(preShakeMs / steps));
-      const shakePattern = [-1, 1, -1, 1, -0.5, 0]; // 마지막 0에서 멈춘다
-      const preShakeSeq = Animated.sequence(
-        shakePattern.map((v) =>
-          Animated.timing(shake, {
-            toValue: v,
-            duration: seg,
+      scale.setValue(1.0);
+      translateY.setValue(0);
+
+      raysOpacity.setValue(0);
+      raysScale.setValue(0.9);
+      childOpacity.setValue(0);
+      childScale.setValue(0.92);
+      childTranslateY.setValue(16);
+
+      // 시퀀스
+      const toMid = Animated.parallel([
+        Animated.timing(closedOpacity, {
+          toValue: 0,
+          duration: midMs * 0.6,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(midOpacity, {
+          toValue: 1,
+          duration: midMs * 0.6,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.timing(scale, {
+            toValue: 1.04,
+            duration: midMs * 0.5,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(scale, {
+            toValue: 1.0,
+            duration: midMs * 0.5,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(translateY, {
+            toValue: -3,
+            duration: midMs * 0.5,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateY, {
+            toValue: 0,
+            duration: midMs * 0.5,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]);
+
+      const smallBurst = Animated.parallel([
+        Animated.sequence([
+          Animated.timing(raysOpacity, {
+            toValue: 0.95,
+            duration: Math.round(openMs * 0.45),
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(raysOpacity, {
+            toValue: raysIdleOpacity,
+            duration: Math.round(openMs * 0.55),
             easing: Easing.inOut(Easing.quad),
             useNativeDriver: true,
-          })
-        )
-      );
-
-      // 2) 잠깐 멈춤(정지)
-      const settleHold = Animated.delay(settleMs);
-
-      // 3) 펼침 진행 + 잔진동 + 레이 소프트인
-      const openTween = Animated.timing(p, {
-        toValue: 1,
-        duration,
-        easing: Easing.bezier(0.42, 0, 0.25, 1), // 자연스러운 감속
-        useNativeDriver: true,
-      });
-      const wobbleSeq = Animated.sequence([
-        Animated.timing(wobble, {
-          toValue: -1,
-          duration: Math.round(trembleMs * 0.35),
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(wobble, {
-          toValue: 1,
-          duration: Math.round(trembleMs * 0.35),
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(wobble, {
-          toValue: 0,
-          duration: Math.round(trembleMs * 0.3),
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(raysScale, {
+            toValue: 1.15,
+            duration: Math.round(openMs * 0.45),
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(raysScale, {
+            toValue: 1.0,
+            duration: Math.round(openMs * 0.55),
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
       ]);
-      const raysSoftIn = Animated.timing(raysOpacity, {
-        toValue: raysIdleOpacity,
-        duration: explodeMs,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      });
+
+      const toOpen = Animated.parallel([
+        // mid ↓ 과 open ↑ 를 살짝 겹치게 → 자연스러운 크로스페이드
+        Animated.timing(midOpacity, {
+          toValue: 0,
+          duration: openMs,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.delay(40),
+          Animated.timing(openOpacity, {
+            toValue: 1,
+            duration: Math.max(120, openMs - 40),
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]),
+        smallBurst,
+      ]);
 
       Animated.sequence([
-        preShakeSeq,            // 부들부들
-        settleHold,             // 잠깐 멈춤
-        Animated.parallel([     // 촤라락 펼침
-          openTween,
-          wobbleSeq,
-          raysSoftIn,
-        ]),
-      ]).start(({ finished }) => {
-        if (!finished || cancelled) return;
-
-        setOpened(true);
-
-        Animated.sequence([
-          Animated.delay(holdOpenMs),
+        Animated.delay(pauseMs),
+        toMid,
+        toOpen,
+        Animated.parallel([
           hideScrollAfterOpen
             ? Animated.timing(scrollOpacity, {
                 toValue: 0,
@@ -208,101 +252,157 @@ export default function ScrollOpening({
                 useNativeDriver: true,
               })
             : Animated.delay(0),
-          Animated.parallel([
-            Animated.timing(afterOpacity, {
-              toValue: 1,
-              duration: 550,
-              easing: Easing.bezier(0.42, 0, 0.25, 1),
-              useNativeDriver: true,
-            }),
-            Animated.timing(afterScale, {
-              toValue: 1,
-              duration: 550,
-              easing: Easing.bezier(0.42, 0, 0.25, 1),
-              useNativeDriver: true,
-            }),
-            Animated.timing(afterTranslateY, {
-              toValue: 0,
-              duration: 550,
-              easing: Easing.bezier(0.42, 0, 0.25, 1),
-              useNativeDriver: true,
-            }),
+          Animated.sequence([
+            Animated.delay(80),
+            Animated.parallel([
+              Animated.timing(childOpacity, {
+                toValue: 1,
+                duration: 520,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: true,
+              }),
+              Animated.timing(childScale, {
+                toValue: 1,
+                duration: 520,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: true,
+              }),
+              Animated.timing(childTranslateY, {
+                toValue: 0,
+                duration: 520,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: true,
+              }),
+            ]),
           ]),
-        ]).start(() => {
-          completedRef.current = true;
-          if (typeof onComplete === "function") onComplete();
-          if (loop && !cancelled) setTimeout(run, 350);
-        });
+        ]),
+      ]).start(({ finished }) => {
+        if (!finished || cancelled) return;
+        setOpened(true);
+        startRaysIdleLoop();
+        if (loop) {
+          setTimeout(() => {
+            stopRaysIdleLoop();
+            setOpened(false);
+            run();
+          }, 300);
+        } else {
+          onComplete && onComplete();
+        }
       });
     };
 
-    if (play) run();
-    else if (!completedRef.current) {
-      p.setValue(0);
-      raysOpacity.setValue(0);
-      scrollOpacity.setValue(1);
-      afterOpacity.setValue(0);
-      afterScale.setValue(0.9);
-      afterTranslateY.setValue(12);
-      shake.setValue(0);
-    }
-
+    run();
     return () => {
       cancelled = true;
+      stopRaysIdleLoop();
     };
   }, [
-    play, loop, duration, trembleMs, explodeMs,
-    hideScrollAfterOpen, raysIdleOpacity,
-    preShakeMs, settleMs, shakeAmp, shakeRotDeg,
+    play,
+    loop,
+    duration,
+    onComplete,
+    pauseMs,
+    openMsRatio,
+    raysIdleOpacity,
+    raysIdleRotateMs,
+    hideScrollAfterOpen,
   ]);
 
+  const raysRotateDeg = raysRotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
   const side = size;
+  const abs = { position: "absolute", width: side, height: side };
+
+  const raysW = raysSize.w || side * 2;
+  const raysH = raysSize.h || side * 2;
+  const raysLeft = -(raysW - side) / 2;
+  const raysTop = -(raysH - side) / 2;
 
   return (
     <View
       style={[
-        { width: side, height: side, alignItems: "center", justifyContent: "center" },
+        {
+          width: side,
+          height: side,
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "visible",
+        },
         style,
       ]}
     >
-      {/* RAYS (무한 회전) */}
-      {RAYS ? (
+      {/* 디버그: 프레임 강제 표출 */}
+      {debugShowFrames && (
+        <>
+          <Image
+            source={CLOSED}
+            style={[abs, { opacity: 0.3 }]}
+            resizeMode="contain"
+          />
+          <Image
+            source={MID}
+            style={[abs, { opacity: 0.3 }]}
+            resizeMode="contain"
+          />
+          <Image
+            source={OPEN}
+            style={[abs, { opacity: 0.3 }]}
+            resizeMode="contain"
+          />
+        </>
+      )}
+
+      {/* 레이 */}
+      {raysW > 0 && raysH > 0 && (
         <Animated.View
           pointerEvents="none"
           style={{
             position: "absolute",
-            width: side * 1.8,
-            height: side * 1.8,
+            width: raysW,
+            height: raysH,
+            left: raysLeft,
+            top: raysTop,
             opacity: raysOpacity,
-            transform: [{ rotate: raysRotateDeg }],
+            transform: [{ scale: raysScale }, { rotate: raysRotateDeg }],
           }}
         >
-          <Image source={RAYS} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
-        </Animated.View>
-      ) : null}
-
-      {/* SCROLL 프레임 시퀀스 (프리-쉐이크 + 스쿼시/스트레치) */}
-      <Animated.View
-        style={{
-          transform: [
-            { translateX: shakeTranslateX }, // 프리-쉐이크 좌우
-            { rotate: shakeRotateDeg },      // 프리-쉐이크 회전
-            { scale: allScale },             // 펼침 중 잔진동
-            { scaleY: unfoldScaleY },        // 펼침 스쿼시/스트레치
-          ],
-          opacity: scrollOpacity,
-        }}
-      >
-        {frames[frameIdx] ? (
-          <Image
-            source={frames[frameIdx]}
-            style={{ width: side, height: side }}
+          <Animated.Image
+            source={RAYS}
             resizeMode="contain"
+            style={{ width: "100%", height: "100%" }}
           />
-        ) : null}
+        </Animated.View>
+      )}
+
+      {/* 스크롤 프레임 */}
+      <Animated.View
+        style={[
+          abs,
+          { opacity: scrollOpacity, transform: [{ scale }, { translateY }] },
+        ]}
+      >
+        <Animated.Image
+          source={CLOSED}
+          resizeMode="contain"
+          style={[abs, { opacity: closedOpacity }]}
+        />
+        <Animated.Image
+          source={MID}
+          resizeMode="contain"
+          style={[abs, { opacity: midOpacity }]}
+        />
+        <Animated.Image
+          source={OPEN}
+          resizeMode="contain"
+          style={[abs, { opacity: openOpacity }]}
+        />
       </Animated.View>
 
-      {/* AFTER OPEN (캐릭터 등) */}
+      {/* 오픈 후 콘텐츠(필요시 사용) */}
       {renderAfterOpen && (
         <Animated.View
           pointerEvents="none"
@@ -312,11 +412,11 @@ export default function ScrollOpening({
             height: side,
             alignItems: "center",
             justifyContent: "center",
-            opacity: afterOpacity,
-            transform: [{ translateY: afterTranslateY }, { scale: afterScale }],
+            opacity: childOpacity,
+            transform: [{ translateY: childTranslateY }, { scale: childScale }],
           }}
         >
-          {renderAfterOpen(side)}
+          {renderAfterOpen(size)}
         </Animated.View>
       )}
     </View>

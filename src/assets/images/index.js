@@ -29,6 +29,8 @@ export const Images = {
     jewels: require("./gacha/jewels.png"),
     textDash: require("./gacha/text_dash.png"),
     textDashGreen: require("./gacha/text_dash_green.png"),
+    character: require("./gacha/character.png"),
+    background: require("./gacha/background.png"),
 
     treasure: {
       closed: require("./gacha/treasure/treasure_close.png"),

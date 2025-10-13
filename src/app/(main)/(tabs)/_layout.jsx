@@ -106,7 +106,7 @@ const TabsLayout = () => {
           }}
         />
         <Tabs.Screen
-          name="heart/index"
+          name="gacha/index"
           options={{
             tabBarLabel: "가챠",
             tabBarIcon: ({ focused }) => (
