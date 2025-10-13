@@ -18,6 +18,14 @@ import { Images } from "@assets/images";
 import AppDialog from "@components/shared/AppDialog";
 import Header from "@components/shared/Header";
 
+import {
+    CHARACTER_INDEX,
+    getCharacterSpriteById,
+    THEME_LABELS,
+} from "@assets/characters";
+import { OBJECTS } from "@assets/objects";
+import { rollAsset, rollCharacter } from "@services/gacha";
+
 // 모드 레지스트리 (여기서 Anim, sources, centerRender 등을 주입)
 
 export default function GachaScreen({ mode: propMode }) {
@@ -36,9 +44,14 @@ export default function GachaScreen({ mode: propMode }) {
   const [opened, setOpened] = useState(false);
   const [askConfirm, setAskConfirm] = useState(false);
   const [dontShow, setDontShow] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [points, setPoints] = useState(0); // 코인바 갱신용
+  const [result, setResult] = useState(null); // 가챠 결과 보관
   const confirmAnim = useRef(new Animated.Value(0)).current;
   const isRunningRef = useRef(false);
   const { height: WIN_H } = Dimensions.get("window");
+
+  const modeKey = propMode || urlMode || "character";
 
   const [topSpace, setTopSpace] = useState(0);
   const [bottomSpace, setBottomSpace] = useState(0);
@@ -58,10 +71,58 @@ export default function GachaScreen({ mode: propMode }) {
     setRunKey((k) => k + 1);
   }, []);
 
-  const handleConfirmGacha = () => {
+  const FREE = process.env.EXPO_PUBLIC_GACHA_FREE?.trim() === "1";
+
+  const handleConfirmGacha = async () => {
+    if (isRunningRef.current || opened || loading) return;
     setAskConfirm(false);
-    playOnce();
+
+    if (FREE) {
+      // ✅ 모의 결과 (테스트용)
+      const fake =
+        cfg.id === "background"
+          ? {
+              ok: true,
+              type: "asset",
+              spent: 0,
+              asset: { asset_id: 7, id: "tent", label: "텐트", group: "bg23" },
+              points: points,
+              title: "🌱 초보 탐험가 (Lv.1)",
+            }
+          : {
+              ok: true,
+              type: "character",
+              spent: 0,
+              character_id: "spring_f",
+              points: points,
+              title: "🌱 초보 탐험가 (Lv.1)",
+            };
+      setResult(fake);
+      isRunningRef.current = true;
+      setPlaying(true);
+      setRunKey((k) => k + 1);
+      return;
+    }
+
+    // ✅ 실제 API 호출
+    setLoading(true);
+    try {
+      const res =
+        cfg.id === "background" ? await rollAsset() : await rollCharacter(); // 🔥 핵심
+      if (!res?.ok) throw new Error("응답 형식 오류");
+      setResult(res);
+      console.log("🎲 Gacha Result:", res);
+      if (typeof res.points === "number") setPoints(res.points);
+      isRunningRef.current = true;
+      setPlaying(true);
+      setRunKey((k) => k + 1);
+    } catch (e) {
+      console.error("❌ Gacha Error:", e);
+    } finally {
+      setLoading(false);
+    }
   };
+
   const handleCancelGacha = () => setAskConfirm(false);
 
   const onCtaPress = useCallback(() => {
@@ -122,7 +183,7 @@ export default function GachaScreen({ mode: propMode }) {
           >
             <View style={[styles.hudRow, { marginTop: insets.top + 60 }]}>
               {/* 좌: 포인트 바 (코인 겹침 + + 버튼) */}
-              <CoinsBar value="100000p" onPlusPress={() => {}} />
+              <CoinsBar value={`${points}p`} onPlusPress={() => {}} />
 
               {/* 우: 캐릭터 도감 / 꾸미기 */}
               <View style={styles.rightPillsRow}>
@@ -177,7 +238,148 @@ export default function GachaScreen({ mode: propMode }) {
                 sources={animSources}
                 renderAfterOpen={() => (
                   <View style={{ alignItems: "center" }}>
-                    {cfg.centerRender?.({ opened: true })}
+                    {/* 🎯 캐릭터 결과 */}
+                    {cfg.id === "character" && result?.type === "character" && (
+                      <>
+                        <Image
+                          source={getCharacterSpriteById(
+                            result.character_id,
+                            true
+                          )}
+                          style={{ width: 260, height: 260 }}
+                          resizeMode="contain"
+                        />
+
+                        {/* 위쪽: 테마 대시 */}
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            marginTop: 8,
+                            marginBottom: 2,
+                            gap: 6,
+                          }}
+                        >
+                          <Image
+                            source={Images.gacha.textDash}
+                            style={{ width: 82, height: 10 }}
+                            resizeMode="contain"
+                          />
+                          <Text className="text-white text-body-1 font-pretendardSemiBold">
+                            {THEME_LABELS[
+                              CHARACTER_INDEX[result.character_id]?.theme
+                            ] ?? ""}
+                          </Text>
+                          <Image
+                            source={Images.gacha.textDash}
+                            style={{
+                              width: 82,
+                              height: 10,
+                              transform: [{ scaleX: -1 }],
+                            }}
+                            resizeMode="contain"
+                          />
+                        </View>
+
+                        {/* 캐릭터 이름 */}
+                        <Text className="text-heading-2 font-pretendardSemiBold text-yellow500">
+                          {CHARACTER_INDEX[result.character_id]?.name ??
+                            result.character_id}
+                        </Text>
+                      </>
+                    )}
+
+                    {/* 💠 오브젝트 결과 */}
+                    {cfg.id === "background" && result?.type === "asset" && (
+                      <>
+                        <Image
+                          source={
+                            OBJECTS[result.asset?.id]?.src ||
+                            Images.placeholder.item
+                          }
+                          style={{ width: 220, height: 220 }}
+                          resizeMode="contain"
+                        />
+
+                        {/* 위쪽: 오브젝트 대시 */}
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            marginTop: 8,
+                            marginBottom: 2,
+                            gap: 6,
+                          }}
+                        >
+                          <Image
+                            source={Images.gacha.textDash}
+                            style={{ width: 82, height: 10 }}
+                            resizeMode="contain"
+                          />
+                          <Text className="text-white text-body-1 font-pretendardSemiBold">
+                            배경
+                          </Text>
+                          <Image
+                            source={Images.gacha.textDash}
+                            style={{
+                              width: 82,
+                              height: 10,
+                              transform: [{ scaleX: -1 }],
+                            }}
+                            resizeMode="contain"
+                          />
+                        </View>
+
+                        {/* 오브젝트 이름 */}
+                        <Text className="text-heading-2 font-pretendardSemiBold text-yellow500">
+                          {result.asset?.label || result.asset?.id}
+                        </Text>
+                      </>
+                    )}
+
+                    {/* 🪙 보너스 결과 (공통) */}
+                    {result?.type === "bonus" && (
+                      <>
+                        <Image
+                          source={Images.gacha.points}
+                          style={{ width: 220, height: 220 }}
+                          resizeMode="contain"
+                        />
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            marginTop: 8,
+                            marginBottom: 2,
+                            gap: 7,
+                          }}
+                        >
+                          <Image
+                            source={Images.gacha.textDash}
+                            style={{ width: 82, height: 10 }}
+                            resizeMode="contain"
+                          />
+                          <Text className="text-white text-body-1 font-pretendardSemiBold">
+                            포인트
+                          </Text>
+                          <Image
+                            source={Images.gacha.textDash}
+                            style={{
+                              width: 82,
+                              height: 10,
+                              transform: [{ scaleX: -1 }],
+                            }}
+                            resizeMode="contain"
+                          />
+                        </View>
+
+                        <Text className="text-heading-2 font-pretendardSemiBold text-yellow500">
+                          {result.bonus} point
+                        </Text>
+                      </>
+                    )}
+
+                    {!result && cfg.centerRender?.({ opened: true })}
                   </View>
                 )}
                 onComplete={() => {
@@ -236,8 +438,11 @@ export default function GachaScreen({ mode: propMode }) {
             ) : (
               <Pressable
                 onPress={onCtaPress}
-                disabled={askConfirm}
-                style={[styles.ctaButton, askConfirm && { opacity: 0.6 }]}
+                disabled={askConfirm || loading || playing}
+                style={[
+                  styles.ctaButton,
+                  (askConfirm || loading || playing) && { opacity: 0.6 },
+                ]}
               >
                 <View style={styles.ctaContent}>
                   <Text className="text-white text-heading-3 font-pretendardSemiBold mr-[10px]">
