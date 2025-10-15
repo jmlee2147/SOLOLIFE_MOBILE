@@ -39,6 +39,7 @@ export const Images = {
       open: require("./gacha/treasure/treasure_open.png"),
       rays: require("./gacha/treasure/treasure_rays.png"),
       static: require("./gacha/treasure/treasure_static.png"),
+      gray: require("./gacha/treasure/treasure_gray.png"),
     },
 
     scroll: {
