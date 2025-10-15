@@ -1,12 +1,23 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  FlatList,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { characters } from "@assets/characters";
-import { CHARACTERS, getCharacterImageKey } from "@assets/characters/CHARACTERS";
+import {
+  CHARACTERS,
+  getCharacterImageKey,
+} from "@assets/characters/CHARACTERS";
 import { OBJECTS } from "@assets/objects";
 import { CANVAS } from "@assets/slots/layout";
 
+import { Images } from "@assets/images";
 import AvatarBundle from "@components/avatar/AvatarBundle";
 import Button from "@components/shared/Button";
 import Header from "@components/shared/Header";
@@ -16,23 +27,41 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 
 // 🔗 API
-import { getAppearance, getMyAssets, getMyCharacters, putAppearance } from "@services/api";
+import {
+  getAppearance,
+  getMyAssets,
+  getMyCharacters,
+  putAppearance,
+} from "@services/api";
 import { useAppearanceStore } from "@store/appearance.store";
 import { customizeToApiPayload } from "@utils/appearance.adapters";
 
-const TABS = ["bg1", "bg2", "bg3", "character"];
-const TAB_LABEL = { bg1: "배경1", bg2: "배경2", bg3: "배경3", character: "캐릭터" };
+// 🔒 미보유(locked) 표시용 회색 보물상자 이미지
+// 실제 파일 경로에 맞게 수정해줘. (예: @assets/common/locked_chest.png)
+const LOCKED_CHEST = Images.gacha.treasure.gray;
 
-// 🔹 server character_id -> file 키 매핑 헬퍼
+const TABS = ["bg1", "bg2", "bg3", "character"];
+const TAB_LABEL = {
+  bg1: "배경1",
+  bg2: "배경2",
+  bg3: "배경3",
+  character: "캐릭터",
+};
+
+// server character_id -> file 키 매핑 헬퍼
 const ID_TO_FILE = CHARACTERS.reduce((m, c) => ((m[c.id] = c.file), m), {});
 
-// 🔹 API 응답 → 커스터마 로컬 슬롯으로 변환
+// API 응답 → 커스터마 로컬 슬롯으로 변환
 function apiToCustomizeSlots(api) {
-  const charFile = api?.current_character_id ? ID_TO_FILE[api.current_character_id] : null;
+  const charFile = api?.current_character_id
+    ? ID_TO_FILE[api.current_character_id]
+    : null;
   const bg1 = api?.current_assets?.["bg1-only"] ?? null;
-  const bg23 = Array.isArray(api?.current_assets?.bg23) ? api.current_assets.bg23.slice(0, 2) : [];
+  const bg23 = Array.isArray(api?.current_assets?.bg23)
+    ? api.current_assets.bg23.slice(0, 2)
+    : [];
   return {
-    bg1: bg1 || "tent",                 // 안전 기본값
+    bg1: bg1 || "tent",
     bg2: bg23[0] || "tree",
     bg3: bg23[1] || "tree",
     character: charFile || "base_explorer_male",
@@ -44,7 +73,7 @@ export default function CustomizeScreen({ initialSlots }) {
   const setFromApi = useAppearanceStore((s) => s.setFromApi);
   const [saving, setSaving] = useState(false);
 
-  // ── 로컬 편집 슬롯 (미리보기에 사용)
+  // 로컬 편집 슬롯 (미리보기에 사용)
   const [slots, setSlots] = useState(
     initialSlots ?? {
       bg1: "tent",
@@ -56,21 +85,21 @@ export default function CustomizeScreen({ initialSlots }) {
 
   const [tab, setTab] = useState("bg1");
 
-  // ── 보유 데이터
+  // 보유 데이터
   const [loadingOwn, setLoadingOwn] = useState(true);
   const [ownedCharIds, setOwnedCharIds] = useState(new Set());
   const [ownedAssetIds, setOwnedAssetIds] = useState(new Set());
 
-  // ── 현재 착용 상태 불러와서 미리보기 초기화
+  // 현재 착용 상태 불러와서 미리보기 초기화
   const [loadingCurrent, setLoadingCurrent] = useState(true);
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const ap = await getAppearance(); // { current_character_id, current_assets: {...} }
+        const ap = await getAppearance();
         if (!alive) return;
         const next = apiToCustomizeSlots(ap);
-        setSlots(next);                   // ✅ 미리보기를 서버 상태로 초기화
+        setSlots(next);
       } catch (e) {
         console.warn("[customize] appearance load error:", e?.message || e);
       } finally {
@@ -82,7 +111,7 @@ export default function CustomizeScreen({ initialSlots }) {
     };
   }, []);
 
-  // ── 보유/미보유 하이드레이션
+  // 보유/미보유 하이드레이션
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -105,7 +134,7 @@ export default function CustomizeScreen({ initialSlots }) {
     };
   }, []);
 
-  // ── 슬롯별 후보 리스트 (+ owned 주입)
+  // 슬롯별 후보 리스트 (+ owned 주입)
   const objectCandidates = useMemo(() => {
     const wrap = (arr) =>
       arr.map((it) => ({
@@ -121,18 +150,24 @@ export default function CustomizeScreen({ initialSlots }) {
     };
   }, [ownedAssetIds]);
 
-  // ── 캐릭터 후보 (+ owned 주입 / 회색 스킨 처리)
+  // 캐릭터 후보 (+ owned 주입 / 회색 스킨은 무시하고 locked면 보물상자 표시)
   const characterCandidates = useMemo(
     () =>
       CHARACTERS.map((c) => {
         const owned = ownedCharIds.has(c.id);
-        const spriteKey = getCharacterImageKey(c.file, owned);
-        return { key: c.file, src: characters[spriteKey], label: c.name, owned };
+        const spriteKey = getCharacterImageKey(c.file, true); // 소스는 항상 컬러로 두되, locked일 땐 chest로 대체
+        return {
+          key: c.file,
+          src: characters[spriteKey],
+          label: c.name,
+          owned,
+        };
       }),
     [ownedCharIds]
   );
 
-  const listData = tab === "character" ? characterCandidates : objectCandidates[tab];
+  const listData =
+    tab === "character" ? characterCandidates : objectCandidates[tab];
 
   const onPick = (item) => {
     if (!item.owned) return;
@@ -140,7 +175,10 @@ export default function CustomizeScreen({ initialSlots }) {
     else setSlots((s) => ({ ...s, [tab]: item.key }));
   };
 
-  const isSelected = (item) => (tab === "character" ? slots.character === item.key : slots[tab] === item.key);
+  const isSelected = (item) =>
+    tab === "character"
+      ? slots.character === item.key
+      : slots[tab] === item.key;
 
   const reset = () =>
     setSlots({
@@ -154,8 +192,8 @@ export default function CustomizeScreen({ initialSlots }) {
     try {
       setSaving(true);
       const payload = customizeToApiPayload(slots);
-      const updated = await putAppearance(payload); // 서버 병합형 응답
-      setFromApi(updated);                          // ✅ 전역상태 갱신 → 홈 즉시 반영
+      const updated = await putAppearance(payload);
+      setFromApi(updated);
       router.back();
     } catch (e) {
       console.warn("[customize] save error:", e?.message || e);
@@ -168,11 +206,21 @@ export default function CustomizeScreen({ initialSlots }) {
     <View style={{ flex: 1 }}>
       <StatusBar style="dark" translucent backgroundColor="transparent" />
 
-      {/* 🔹 헤더 + 미리보기 영역 */}
+      {/* 헤더 + 미리보기 영역 */}
       <View style={styles.topArea}>
-        <LinearGradient colors={["#B9E09D", "#419833"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient
+          colors={["#B9E09D", "#419833"]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
         <View style={{ height: insets.top }} />
-        <Header title="꾸미기" leftIcon="previous" onLeftPress={() => router.back()} backgroundColor="transparent" />
+        <Header
+          title="꾸미기"
+          leftIcon="previous"
+          onLeftPress={() => router.back()}
+          backgroundColor="transparent"
+        />
 
         {/* 미리보기 */}
         <View style={styles.previewWrap}>
@@ -187,8 +235,14 @@ export default function CustomizeScreen({ initialSlots }) {
         {TABS.map((t) => {
           const active = tab === t;
           return (
-            <Pressable key={t} style={[styles.tabBtn, active && styles.tabBtnActive]} onPress={() => setTab(t)}>
-              <Text style={[styles.tabText, active && styles.tabTextActive]}>{TAB_LABEL[t]}</Text>
+            <Pressable
+              key={t}
+              style={[styles.tabBtn, active && styles.tabBtnActive]}
+              onPress={() => setTab(t)}
+            >
+              <Text style={[styles.tabText, active && styles.tabTextActive]}>
+                {TAB_LABEL[t]}
+              </Text>
             </Pressable>
           );
         })}
@@ -200,22 +254,45 @@ export default function CustomizeScreen({ initialSlots }) {
         numColumns={3}
         data={listData}
         keyExtractor={(it) => it.key}
-        renderItem={({ item }) => <GridItem item={item} selected={isSelected(item)} onPress={() => onPick(item)} locked={!item.owned} />}
+        renderItem={({ item }) => (
+          <GridItem
+            item={item}
+            selected={isSelected(item)}
+            onPress={() => onPick(item)}
+            locked={!item.owned}
+            isCharacterTab={tab === "character"}
+            showLabel={tab !== "character"} // ← 캐릭터 탭에선 이름 숨김
+          />
+        )}
         showsVerticalScrollIndicator={false}
         columnWrapperStyle={styles.column}
       />
 
       {/* 하단 버튼 */}
       <View style={styles.bottomRow}>
-        <Button title="되돌리기" variant={saving ? "disabled" : "secondary"} size="small" onPress={reset} disabled={saving} />
-        <Button title={saving ? "저장 중..." : "저장하기"} variant={saving ? "disabled" : "primary"} size="medium" onPress={save} disabled={saving} />
+        <Button
+          title="되돌리기"
+          variant={saving ? "disabled" : "secondary"}
+          size="small"
+          onPress={reset}
+          disabled={saving}
+        />
+        <Button
+          title={saving ? "저장 중..." : "저장하기"}
+          variant={saving ? "disabled" : "primary"}
+          size="medium"
+          onPress={save}
+          disabled={saving}
+        />
       </View>
 
       {/* 로딩 오버레이 */}
       {(loadingOwn || loadingCurrent) && (
         <View style={styles.loadingOverlay}>
           <Text style={{ color: "#2E4A31", opacity: 0.75 }}>
-            {loadingCurrent ? "현재 착용 불러오는 중…" : "보유 아이템 불러오는 중…"}
+            {loadingCurrent
+              ? "현재 착용 불러오는 중…"
+              : "보유 아이템 불러오는 중…"}
           </Text>
         </View>
       )}
@@ -224,14 +301,40 @@ export default function CustomizeScreen({ initialSlots }) {
 }
 
 /* ===== 서브 컴포넌트 ===== */
-function GridItem({ item, selected, onPress, locked }) {
+function GridItem({
+  item,
+  selected,
+  onPress,
+  locked,
+  showLabel = true,
+  isCharacterTab = false,
+}) {
+  // locked면 회색 보물상자 이미지로 대체
+  const displaySrc = locked ? LOCKED_CHEST : item.src ?? OBJECTS[item.key]?.src;
+
+  // locked면 항상 동일한 사이즈 적용 (탭 상관없이)
+  const imageStyle = locked
+    ? styles.lockedImage
+    : isCharacterTab
+    ? styles.cardImageCharacter
+    : styles.cardImage;
+
   return (
-    <Pressable onPress={onPress} disabled={locked} style={[styles.card, selected && styles.cardSelected, locked && styles.cardLocked]}>
-      <Image source={item.src ?? OBJECTS[item.key]?.src} style={styles.cardImage} resizeMode="contain" />
-      <Text style={[styles.cardLabel, locked && styles.cardLabelLocked]} numberOfLines={1}>
-        {item.label ?? OBJECTS[item.key]?.label ?? item.key}
-      </Text>
-      {locked && <View style={styles.lockMask} />}
+    <Pressable
+      onPress={onPress}
+      disabled={locked}
+      style={[styles.card, selected && styles.cardSelected]}
+    >
+      <Image source={displaySrc} style={imageStyle} resizeMode="contain" />
+      {/* 캐릭터 탭에서는 라벨 숨김, 그 외엔 locked면 라벨 숨김 */}
+      {showLabel && !locked && (
+        <Text
+          style={[styles.cardLabel, locked && styles.cardLabelLocked]}
+          numberOfLines={1}
+        >
+          {item.label ?? OBJECTS[item.key]?.label ?? item.key}
+        </Text>
+      )}
     </Pressable>
   );
 }
@@ -247,10 +350,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-end",
   },
-  tabsRow: { marginTop: 23, paddingHorizontal: 30, flexDirection: "row", gap: 10 },
-  tabBtn: { paddingHorizontal: 15, paddingVertical: 5, borderRadius: 999, backgroundColor: "#F4F4F4" },
+  tabsRow: {
+    marginTop: 23,
+    paddingHorizontal: 30,
+    flexDirection: "row",
+    gap: 10,
+  },
+  tabBtn: {
+    paddingHorizontal: 15,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "#F4F4F4",
+  },
   tabBtnActive: { backgroundColor: "#62974F" },
-  tabText: { color: "#42790E", fontSize: 16, fontWeight: "600", lineHeight: 16 * 1.4 },
+  tabText: {
+    color: "#42790E",
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 16 * 1.4,
+  },
   tabTextActive: { color: "#FFF" },
   grid: { paddingHorizontal: 30, paddingTop: 20, paddingBottom: 10, gap: 10 },
   column: { justifyContent: "space-between", marginBottom: 0 },
@@ -263,14 +381,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 2,
     borderColor: "transparent",
+    paddingHorizontal: 4,
+    paddingVertical: 6,
   },
   cardSelected: { backgroundColor: "#FCFFFA", borderColor: "#64BC2E" },
-  cardLocked: { opacity: 0.75 },
-  cardImage: { width: 74, height: 70 },
-  cardLabel: { fontSize: 14, fontWeight: "500" },
+  cardImage: { width: 64, height: 64 },
+  lockedImage: { width: 80, height: 76 },
+  cardImageCharacter: { width: 85, height: 88 },
+  cardLabel: { marginTop: 6, fontSize: 14, fontWeight: "500" },
   cardLabelLocked: { color: "#99A59D" },
-  lockMask: { position: "absolute", inset: 0, backgroundColor: "rgba(255,255,255,0.55)", borderRadius: 12 },
-  bottomRow: { flexDirection: "row", gap: 12, paddingHorizontal: 25, paddingTop: 10 },
+  bottomRow: {
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 25,
+    paddingTop: 10,
+  },
   loadingOverlay: {
     position: "absolute",
     inset: 0,
