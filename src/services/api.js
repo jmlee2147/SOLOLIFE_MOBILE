@@ -336,3 +336,27 @@ export async function getFolderLocations(folderId, page = 1, limit = 200) {
   );
   return data;
 }
+
+
+// ── Characters / Assets: owned list ─────────────────────────────
+export async function getMyCharacters() {
+  return authFetch(`/characters/me`, { method: "GET" });
+}
+
+export async function getMyAssets() {
+  return authFetch(`/assets/me`, { method: "GET" });
+}
+
+// ── Appearance: get / put ───────────────────────────────────────
+export async function getAppearance() {
+  // 서버가 기본형으로 병합해 반환
+  return authFetch(`/users/me/appearance`, { method: "GET" });
+}
+
+export async function putAppearance(payload) {
+  // payload 예) { character_id: "base_f", assets: { "bg1-only": "tent", "bg23": ["tree"] } }
+  return authFetch(`/users/me/appearance`, {
+    method: "PUT",
+    body: payload,
+  });
+}
