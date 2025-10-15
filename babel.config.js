@@ -18,6 +18,7 @@ module.exports = function (api) {
             "@utils": "./src/utils",
             "@config": "./src/config",
             "@services": "./src/services",
+            "@store": "./src/store",
           },
         },
       ],

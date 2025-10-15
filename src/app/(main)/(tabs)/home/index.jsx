@@ -21,6 +21,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+// 커스터마이징 프리뷰 (공용 히어로 렌더러)
+import { CANVAS } from "@assets/slots/layout";
+import HeroPreview from "@components/avatar/HeroPreview";
+import { useAppearanceStore } from "@store/appearance.store";
+
 // 테마 + 이펙트
 import Rain from "@components/effects/Rain";
 import Snow from "@components/effects/Snow";
@@ -34,6 +39,7 @@ const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN?.trim();
 const { width: SCREEN_W } = Dimensions.get("window");
 const HEADER_HEIGHT = 44;
 
+/* ================= hooks ================= */
 function useTodayTheme() {
   const [data, setData] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
@@ -64,6 +70,7 @@ function useTodayTheme() {
         let lng = coords.longitude;
         console.log("[today] 📍 User coords:", lat, lng);
 
+        // 시뮬레이터 기본 좌표 보정
         if (lat === 37.785834 && lng === -122.406417) {
           console.log("[today] ⚙️ Expo mock detected → override to Suwon");
           lat = 37.2636;
@@ -128,8 +135,12 @@ function useTodayTheme() {
   return { data, loading, error };
 }
 
+/* ================= screen ================= */
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+
+  const heroSlots = useAppearanceStore((s) => s.heroSlots);
+  console.log("[Home] heroSlots from store:", heroSlots);
   const [showDialog, setShowDialog] = useState(false);
   const [dontShow, setDontShow] = useState(false);
 
@@ -147,26 +158,6 @@ export default function HomeScreen() {
 
   // 🔹 테마 상태 (백엔드 /weather/brief + 로컬 시간대 분기)
   const theme = useThemeX(); // { condition, subphase, colors, effects, provider, updatedAt }
-
-  // 🔹 테스트용 강제 오버라이드
-  {/*
-  const DEV_OVERRIDE = false; // true로 바꾸면 테스트 모드
-  if (DEV_OVERRIDE) {
-    // ① 날씨 상태 고르기
-    const cond = "SUNNY"; // SUNNY | CLOUDY | RAIN | SNOW
-    // ② 시간대 직접 지정
-    // SUNNY → morning | day | night
-    // CLOUDY → am | pm
-    // RAIN → all
-    // SNOW → am | pm
-    const sub = "night";
-
-    theme.condition = cond;
-    theme.subphase = sub;
-    theme.colors = pickColors(cond, sub); // 팔레트 자동
-    theme.effects = pickEffects(cond, sub); // 이펙트 자동
-  }
-  */}
 
   const isDarkBG =
     theme?.condition === "SUNNY" ||
@@ -212,7 +203,7 @@ export default function HomeScreen() {
         backgroundColor="transparent"
       />
 
-      {/* 상단 히어로 영역 (고정) */}
+      {/* 상단 히어로 영역 (공용 프리뷰 사용) */}
       <View
         style={[
           styles.hero,
@@ -231,12 +222,8 @@ export default function HomeScreen() {
           <View style={styles.speechTail} />
         </View>
 
-        {/* 마스코트 */}
-        <Image
-          source={Images.backgrounds.main}
-          style={styles.mascot}
-          resizeMode="contain"
-        />
+        {/* 🔸 공용 커스터마이징 프리뷰 (캐릭터 + 에셋 합성) */}
+        <HeroPreview slots={heroSlots} size={CANVAS.height} style={{ alignSelf: "center", marginTop: 15 }} />
 
         {/* 프로필/진행도/오른쪽 알약 버튼 */}
         <View style={styles.heroBottomCol}>
@@ -285,7 +272,6 @@ export default function HomeScreen() {
           backgroundColor: "#FFF",
           borderTopLeftRadius: 22,
           borderTopRightRadius: 22,
-          // 원래 흰 시트처럼 살짝 뜨는 그림자 느낌
           shadowColor: "#000",
           shadowOpacity: 0.08,
           shadowRadius: 12,
@@ -301,7 +287,7 @@ export default function HomeScreen() {
         <BottomSheetScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingBottom: insets.bottom + 80, // 하단 여백
+            paddingBottom: insets.bottom + 80,
           }}
         >
           {/* CTA 카드 */}
@@ -316,7 +302,7 @@ export default function HomeScreen() {
             badgeText="지금 시작하기"
           />
 
-          {/* CTA 카드 2 (테두리 그라데이션) */}
+          {/* CTA 카드 2 */}
           <CtaOutline
             title="루트 추천받기"
             subtitle="혼자가기 좋은 루트를 추천해 드려요."
@@ -462,7 +448,6 @@ export default function HomeScreen() {
                   pathname: "/(main)/place-recommend/detail/[id]",
                   params: {
                     id: String(loc.location_id),
-                    // 상세 화면에서 초기 데이터로 활용 가능하면 아래 전달
                     initial: encodeURIComponent(
                       JSON.stringify({
                         location_id: Number(loc.location_id),
@@ -569,7 +554,7 @@ export default function HomeScreen() {
   );
 }
 
-/* 서브 컴포넌트: 그대로 */
+/* ================= sub components ================= */
 function Pill({ label, icon, onPress }) {
   return (
     <Pressable onPress={onPress} style={styles.pill}>
@@ -587,8 +572,7 @@ function Pill({ label, icon, onPress }) {
 
 function Shortcut({ icon, label, onPress }) {
   const isDecorate = label === "꾸미기";
-  const iconSize = isDecorate ? 52 : 42; // 원래보다 약간 키움
-
+  const iconSize = isDecorate ? 52 : 42;
   return (
     <Pressable onPress={onPress} style={styles.shortcut}>
       <View style={styles.shortcutIconWrap}>
@@ -640,43 +624,27 @@ function CtaFilled({
   imageScale = 1.1,
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={{ marginHorizontal: 20, marginTop: 14 }}
-    >
-      {/* “지금 시작하기” 배지 */}
+    <Pressable onPress={onPress} style={{ marginHorizontal: 20, marginTop: 14 }}>
       {!!badgeText && (
         <View style={ctaStyles.badgeWrap}>
-          {/* 보더 그라데이션 */}
           <LinearGradient
             colors={["#64BC2E", "#2E7A45"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={ctaStyles.badgeBorder}
           >
-            {/* 흰 배경 + 텍스트 */}
             <View style={ctaStyles.badgeInner}>
-              {/* 텍스트 그라데이션 */}
               <MaskedView
                 maskElement={
                   <Text
-                    style={[
-                      ctaStyles.badgeText,
-                      { backgroundColor: "transparent" },
-                    ]}
+                    style={[ctaStyles.badgeText, { backgroundColor: "transparent" }]}
                   >
                     {badgeText}
                   </Text>
                 }
               >
-                <LinearGradient
-                  colors={["#64BC2E", "#2E7A45"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <Text style={[ctaStyles.badgeText, { opacity: 0 }]}>
-                    {badgeText}
-                  </Text>
+                <LinearGradient colors={["#64BC2E", "#2E7A45"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  <Text style={[ctaStyles.badgeText, { opacity: 0 }]}>{badgeText}</Text>
                 </LinearGradient>
               </MaskedView>
             </View>
@@ -689,32 +657,19 @@ function CtaFilled({
         end={{ x: 1, y: 1 }}
         style={ctaStyles.cardGrad}
       >
-        {/* 오른쪽 이미지: 레이아웃 비참여(absolute), 텍스트 아래 레이어 */}
         <View pointerEvents="none" style={ctaStyles.imageAbs}>
           <Image
             source={image}
             style={[
               ctaStyles.image,
-              {
-                transform: [
-                  { translateX: imageOffsetX },
-                  { translateY: imageOffsetY },
-                  { scale: imageScale },
-                ],
-              },
+              { transform: [{ translateX: imageOffsetX }, { translateY: imageOffsetY }, { scale: imageScale }] },
             ]}
             resizeMode="cover"
           />
         </View>
-
-        {/* 텍스트: 위 레이어 */}
         <View style={ctaStyles.textBlock}>
-          <Text className="text-white text-heading-2 font-pretendardSemiBold">
-            {title}
-          </Text>
-          <Text className="text-white text-body-3 font-pretendardRegular">
-            {subtitle}
-          </Text>
+          <Text className="text-white text-heading-2 font-pretendardSemiBold">{title}</Text>
+          <Text className="text-white text-body-3 font-pretendardRegular">{subtitle}</Text>
         </View>
       </LinearGradient>
     </Pressable>
@@ -731,10 +686,7 @@ function CtaOutline({
   imageScale = 1.1,
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={{ marginHorizontal: 20, marginTop: 11 }}
-    >
+    <Pressable onPress={onPress} style={{ marginHorizontal: 20, marginTop: 11 }}>
       <LinearGradient
         colors={["#6BD58E", "#2A7A3A"]}
         start={{ x: 0, y: 0 }}
@@ -742,32 +694,19 @@ function CtaOutline({
         style={ctaStyles.cardBorderGrad}
       >
         <View style={ctaStyles.cardBorderInner}>
-          {/* 오른쪽 이미지: 절대배치(아래 레이어) */}
           <View pointerEvents="none" style={ctaStyles.imageAbs}>
             <Image
               source={image}
               style={[
                 ctaStyles.image,
-                {
-                  transform: [
-                    { translateX: imageOffsetX },
-                    { translateY: imageOffsetY },
-                    { scale: imageScale },
-                  ],
-                },
+                { transform: [{ translateX: imageOffsetX }, { translateY: imageOffsetY }, { scale: imageScale }] },
               ]}
               resizeMode="cover"
             />
           </View>
-
-          {/* 텍스트: 위 레이어 */}
           <View style={ctaStyles.textBlock}>
-            <Text className="text-black text-heading-2 font-pretendardSemiBold">
-              {title}
-            </Text>
-            <Text className="text-black text-body-3 font-pretendardRegular">
-              {subtitle}
-            </Text>
+            <Text className="text-black text-heading-2 font-pretendardSemiBold">{title}</Text>
+            <Text className="text-black text-body-3 font-pretendardRegular">{subtitle}</Text>
           </View>
         </View>
       </LinearGradient>
@@ -778,17 +717,11 @@ function CtaOutline({
 function MissionRow({ title, point }) {
   return (
     <View style={missionStyles.row}>
-      <Text
-        className="text-body-2 font-pretendardMedium"
-        numberOfLines={1}
-        style={{ flex: 1 }}
-      >
+      <Text className="text-body-2 font-pretendardMedium" numberOfLines={1} style={{ flex: 1 }}>
         {title}
       </Text>
       <View style={missionStyles.pointPill}>
-        <Text className="text-body-3 font-pretendardSemiBold text-green900">
-          {point} p
-        </Text>
+        <Text className="text-body-3 font-pretendardSemiBold text-green900">{point} p</Text>
       </View>
     </View>
   );
@@ -797,10 +730,7 @@ function MissionRow({ title, point }) {
 function MissionTileDone({ title }) {
   return (
     <View style={[missionStyles.tile, missionStyles.tileDone]}>
-      <Text
-        className="text-white text-heading-2 font-pretendardSemiBold"
-        numberOfLines={2}
-      >
+      <Text className="text-white text-heading-2 font-pretendardSemiBold" numberOfLines={2}>
         {title}
       </Text>
       <View style={missionStyles.tileCheckCircle}>
@@ -813,10 +743,7 @@ function MissionTileDone({ title }) {
 function MissionTileProgress({ title, progress }) {
   return (
     <View style={[missionStyles.tile, missionStyles.tileDefault]}>
-      <Text
-        className="text-black text-heading-2 font-pretendardSemiBold"
-        numberOfLines={2}
-      >
+      <Text className="text-black text-heading-2 font-pretendardSemiBold" numberOfLines={2}>
         {title}
       </Text>
       <Text style={missionStyles.tileProgress}>{progress}</Text>
@@ -824,7 +751,7 @@ function MissionTileProgress({ title, progress }) {
   );
 }
 
-/* ===== Styles ===== */
+/* ================= styles ================= */
 const styles = StyleSheet.create({
   /* HERO */
   hero: {
@@ -852,12 +779,6 @@ const styles = StyleSheet.create({
     height: 12,
     backgroundColor: "#fff",
     transform: [{ rotate: "45deg" }],
-  },
-  mascot: {
-    width: 343,
-    height: 260,
-    alignSelf: "center",
-    marginTop: 15,
   },
 
   heroBottomCol: {
@@ -899,44 +820,6 @@ const styles = StyleSheet.create({
   },
   pillText: { fontSize: 14, color: "#FFF", fontFamily: "Pretendard-SemiBold" },
 
-  /* CTA */
-  ctaCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 10,
-    padding: 14,
-    marginHorizontal: 20,
-    marginTop: 12,
-  },
-  ctaThumb: { width: 44, height: 44, marginRight: 12, borderRadius: 8 },
-  ctaFilled: { backgroundColor: "#2A7A3A" },
-  arrowCircleFilled: {
-    width: 33,
-    height: 33,
-    borderRadius: 17,
-    borderWidth: 1.5,
-    borderColor: "#fff",
-    backgroundColor: "transparent",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  ctaOutline: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#2A7A3A",
-  },
-  arrowCircleOutline: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1.5,
-    borderColor: "#2A7A3A",
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 10,
-  },
-
   /* Shortcuts */
   shortcutsRow: {
     marginTop: 27,
@@ -967,12 +850,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: "Pretendard-SemiBold",
-    color: "#111",
-  },
-  more: { fontSize: 12, color: "#8C8C8C", fontFamily: "Pretendard-Medium" },
 
   questCard: {
     marginTop: 10,
@@ -1044,27 +921,6 @@ const styles = StyleSheet.create({
   },
   bannerImg: { width: "100%", height: "100%" },
   bannerOverlay: { position: "absolute", left: 16, bottom: 14 },
-  bannerTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontFamily: "Pretendard-SemiBold",
-    textShadowColor: "rgba(0,0,0,0.35)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  bannerSub: {
-    color: "#fff",
-    fontSize: 13,
-    fontFamily: "Pretendard-Medium",
-    marginTop: 2,
-  },
-  bannerMeta: {
-    color: "#fff",
-    fontSize: 11,
-    opacity: 0.9,
-    marginTop: 6,
-    fontFamily: "Pretendard-Medium",
-  },
 });
 
 const ctaStyles = StyleSheet.create({
@@ -1076,18 +932,12 @@ const ctaStyles = StyleSheet.create({
     paddingLeft: 18,
     paddingVertical: 18,
   },
-  cardInner: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  textBlock: {
-    zIndex: 2,
-  },
+  textBlock: { zIndex: 2 },
 
   /* Gradient Border */
   cardBorderGrad: {
     borderRadius: 10,
-    padding: 2, // 테두리 두께
+    padding: 2,
   },
   cardBorderInner: {
     borderRadius: 8,
@@ -1105,35 +955,19 @@ const ctaStyles = StyleSheet.create({
     right: 0,
     top: -40,
     bottom: -40,
-    width: 180, // 필요 시 160~200 사이로 조절
-    // overflow: "hidden",
+    width: 180,
     zIndex: 1,
   },
-
-  /* 오른쪽 이미지 클리핑 (라운드 카드 경계 안에서 잘리도록) */
-  imageClip: {
-    width: "100%",
-    height: "100%",
-    overflow: "hidden",
-  },
-  image: {
-    width: "200%",
-    height: "100%",
-  },
+  image: { width: "200%", height: "100%" },
 
   /* 배지 */
   badgeWrap: {
     position: "absolute",
     left: 14,
-    top: -12, // 카드에 살짝 걸치도록
+    top: -12,
     zIndex: 3,
   },
-
-  badgeBorder: {
-    padding: 1, // 테두리 두께
-    borderRadius: 999,
-  },
-
+  badgeBorder: { padding: 1, borderRadius: 999 },
   badgeInner: {
     backgroundColor: "#FFF",
     borderRadius: 999,
@@ -1142,23 +976,7 @@ const ctaStyles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  badge: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: "#2C6E3A",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  badgeText: {
-    fontSize: 12,
-    fontFamily: "Pretendard-SemiBold",
-  },
+  badgeText: { fontSize: 12, fontFamily: "Pretendard-SemiBold" },
 });
 
 const missionStyles = StyleSheet.create({
@@ -1174,11 +992,6 @@ const missionStyles = StyleSheet.create({
     borderRadius: 999,
     marginBottom: 8,
   },
-  pointChipText: {
-    color: "#6F766F",
-    fontSize: 12,
-    fontFamily: "Pretendard-SemiBold",
-  },
   pointRow: { flexDirection: "row", alignItems: "center" },
   pointValue: {
     fontSize: 34,
@@ -1192,16 +1005,7 @@ const missionStyles = StyleSheet.create({
     fontFamily: "Pretendard-SemiBold",
   },
 
-  /* “오늘의 미션” */
-  smallChip: {
-    alignSelf: "flex-start",
-    backgroundColor: "#F0F1EF",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginBottom: 10,
-  },
-
+  /* 오늘의 미션 */
   todayCard: {
     borderRadius: 10,
     borderWidth: 1,
@@ -1218,11 +1022,6 @@ const missionStyles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 4,
   },
-  todayHeadTitle: {
-    color: "#9BA09B",
-    fontSize: 14,
-    fontFamily: "Pretendard-SemiBold",
-  },
   doneChip: {
     backgroundColor: "#F4F4F4",
     height: 26,
@@ -1230,11 +1029,6 @@ const missionStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 999,
-  },
-  doneChipText: {
-    color: "#9BA09B",
-    fontSize: 12,
-    fontFamily: "Pretendard-SemiBold",
   },
 
   row: {
@@ -1244,9 +1038,6 @@ const missionStyles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: "rgba(0,0,0,0.06)",
   },
-  rowTitle: {
-    flex: 1,
-  },
   pointPill: {
     backgroundColor: "#C9DCC1",
     height: 26,
@@ -1254,11 +1045,6 @@ const missionStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 999,
-  },
-  pointPillText: {
-    color: "#2F6A31",
-    fontSize: 13,
-    fontFamily: "Pretendard-Bold",
   },
 
   /* 진행중 미션 타일 */
@@ -1277,16 +1063,6 @@ const missionStyles = StyleSheet.create({
   },
   tileDefault: { backgroundColor: "#FFFFFF" },
   tileDone: { backgroundColor: "#8CAF69" },
-  tileTitle: {
-    color: "#101210",
-    fontSize: 16,
-    fontFamily: "Pretendard-SemiBold",
-  },
-  tileTitleDone: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontFamily: "Pretendard-SemiBold",
-  },
   tileProgress: {
     alignSelf: "flex-end",
     fontSize: 28,
