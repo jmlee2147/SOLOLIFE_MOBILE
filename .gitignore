@@ -9,7 +9,11 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# Native (prebuild output)
+ios/
+android/
+
+# Kotlin / Java build artifacts
 .kotlin/
 *.orig.*
 *.jks
@@ -36,5 +40,6 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# misc
 app-example
 .env
