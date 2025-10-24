@@ -84,10 +84,9 @@ export default function CategoryScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       <Header
-        title="장소 추천받기"
         leftIcon="previous"
         onLeftPress={() => router.back()}
-        rightIcon="home_header"
+        rightIcon="close"
         onRightPress={() => router.push("/home")}
       />
 
