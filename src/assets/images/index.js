@@ -17,6 +17,8 @@ export const Images = {
     bubble: require("./common/bubble.png"),
     collection: require("./common/collection.png"),
     point: require("./common/point.png"),
+    path: require("./common/path.png"),
+    profile: require("./common/profile.png"),
   },
 
   backgrounds: {

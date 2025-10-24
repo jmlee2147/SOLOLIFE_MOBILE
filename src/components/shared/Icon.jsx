@@ -390,7 +390,7 @@ const icons = {
       />
     </Svg>
   ),
-  circle_check: ({ width = 24, height = 24, color="#000", ...props }) => (
+  circle_check: ({ width = 24, height = 24, color = "#000", ...props }) => (
     <Svg
       width={width}
       height={height}
@@ -1284,6 +1284,25 @@ const icons = {
         />
       </G>
       <Defs></Defs>
+    </Svg>
+  ),
+  camp: ({ width = 47, height = 35, color = "#D4D4D4", ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 47 35"
+      fill="none"
+      {...props}
+    >
+      <Path
+        fill={color}
+        d="m13.472 4.437 18.826-3.5a.921.921 0 0 1 1 .51L45.15 26.311a.921.921 0 0 1-.53 1.267l-18.451 6.4-13.285-3.52-11.271-2.915a.921.921 0 0 1-.57-1.35L13.471 4.438Z"
+      />
+      <Path
+        stroke="#fff"
+        strokeWidth={1.843}
+        d="m13.472 4.437 18.826-3.5a.921.921 0 0 1 1 .51L45.15 26.311a.921.921 0 0 1-.53 1.267l-18.451 6.4M13.472 4.437l12.697 29.541M13.472 4.437 1.043 26.193a.921.921 0 0 0 .57 1.35l11.27 2.914m13.286 3.521-13.285-3.52m0 0V18.055"
+      />
     </Svg>
   ),
 };
