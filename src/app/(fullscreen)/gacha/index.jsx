@@ -1,15 +1,16 @@
+import { usePointsStore } from "@store/points.store";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useRef, useState } from "react";
 import {
-    Animated,
-    Dimensions,
-    Image,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  Animated,
+  Dimensions,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getModeConfig } from "./modes";
@@ -19,9 +20,9 @@ import AppDialog from "@components/shared/AppDialog";
 import Header from "@components/shared/Header";
 
 import {
-    CHARACTER_INDEX,
-    getCharacterSpriteById,
-    THEME_LABELS,
+  CHARACTER_INDEX,
+  getCharacterSpriteById,
+  THEME_LABELS,
 } from "@assets/characters";
 import { OBJECTS } from "@assets/objects";
 import { rollAsset, rollCharacter } from "@services/gacha";
@@ -35,7 +36,7 @@ export default function GachaScreen({ mode: propMode }) {
   const cfg = getModeConfig(propMode || urlMode || "character");
   const finalBanner =
     cfg.banner ??
-    (isHalloween
+    (cfg.isHalloween
       ? { text: "~10/31 이벤트 기간 동안에만 만날 수 있어요!" }
       : undefined);
 
@@ -45,13 +46,23 @@ export default function GachaScreen({ mode: propMode }) {
   const [askConfirm, setAskConfirm] = useState(false);
   const [dontShow, setDontShow] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [points, setPoints] = useState(0); // 코인바 갱신용
+  const { points, loadPoints } = usePointsStore();
   const [result, setResult] = useState(null); // 가챠 결과 보관
   const confirmAnim = useRef(new Animated.Value(0)).current;
   const isRunningRef = useRef(false);
   const { height: WIN_H } = Dimensions.get("window");
 
   const modeKey = propMode || urlMode || "character";
+
+  React.useEffect(() => {
+    loadPoints?.();
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadPoints?.();
+    }, [loadPoints])
+  );
 
   const [topSpace, setTopSpace] = useState(0);
   const [bottomSpace, setBottomSpace] = useState(0);
@@ -112,7 +123,7 @@ export default function GachaScreen({ mode: propMode }) {
       if (!res?.ok) throw new Error("응답 형식 오류");
       setResult(res);
       console.log("🎲 Gacha Result:", res);
-      if (typeof res.points === "number") setPoints(res.points);
+      await loadPoints?.();
       isRunningRef.current = true;
       setPlaying(true);
       setRunKey((k) => k + 1);
@@ -183,7 +194,7 @@ export default function GachaScreen({ mode: propMode }) {
           >
             <View style={[styles.hudRow, { marginTop: insets.top + 60 }]}>
               {/* 좌: 포인트 바 (코인 겹침 + + 버튼) */}
-              <CoinsBar value={`${points}p`} onPlusPress={() => {}} />
+              <CoinsBar value={`${Number(points ?? 0).toLocaleString()}p`} onPlusPress={() => {}} />
 
               {/* 우: 캐릭터 도감 / 꾸미기 */}
               <View style={styles.rightPillsRow}>
@@ -438,10 +449,18 @@ export default function GachaScreen({ mode: propMode }) {
             ) : (
               <Pressable
                 onPress={onCtaPress}
-                disabled={askConfirm || loading || playing}
+                disabled={
+                  askConfirm ||
+                  loading ||
+                  playing ||
+                  (!FREE && Number(points ?? 0) < Number(cfg.cost ?? 0))
+                }
                 style={[
                   styles.ctaButton,
-                  (askConfirm || loading || playing) && { opacity: 0.6 },
+                  (askConfirm ||
+                    loading ||
+                    playing ||
+                    (!FREE && Number(points ?? 0) < Number(cfg.cost ?? 0))) && { opacity: 0.6 },
                 ]}
               >
                 <View style={styles.ctaContent}>

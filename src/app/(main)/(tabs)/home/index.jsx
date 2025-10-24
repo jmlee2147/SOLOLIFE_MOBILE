@@ -31,6 +31,7 @@ import Rain from "@components/effects/Rain";
 import Snow from "@components/effects/Snow";
 import Stars from "@components/effects/Stars";
 import { useThemeX } from "@providers/ThemeProvider";
+import { usePointsStore } from "@store/points.store";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
@@ -220,6 +221,9 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams?.() || {};
 
+  // points store
+  const { points, loadPoints } = usePointsStore();
+
   // DEV override state (persisted)
   const [devThemeOn, setDevThemeOn] = useState(false);
   const [devPresetIdx, setDevPresetIdx] = useState(0);
@@ -256,6 +260,18 @@ export default function HomeScreen() {
       console.warn(`[DEV THEME] Unknown preset key: ${key}`);
     }
   }, []);
+
+  // Load points on app entry
+  React.useEffect(() => {
+    loadPoints?.();
+  }, []);
+
+  // Refresh points when this screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      loadPoints?.();
+    }, [loadPoints])
+  );
 
   // Expose a global helper in dev: __setThemePreset('RAIN')
   React.useEffect(() => {
@@ -548,7 +564,7 @@ export default function HomeScreen() {
                   style={{ width: 32, height: 32, marginRight: 4 }}
                   resizeMode="contain"
                 />
-                <Text style={missionStyles.pointValue}>100000</Text>
+                <Text style={missionStyles.pointValue}>{Number(points ?? 0).toLocaleString()}</Text>
                 <Text style={missionStyles.pointUnit}> p</Text>
               </View>
             </View>
