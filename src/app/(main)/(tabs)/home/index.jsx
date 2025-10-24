@@ -7,7 +7,7 @@ import MaskedView from "@react-native-masked-view/masked-view";
 import { consumePendingToast, peekPendingToast } from "@utils/toastNext";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
-import { router, useFocusEffect, usePathname } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useRef, useState } from "react";
 import {
@@ -39,6 +39,82 @@ const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN?.trim();
 const { width: SCREEN_W } = Dimensions.get("window");
 const HEADER_HEIGHT = 44;
 
+const KST_TZ = "Asia/Seoul";
+
+// ===== DEV THEME OVERRIDE (development only) =====
+const THEME_PRESETS = [
+  {
+    key: "SUNNY_AM",
+    condition: "SUNNY",
+    subphase: "am",
+    colors: ["#B9E09D", "#419833"],
+    effects: { showStars: false, showRain: false, showSnow: false },
+    provider: "dev",
+  },
+  {
+    key: "SUNNY_PM",
+    condition: "SUNNY",
+    subphase: "pm",
+    colors: ["#1F31A2", "#FF7E33"],
+    effects: { showStars: false, showRain: false, showSnow: false },
+    provider: "dev",
+  },
+  {
+    key: "SUNNY_NIGHT",
+    condition: "SUNNY",
+    subphase: "night",
+    colors: ["#001139", "#336998"],
+    effects: { showStars: true, showRain: false, showSnow: false },
+    provider: "dev",
+  },
+  {
+    key: "RAIN",
+    condition: "RAIN",
+    subphase: "pm",
+    colors: ["#4F8F78", "#E7E7E7"],
+    effects: { showStars: false, showRain: true, showSnow: false },
+    provider: "dev",
+  },
+  {
+    key: "SNOW_AM",
+    condition: "SNOW",
+    subphase: "am",
+    colors: ["#BBC5C9", "#E7E7E7"],
+    effects: { showStars: false, showRain: false, showSnow: true },
+    provider: "dev",
+  },
+  {
+    key: "SNOW_PM",
+    condition: "SNOW",
+    subphase: "pm",
+    colors: ["#12315B", "#E7E7E7"],
+    effects: { showStars: false, showRain: false, showSnow: true },
+    provider: "dev",
+  },
+  {
+    key: "CLOUDY_AM",
+    condition: "CLOUDY",
+    subphase: "am",
+    colors: ["#BBC5C9", "#E7E7E7"],
+    effects: { showStars: false, showRain: false, showSnow: false },
+    provider: "dev",
+  },
+  {
+    key: "CLOUDY_PM",
+    condition: "CLOUDY",
+    subphase: "pm",
+    colors: ["#12315B", "#E7E7E7"],
+    effects: { showStars: false, showRain: false, showSnow: false },
+    provider: "dev",
+  },
+];
+
+const getPresetIndexByKey = (key) => {
+  if (!key) return -1;
+  const k = String(key).trim().toUpperCase();
+  return THEME_PRESETS.findIndex((p) => p.key.toUpperCase() === k);
+};
+
 /* ================= hooks ================= */
 function useTodayTheme() {
   const [data, setData] = React.useState(null);
@@ -58,13 +134,13 @@ function useTodayTheme() {
       }
 
       try {
-        // ✅ 위치 권한 요청
+        // 위치 권한 요청
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
           throw new Error("Location permission denied");
         }
 
-        // ✅ 현재 위치 얻기
+        // 현재 위치 얻기
         const { coords } = await Location.getCurrentPositionAsync({});
         let lat = coords.latitude;
         let lng = coords.longitude;
@@ -77,7 +153,7 @@ function useTodayTheme() {
           lng = 127.0286;
         }
 
-        // ✅ 토큰 우선순위: TEST_TOKEN > AsyncStorage("jwt")
+        // 토큰 우선순위: TEST_TOKEN > AsyncStorage("jwt")
         let token = TEST_TOKEN;
         if (!token) {
           try {
@@ -87,7 +163,9 @@ function useTodayTheme() {
           }
         }
 
-        const url = `${API_BASE_URL}/today?lat=${lat}&lng=${lng}`;
+        const url = `${API_BASE_URL}/today?lat=${lat}&lng=${lng}&tz=${encodeURIComponent(
+          KST_TZ
+        )}`;
         console.log("[today] ▶️ Fetch start:", url);
 
         const r = await fetch(url, {
@@ -95,6 +173,8 @@ function useTodayTheme() {
           headers: {
             Accept: "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            "X-Timezone": KST_TZ,
+            "Accept-Language": "ko-KR",
           },
           signal: ctrl.signal,
         });
@@ -138,6 +218,85 @@ function useTodayTheme() {
 /* ================= screen ================= */
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams?.() || {};
+
+  // DEV override state (persisted)
+  const [devThemeOn, setDevThemeOn] = useState(false);
+  const [devPresetIdx, setDevPresetIdx] = useState(0);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const on = await AsyncStorage.getItem("dev_theme_on");
+        const idx = await AsyncStorage.getItem("dev_theme_idx");
+        if (on === "1") setDevThemeOn(true);
+        if (idx && !Number.isNaN(Number(idx))) setDevPresetIdx(Number(idx));
+      } catch {}
+    })();
+  }, []);
+
+  React.useEffect(() => {
+    AsyncStorage.setItem("dev_theme_on", devThemeOn ? "1" : "0").catch(() => {});
+  }, [devThemeOn]);
+
+  React.useEffect(() => {
+    AsyncStorage.setItem("dev_theme_idx", String(devPresetIdx)).catch(() => {});
+  }, [devPresetIdx]);
+
+  const cycleDevPreset = React.useCallback(() => {
+    setDevPresetIdx((p) => (p + 1) % THEME_PRESETS.length);
+  }, []);
+
+  const setDevPresetByKey = React.useCallback((key) => {
+    const idx = getPresetIndexByKey(key);
+    if (idx >= 0) {
+      setDevPresetIdx(idx);
+      setDevThemeOn(true);
+    } else {
+      console.warn(`[DEV THEME] Unknown preset key: ${key}`);
+    }
+  }, []);
+
+  // Expose a global helper in dev: __setThemePreset('RAIN')
+  React.useEffect(() => {
+    if (!__DEV__) return;
+    if (typeof global !== 'undefined') {
+      global.__setThemePreset = (key) => setDevPresetByKey(key);
+    }
+    return () => {
+      if (typeof global !== 'undefined' && global.__setThemePreset) {
+        try { delete global.__setThemePreset; } catch {}
+      }
+    };
+  }, [setDevPresetByKey]);
+
+  React.useEffect(() => {
+    if (!__DEV__) return;
+    const key = params?.devTheme;
+    if (key) {
+      setDevPresetByKey(key);
+    }
+  }, [params?.devTheme, setDevPresetByKey]);
+
+  // ===== DEV SECRET GESTURE (no visible UI) =====
+  // 단일 탭: 프리셋 순환, 자동으로 devThemeOn = true
+  // 롱프레스: ON/OFF 토글
+  const onSecretTap = React.useCallback(() => {
+    if (!__DEV__) return;
+    setDevThemeOn(true);
+    setDevPresetIdx((idx) => {
+      const next = (idx + 1) % THEME_PRESETS.length;
+      return next;
+    });
+  }, []);
+
+  const onSecretLong = React.useCallback(() => {
+    if (!__DEV__) return;
+    setDevThemeOn((prev) => {
+      const next = !prev;
+      return next;
+    });
+  }, []);
 
   const heroSlots = useAppearanceStore((s) => s.heroSlots);
   console.log("[Home] heroSlots from store:", heroSlots);
@@ -159,11 +318,23 @@ export default function HomeScreen() {
   // 🔹 테마 상태 (백엔드 /weather/brief + 로컬 시간대 분기)
   const theme = useThemeX(); // { condition, subphase, colors, effects, provider, updatedAt }
 
+  // Choose between backend theme and dev override (only in __DEV__)
+  const themeFromBackend = theme;
+  const themeFromDev = THEME_PRESETS[devPresetIdx] || THEME_PRESETS[0];
+  const activeTheme = __DEV__ && devThemeOn ? themeFromDev : themeFromBackend;
+
   const isDarkBG =
-    theme?.condition === "SUNNY" ||
-    theme?.condition === "RAIN" ||
-    (theme?.condition === "CLOUDY" && theme?.subphase === "pm") ||
-    (theme?.condition === "SNOW" && theme?.subphase === "pm");
+    activeTheme?.condition === "SUNNY" ||
+    activeTheme?.condition === "RAIN" ||
+    (activeTheme?.condition === "SNOW" && activeTheme?.subphase === "pm") ||
+    (activeTheme?.condition === "CLOUDY" && activeTheme?.subphase === "pm");
+
+  // ── Pill color override for specific themes
+  const isCloudyAM = activeTheme?.condition === "CLOUDY" && activeTheme?.subphase === "am";
+  const isSnowAM = activeTheme?.condition === "SNOW" && activeTheme?.subphase === "am";
+  const useSpecialPillTheme = isCloudyAM || isSnowAM;
+  const pillBgColor = useSpecialPillTheme ? "rgba(48,48,48,0.3)" : undefined; // light gray for CLOUDY_AM, SNOW_AM
+  const pillTextColor = useSpecialPillTheme ? "#FFFFFF" : undefined; // dark text on light background
 
   useFocusEffect(
     React.useCallback(() => {
@@ -186,16 +357,16 @@ export default function HomeScreen() {
     <View style={{ flex: 1 }}>
       {/* 🔹 전역 배경 그라데이션 */}
       <LinearGradient
-        colors={theme?.colors ?? ["#B9E09D", "#419833"]}
+        colors={activeTheme?.colors ?? ["#B9E09D", "#419833"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
         style={{ position: "absolute", inset: 0 }}
       />
 
       {/* 🔹 날씨 이펙트 */}
-      {theme?.effects?.showStars ? <Stars count={40} /> : null}
-      {theme?.effects?.showRain ? <Rain count={96} /> : null}
-      {theme?.effects?.showSnow ? <Snow count={48} /> : null}
+      {activeTheme?.effects?.showStars ? <Stars count={40} /> : null}
+      {activeTheme?.effects?.showRain ? <Rain count={96} /> : null}
+      {activeTheme?.effects?.showSnow ? <Snow count={48} /> : null}
 
       <StatusBar
         style={isDarkBG ? "light" : "dark"}
@@ -223,7 +394,11 @@ export default function HomeScreen() {
         </View>
 
         {/* 🔸 공용 커스터마이징 프리뷰 (캐릭터 + 에셋 합성) */}
-        <HeroPreview slots={heroSlots} size={CANVAS.height} style={{ alignSelf: "center", marginTop: 15 }} />
+        <HeroPreview
+          slots={heroSlots}
+          size={CANVAS.height}
+          style={{ alignSelf: "center", marginTop: 15 }}
+        />
 
         {/* 프로필/진행도/오른쪽 알약 버튼 */}
         <View style={styles.heroBottomCol}>
@@ -250,13 +425,17 @@ export default function HomeScreen() {
             <Pill
               label="미션"
               icon={Images.common.medal}
-              onPress={() => router.push("/(fullscreen)/mission")}
+              onPress={() => router.push("/mission")}
+              bgColor={pillBgColor}
+              textColor={pillTextColor}
             />
-            <Pill label="출석체크" icon={Images.common.check} />
+            <Pill label="출석체크" icon={Images.common.check} bgColor={pillBgColor} textColor={pillTextColor} />
             <Pill
               label="찜 / 저장"
               icon={Images.common.bookmark}
               onPress={() => router.push("/storage")}
+              bgColor={pillBgColor}
+              textColor={pillTextColor}
             />
           </View>
         </View>
@@ -348,7 +527,7 @@ export default function HomeScreen() {
               </Text>
               <Pressable
                 hitSlop={8}
-                onPress={() => router.push("/(fullscreen)/mission")}
+                onPress={() => router.push("/mission")}
               >
                 <Text className="text-body-2 font-pretendardMedium">
                   더보기
@@ -539,6 +718,16 @@ export default function HomeScreen() {
         </BottomSheetScrollView>
       </BottomSheet>
 
+      {__DEV__ && (
+        <Pressable
+          onPress={onSecretTap}
+          onLongPress={onSecretLong}
+          delayLongPress={400}
+          hitSlop={20}
+          style={{ position: "absolute", right: 8, top: insets.top + 8, width: 44, height: 44, backgroundColor: "transparent" }}
+        />
+      )}
+
       {/* 다이얼로그 */}
       <AppDialog
         visible={showDialog}
@@ -555,9 +744,9 @@ export default function HomeScreen() {
 }
 
 /* ================= sub components ================= */
-function Pill({ label, icon, onPress }) {
+function Pill({ label, icon, onPress, bgColor, textColor }) {
   return (
-    <Pressable onPress={onPress} style={styles.pill}>
+    <Pressable onPress={onPress} style={[styles.pill, bgColor ? { backgroundColor: bgColor } : null]}>
       {icon && (
         <Image
           source={icon}
@@ -565,7 +754,7 @@ function Pill({ label, icon, onPress }) {
           resizeMode="contain"
         />
       )}
-      <Text style={styles.pillText}>{label}</Text>
+      <Text style={[styles.pillText, textColor ? { color: textColor } : null]}>{label}</Text>
     </Pressable>
   );
 }
@@ -624,7 +813,10 @@ function CtaFilled({
   imageScale = 1.1,
 }) {
   return (
-    <Pressable onPress={onPress} style={{ marginHorizontal: 20, marginTop: 14 }}>
+    <Pressable
+      onPress={onPress}
+      style={{ marginHorizontal: 20, marginTop: 14 }}
+    >
       {!!badgeText && (
         <View style={ctaStyles.badgeWrap}>
           <LinearGradient
@@ -637,14 +829,23 @@ function CtaFilled({
               <MaskedView
                 maskElement={
                   <Text
-                    style={[ctaStyles.badgeText, { backgroundColor: "transparent" }]}
+                    style={[
+                      ctaStyles.badgeText,
+                      { backgroundColor: "transparent" },
+                    ]}
                   >
                     {badgeText}
                   </Text>
                 }
               >
-                <LinearGradient colors={["#64BC2E", "#2E7A45"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                  <Text style={[ctaStyles.badgeText, { opacity: 0 }]}>{badgeText}</Text>
+                <LinearGradient
+                  colors={["#64BC2E", "#2E7A45"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Text style={[ctaStyles.badgeText, { opacity: 0 }]}>
+                    {badgeText}
+                  </Text>
                 </LinearGradient>
               </MaskedView>
             </View>
@@ -662,14 +863,24 @@ function CtaFilled({
             source={image}
             style={[
               ctaStyles.image,
-              { transform: [{ translateX: imageOffsetX }, { translateY: imageOffsetY }, { scale: imageScale }] },
+              {
+                transform: [
+                  { translateX: imageOffsetX },
+                  { translateY: imageOffsetY },
+                  { scale: imageScale },
+                ],
+              },
             ]}
             resizeMode="cover"
           />
         </View>
         <View style={ctaStyles.textBlock}>
-          <Text className="text-white text-heading-2 font-pretendardSemiBold">{title}</Text>
-          <Text className="text-white text-body-3 font-pretendardRegular">{subtitle}</Text>
+          <Text className="text-white text-heading-2 font-pretendardSemiBold">
+            {title}
+          </Text>
+          <Text className="text-white text-body-3 font-pretendardRegular">
+            {subtitle}
+          </Text>
         </View>
       </LinearGradient>
     </Pressable>
@@ -686,7 +897,10 @@ function CtaOutline({
   imageScale = 1.1,
 }) {
   return (
-    <Pressable onPress={onPress} style={{ marginHorizontal: 20, marginTop: 11 }}>
+    <Pressable
+      onPress={onPress}
+      style={{ marginHorizontal: 20, marginTop: 11 }}
+    >
       <LinearGradient
         colors={["#6BD58E", "#2A7A3A"]}
         start={{ x: 0, y: 0 }}
@@ -699,14 +913,24 @@ function CtaOutline({
               source={image}
               style={[
                 ctaStyles.image,
-                { transform: [{ translateX: imageOffsetX }, { translateY: imageOffsetY }, { scale: imageScale }] },
+                {
+                  transform: [
+                    { translateX: imageOffsetX },
+                    { translateY: imageOffsetY },
+                    { scale: imageScale },
+                  ],
+                },
               ]}
               resizeMode="cover"
             />
           </View>
           <View style={ctaStyles.textBlock}>
-            <Text className="text-black text-heading-2 font-pretendardSemiBold">{title}</Text>
-            <Text className="text-black text-body-3 font-pretendardRegular">{subtitle}</Text>
+            <Text className="text-black text-heading-2 font-pretendardSemiBold">
+              {title}
+            </Text>
+            <Text className="text-black text-body-3 font-pretendardRegular">
+              {subtitle}
+            </Text>
           </View>
         </View>
       </LinearGradient>
@@ -717,11 +941,17 @@ function CtaOutline({
 function MissionRow({ title, point }) {
   return (
     <View style={missionStyles.row}>
-      <Text className="text-body-2 font-pretendardMedium" numberOfLines={1} style={{ flex: 1 }}>
+      <Text
+        className="text-body-2 font-pretendardMedium"
+        numberOfLines={1}
+        style={{ flex: 1 }}
+      >
         {title}
       </Text>
       <View style={missionStyles.pointPill}>
-        <Text className="text-body-3 font-pretendardSemiBold text-green900">{point} p</Text>
+        <Text className="text-body-3 font-pretendardSemiBold text-green900">
+          {point} p
+        </Text>
       </View>
     </View>
   );
@@ -730,7 +960,10 @@ function MissionRow({ title, point }) {
 function MissionTileDone({ title }) {
   return (
     <View style={[missionStyles.tile, missionStyles.tileDone]}>
-      <Text className="text-white text-heading-2 font-pretendardSemiBold" numberOfLines={2}>
+      <Text
+        className="text-white text-heading-2 font-pretendardSemiBold"
+        numberOfLines={2}
+      >
         {title}
       </Text>
       <View style={missionStyles.tileCheckCircle}>
@@ -743,7 +976,10 @@ function MissionTileDone({ title }) {
 function MissionTileProgress({ title, progress }) {
   return (
     <View style={[missionStyles.tile, missionStyles.tileDefault]}>
-      <Text className="text-black text-heading-2 font-pretendardSemiBold" numberOfLines={2}>
+      <Text
+        className="text-black text-heading-2 font-pretendardSemiBold"
+        numberOfLines={2}
+      >
         {title}
       </Text>
       <Text style={missionStyles.tileProgress}>{progress}</Text>
@@ -1075,5 +1311,36 @@ const missionStyles = StyleSheet.create({
     height: 46,
     alignItems: "center",
     justifyContent: "center",
+  },
+});
+
+
+const devStyles = StyleSheet.create({
+  devFabCol: {
+    position: "absolute",
+    right: 14,
+    top: 14,
+    zIndex: 50,
+  },
+  devFab: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  devFabText: {
+    color: "#fff",
+    fontSize: 12,
+    fontFamily: "Pretendard-SemiBold",
+  },
+  devFabSub: {
+    marginTop: 2,
+    color: "#E8F5E9",
+    fontSize: 11,
+    fontFamily: "Pretendard-Medium",
   },
 });
