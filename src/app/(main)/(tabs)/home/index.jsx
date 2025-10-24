@@ -314,6 +314,21 @@ export default function HomeScreen() {
     });
   }, []);
 
+  // ===== Secret double-tap to Onboarding (always enabled, invisible) =====
+  const lastSecretTapRef = React.useRef(0);
+  const onSecretToOnboarding = React.useCallback(() => {
+    const now = Date.now();
+    // If two taps occur within 400ms → treat as double-tap
+    if (now - lastSecretTapRef.current < 400) {
+      lastSecretTapRef.current = 0;
+      try {
+        router.push("/(fullscreen)/onboarding");
+      } catch {}
+    } else {
+      lastSecretTapRef.current = now;
+    }
+  }, []);
+
   const heroSlots = useAppearanceStore((s) => s.heroSlots);
   console.log("[Home] heroSlots from store:", heroSlots);
   const [showDialog, setShowDialog] = useState(false);
@@ -452,6 +467,19 @@ export default function HomeScreen() {
               onPress={() => router.push("/storage")}
               bgColor={pillBgColor}
               textColor={pillTextColor}
+            />
+            {/* 시연용 비밀 버튼: 2회 연속 탭 → 온보딩 */}
+            <Pressable
+              onPress={onSecretToOnboarding}
+              hitSlop={12}
+              style={{
+                width: 36,
+                height: 36,
+                opacity: 1, // 완전 투명 (시연용)
+                marginLeft: 2,
+              }}
+              accessibilityLabel="secret-onboarding-trigger"
+              accessibilityRole="button"
             />
           </View>
         </View>
