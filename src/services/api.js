@@ -20,9 +20,16 @@ let tokenCache = null;
 
 async function getToken() {
   if (tokenCache) return tokenCache;
+
+  // 1️⃣ AsyncStorage에서 우선 시도
   const t = await AsyncStorage.getItem("jwt");
-  tokenCache = t;
-  return t;
+
+  // 2️⃣ 비어 있으면 .env fallback
+  const fallback = process.env.EXPO_PUBLIC_TEST_TOKEN?.trim();
+  const token = t || fallback;
+
+  tokenCache = token;
+  return token;
 }
 
 axiosApi.interceptors.request.use(async (config) => {
@@ -335,6 +342,59 @@ export async function getFolderLocations(folderId, page = 1, limit = 200) {
     `/folders/me/like-folders/${folderId}/locations?page=${page}&limit=${limit}`
   );
   return data;
+}
+
+// ========================
+// 📂 좋아요 폴더 + 폴더 내 장소 조회 확장
+// ========================
+
+// 📁 모든 좋아요 폴더 목록 조회
+export async function getLikeFoldersAll() {
+  try {
+    const res = await axiosApi.get("/folders/me/like-folders");
+    return res.data.items || [];
+  } catch (e) {
+    console.warn("[getLikeFoldersAll] error:", e?.response?.status, e?.message);
+    throw e;
+  }
+}
+
+// 📦 특정 폴더의 장소 목록 (페이징 포함)
+export async function getFolderLocationsFull(folderId, page = 1, limit = 60) {
+  if (!folderId) throw new Error("folderId is required");
+  try {
+    const { data } = await axiosApi.get(
+      `/folders/me/like-folders/${folderId}/locations?page=${page}&limit=${limit}`
+    );
+    return data; // { items, total, page, limit }
+  } catch (e) {
+    console.warn("[getFolderLocationsFull] error:", e?.response?.status, e?.message);
+    throw e;
+  }
+}
+
+// ❤️ 폴더 기반 찜 장소 목록 (MapScreen 등에서 직접 사용)
+export async function getLikedPlacesFromFolder(folderId, page = 1, limit = 60) {
+  const data = await getFolderLocationsFull(folderId, page, limit);
+
+  const mapped = (data.items || []).map((it, idx) => ({
+    id: String(it.location_id ?? idx),
+    name: it.location_name || "이름 없는 장소",
+    address: it.address ?? "",
+    lat: Number(it.latitude),
+    lng: Number(it.longitude),
+    category: it.category ?? "",
+    rating: it.rating_avg ?? null,
+    reviews: it.rating_count ?? null,
+    tags: it.keywords || it.features || [],
+    photos: [],
+    liked: true,
+  }));
+
+  return {
+    items: mapped,
+    total: Number(data.total || 0),
+  };
 }
 
 
