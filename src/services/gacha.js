@@ -1,6 +1,5 @@
-
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
-const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN?.trim(); // 👈 이거!!
+const TEST_TOKEN = process.env.EXPO_PUBLIC_TEST_TOKEN?.trim(); 
 
 async function getToken() {
   // 실제 로그인 붙으면 SecureStore로 교체
@@ -44,4 +43,18 @@ export async function rollCharacter() {
 
 export async function rollAsset() {
   return request("/gacha/roll/asset", { method: "POST" });
+}
+
+/* ────────────────────────────────
+   POINTS API (via /auth/me)
+───────────────────────────────── */
+export async function getMyPoints() {
+  try {
+    const data = await request("/auth/me");
+    // 백엔드 응답에 experience_points 필드 포함
+    return data?.experience_points ?? 0;
+  } catch (e) {
+    console.warn("[getMyPoints] failed:", e.message);
+    return 0;
+  }
 }

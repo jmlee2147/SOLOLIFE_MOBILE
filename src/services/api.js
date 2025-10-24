@@ -420,3 +420,40 @@ export async function putAppearance(payload) {
     body: payload,
   });
 }
+
+// ── Points (Wallet) ─────────────────────────────────────────────
+export async function getMyPoints() {
+  // 1) 신 백엔드: /auth/me 에서 experience_points(또는 유사 키) 우선 사용
+  try {
+    const me = await authFetch(`/auth/me`, { method: "GET" });
+    const raw =
+      me?.experience_points ??
+      me?.points ??
+      me?.wallet?.points ??
+      me?.data?.experience_points ??
+      me?.data?.points ??
+      0;
+    const val = Number(raw);
+    if (Number.isFinite(val)) return val;
+  } catch (e) {
+    // fallthrough to legacy attempt
+    if (__DEV__) console.warn("[getMyPoints] /auth/me failed:", e?.message || e);
+  }
+
+  // 2) 레거시 호환: /users/me/points 구조가 있는 경우 보조로 시도
+  try {
+    const legacy = await authFetch(`/users/me/points`, { method: "GET" });
+    const raw =
+      legacy?.points ??
+      legacy?.balance ??
+      legacy?.data?.points ??
+      legacy?.data?.balance ??
+      0;
+    const val = Number(raw);
+    return Number.isFinite(val) ? val : 0;
+  } catch (e2) {
+    if (__DEV__)
+      console.warn("[getMyPoints] fallback /users/me/points failed:", e2?.message || e2);
+    return 0;
+  }
+}

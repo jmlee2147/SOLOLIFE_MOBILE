@@ -1,5 +1,6 @@
 import { Images } from "@assets/images";
 import Header from "@components/shared/Header";
+import { usePointsStore } from "@store/points.store";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
@@ -21,6 +22,12 @@ export default function MissionScreen() {
   const progressingCount = 0;
   const doneCount = 0;
   const router = useRouter();
+
+  const { points, loadPoints } = usePointsStore();
+
+  React.useEffect(() => {
+    loadPoints?.();
+  }, []);
 
   const [activeTab, setActiveTab] = React.useState("progress");
 
@@ -58,7 +65,9 @@ export default function MissionScreen() {
               }}
               resizeMode="contain"
             />
-            <Text style={styles.pointValue}>100000</Text>
+            <Text style={styles.pointValue}>
+              {Number(points ?? 0).toLocaleString()}
+            </Text>
             <Text style={styles.pointUnit}> p</Text>
           </View>
         </View>
