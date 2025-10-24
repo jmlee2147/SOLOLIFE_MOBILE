@@ -5,8 +5,8 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
 async function debugLogin() {
   const url = `${BASE_URL}/auth/login`;
   const tries = [
-    { body: { email: "test@test.com", password: "test" }, note: "email/password" },
-    { body: { username: "test", password: "test" }, note: "username/password" },
+    { body: { email: "user@example.com", password: "test" }, note: "email/password" },
+    { body: { username: "testuser", password: "test" }, note: "username/password" },
     { body: { user: "test@test.com", pass: "test" }, note: "user/pass (혹시모름)" },
   ];
 

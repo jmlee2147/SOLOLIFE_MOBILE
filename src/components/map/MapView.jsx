@@ -111,6 +111,7 @@ export default function MapView({
 
     // 다중 마커용 색 팔레트 (1,2,3…에 매핑)
     var PALETTE = ["#62974F", "#117C73", "#00196A"];
+    var HEART_COLOR = "#EE7A13"; // 좋아요(하트) 색상 통일: 주황
 
     function colorForMarker(m, i){
       // label이 숫자면 1→0, 2→1 …로 매핑, 아니면 index 사용
@@ -121,6 +122,12 @@ export default function MapView({
 
     function init() {
       var markerData = ${markersJSON};
+      if (window.ReactNativeWebView) {
+           try { window.ReactNativeWebView.postMessage(JSON.stringify({
+             type: "debug-markers", count: (markerData||[]).length,
+             first: (markerData||[])[0] || null
+           })); } catch(_) {}
+         }
       var hasMany = Array.isArray(markerData) && markerData.length > 0;
 
       // 단일 마커
@@ -162,7 +169,7 @@ export default function MapView({
           title: m.name || "",
           icon: {
             content: m.liked
-              ? likedPinSVG(fill)                  // 좋아요: 하트 색도 팔레트 적용
+              ? likedPinSVG(HEART_COLOR)           // ✅ 좋아요: 하트 색상 주황으로 고정
               : pinSVG(m.label || "", fill, stroke), // 번호 핀: 팔레트 + 테두리
             size: new naver.maps.Size(25,34),
             anchor: new naver.maps.Point(12,34)
@@ -203,6 +210,16 @@ export default function MapView({
       originWhitelist={["*"]}
       javaScriptEnabled
       domStorageEnabled
+      onMessage={(event) => {
+        try {
+          const msg = JSON.parse(event.nativeEvent.data);
+          if (msg.type === "debug-markers") {
+            console.log("[debug-markers]", msg);
+          }
+        } catch (e) {
+          console.log("[webview-msg]", event.nativeEvent.data);
+        }
+      }}
     />
   );
 }
