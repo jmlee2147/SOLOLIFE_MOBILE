@@ -16,6 +16,7 @@ export default function MainLayout() {
     "Pretendard-Medium": require("../assets/fonts/Pretendard-Medium.ttf"),
     "Pretendard-SemiBold": require("../assets/fonts/Pretendard-SemiBold.ttf"),
     "Pretendard-ExtraBold": require("../assets/fonts/Pretendard-ExtraBold.ttf"),
+    "SimKyungHa": require("../assets/fonts/SimKyungHa.ttf"),
   });
 
   if (!loaded) return null;

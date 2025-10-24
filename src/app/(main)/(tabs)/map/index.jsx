@@ -64,7 +64,7 @@ const MOCK_POPULAR_PLACES = [
     name: "라운지오커피 영통점",
     category: "카페",
     address: "경기 수원시 영통구 청명남로 12번길 10",
-    thumb: { uri: "https://picsum.photos/seed/loungeo/300/300" },
+    thumb: { uri: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQBEYMysWkkABLhuOLTgJGSrQxqfqhayTVjmQ&s" },
   },
   {
     id: "2",

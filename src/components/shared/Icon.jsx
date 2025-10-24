@@ -1305,6 +1305,28 @@ const icons = {
       />
     </Svg>
   ),
+  skip: ({ width = 13, height = 14, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 13 14"
+      fill="none"
+      {...props}
+    >
+      <Path fill="#93B56C" d="M12.5 14h-2V0h2v14Zm-2-7L0 13.928V.072L10.5 7Z" />
+    </Svg>
+  ),
+  next_triangle: ({ width = 15, height = 20, ...props }) => (
+    <Svg
+      width={width}
+      height={height}
+      viewBox="0 0 15 20"
+      fill="none"
+      {...props}
+    >
+      <Path fill="#E7C192" d="M15 9.96 0 19.92V.002L15 9.96Z" />
+    </Svg>
+  ),
 };
 
 const Icon = ({ name, width, height, style, ...props }) => {

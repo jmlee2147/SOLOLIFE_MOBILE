@@ -99,6 +99,29 @@ export const Images = {
     mapShopping: require("./places/map_shopping.png"),
   },
 
+  onboarding: {
+    "1": require("./onboarding/1.png"),
+    "2": require("./onboarding/2.png"),
+    "3": require("./onboarding/3.png"),
+    "4": require("./onboarding/4.png"),
+    "5": require("./onboarding/5.png"),
+    "6": require("./onboarding/6.png"),
+    "7": require("./onboarding/7.png"),
+
+    "activity": require("./onboarding/activity.png"),
+    "book": require("./onboarding/book.png"),
+    "cafe": require("./onboarding/cafe.png"),
+    "food": require("./onboarding/food.png"),
+    "museum": require("./onboarding/museum.png"),
+    "shopping": require("./onboarding/shopping.png"),
+
+    "monkey_happy": require("./onboarding/monkey_happy.png"),
+    "monkey_heart": require("./onboarding/monkey_heart.png"),
+    "bg_forest": require("./onboarding/bg_forest.png"),
+    "bg_profile": require("./onboarding/bg_profile.png"),
+    "profile_card": require("./onboarding/profile_card.png"),
+  },
+
   characters,
 };
 
