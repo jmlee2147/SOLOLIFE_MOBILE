@@ -239,7 +239,7 @@ export default function MapScreen() {
             resp.data.items) ||
           (Array.isArray(resp) ? resp : []);
 
-        console.log("[folders] fid:", fid, "items:", items.length);
+        // console.log("[folders] fid:", fid, "items:", items.length);
 
         for (const it of items) {
           // 안전 파싱: 다양한 키 및 이상문자 대응 + 스킵 로깅
@@ -279,12 +279,7 @@ export default function MapScreen() {
 
       // location_id 기준으로 중복 제거
       const dedup = Array.from(new Map(all.map((p) => [p.id, p])).values());
-      console.log(
-        "[likes/fallback] collected total:",
-        dedup.length,
-        "first:",
-        dedup[0] || null
-      );
+      // console.log("[likes/fallback] collected total:",dedup.length,"first:",dedup[0] || null);
       return dedup;
     } catch (e) {
       console.warn("[likes/folders] collect fail:", e?.message);
@@ -390,12 +385,7 @@ export default function MapScreen() {
         // 2) 좌표가 하나도 없으면 폴더에서 긁어오기 (서비스 api는 이미 잘 동작하고 있음)
         if (withCoords.length === 0) {
           const fromFolders = await collectLikedFromFolders();
-          console.log(
-            "[likes/fallback] fromFolders length:",
-            fromFolders.length,
-            "sample:",
-            fromFolders[0] || null
-          );
+          // console.log("[likes/fallback] fromFolders length:",fromFolders.length,"sample:",fromFolders[0] || null);
           withCoords = fromFolders;
           const idsFromFolders = fromFolders.map((p) => p.id);
           setLikedIds(new Set([...idsFromMe, ...idsFromFolders]));
@@ -564,21 +554,9 @@ export default function MapScreen() {
     const valid = (Array.isArray(markers) ? markers : []).filter(
       (m) => Number.isFinite(Number(m.lat)) && Number.isFinite(Number(m.lng))
     );
-    console.log(
-      "[markers-src] likedPlaces:",
-      likedPlaces.length,
-      "searchResults:",
-      searchResults.length,
-      "mode:",
-      sheetMode
-    );
-    console.log(
-      "[markers-valid] count:",
-      valid.length,
-      "first:",
-      valid[0] || null
-    );
-    console.log("[debug-markers]", JSON.stringify({ type: "debug-markers", count: (markers || []).length, first: (markers || [])[0] ?? null }));
+    // console.log("[markers-src] likedPlaces:", likedPlaces.length,"searchResults:", searchResults.length,"mode:",sheetMode);
+    // console.log("[markers-valid] count:", valid.length, "first:", valid[0] || null);
+    // console.log("[debug-markers]", JSON.stringify({ type: "debug-markers", count: (markers || []).length, first: (markers || [])[0] ?? null }));
   }, [markers, likedPlaces, searchResults, sheetMode]);
   // ====== 폴더 목록/썸네일 ======
   const getFolderCount = (f) =>

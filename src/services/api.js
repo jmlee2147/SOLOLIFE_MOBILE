@@ -308,9 +308,9 @@ export async function createLikeFolderUnique(baseName = "새 폴더", opts = {})
   const maxRetry = 3;
   for (let i = 0; i < maxRetry; i++) {
     try {
-      console.log("[api →] POST /folders/me/like-folders", { name: candidate });
+      // console.log("[api →] POST /folders/me/like-folders", { name: candidate });
       const { data } = await axiosApi.post("/folders/me/like-folders", { name: candidate });
-      console.log("[api ←] /folders/me/like-folders", data);
+      // console.log("[api ←] /folders/me/like-folders", data);
       return data; // { folder_id, name, ... }
     } catch (e) {
       const status = e?.response?.status || e?.status;
